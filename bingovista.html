@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=600, initial-scale=0.7">
+	<title>Rain World Bingo Board Viewer</title>
+	<link rel="preload" as="image"href="bingoicons.png" crossorigin="anonymous">
+	<link rel="preload" as="image"href="uiSprites.png" crossorigin="anonymous">
+	<link rel="preload" as="image"href="uispritesmsc.png" crossorigin="anonymous">
+	<link rel="preload" as="fetch"href="bingoicons.txt" crossorigin="anonymous">
+	<link rel="preload" as="fetch"href="uiSprites.txt" crossorigin="anonymous">
+	<link rel="preload" as="fetch"href="uispritesmsc.txt" crossorigin="anonymous">
+	<link rel="preload" as="script" href="bingovista.js">
+	<style type="text/css" media="all"><!--
+.desctxt {
+	vertical-align: top;
+	padding-left: 0.6em;
+	width: calc(26em);
+}
+.drop {
+	border: 1px solid #a0a0a0;
+	border-radius: 0.63em;
+	text-align: center;
+}
+.droptbl {
+	min-width: 20em;
+	min-height: 8em;
+}
+.errorbox {
+	color: #e80000;
+	font-size: small;
+	margin-top: 4px;
+}
+body {
+	font-family: Verdana, Arial, sans-serif;
+	line-height: 130%;
+	font-size: 100%;
+	text-size-adjust: none;
+	-webkit-text-size-adjust: none;
+}
+body div {
+	text-align: center;
+}
+canvas {
+	border: 1px solid #404040;
+}
+div {
+	margin-top: 0.5em;
+}
+h1 {
+	padding-bottom: 8px;
+	line-height: 130%;
+	text-align: center;
+}
+input[type=button] {
+	padding: 4px 6px;
+}
+input[type=file] {
+	border: 1px solid #808080;
+	padding: 6px;
+}
+label input {
+	vertical-align: 1px;
+}
+table {
+	margin: 6px auto 0 auto;
+}
+textarea {
+	padding: 0.2em 0.4em;
+	width: 36em;
+	height: 20em;
+	background-color: #f2f2f2;
+	line-break: anywhere;
+}
+p {
+	padding-bottom: 0.5em;
+	margin-left: 1em;
+	margin-right: 2em;
+	max-width: 50em;
+	font-size: inherit;
+}
+@media only screen and (min-width: 700px) {
+	body div {
+		text-align: left;
+		margin-left: 1em;
+	}
+	h1 {
+		padding-bottom: 8px;
+		margin-left: 2em;
+		line-height: 130%;
+		text-align: left;
+	}
+	h1 br {
+		display: none;
+	}
+	table {
+		margin: 6px auto 0 calc(1em - 2px);
+	}
+}
+	--></style>
+	<style type="text/css" media="screen" id="darkmode"><!--
+body {
+	color: #ffffff;
+	background-color: #020204;
+}
+canvas {
+	border: 1px solid #b0b0b0;
+}
+.drop {
+	border: 1px solid #808080;
+}
+input[type=file] {
+	border-color: #c0c0c0;
+}
+textarea {
+	color: #ffffff;
+	background-color: #404040;
+}
+	--></style>
+  </head>
+  <body>
+	<h1>Rain World: Bingo Mod<br> Board Viewer</h1>
+	<div><canvas width="455" height="455" id="board">Canvas support and scripting are required.</canvas></div>
+	<table><tr><td><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
+	<p>&nbsp;</p>
+	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
+	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text"></div>
+	<p>Paste/edit above, or select file or drag-and-drop below:</p>
+	<table class="droptbl"><tr><td class="drop" id="droptarget"><input type="file" id="fileload" accept=".txt,text/plain"></td></tr></table>
+	<p class="errorbox" id="errorbox"></p>
+	<p>&nbsp;</p>
+	<div><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label></div>
+	<p>&nbsp;</p>
+	<p>Bingo Board Viewer, by T3sl4co1l, 2025/02/04.</p>
+	<p>For use with Rain World Bingo Mod v0.85 (by Nacu).</p>
+	<p>Usage: in-game, while configuring the board and selecting challenges, press "Copy".  Clipboard contents can be pasted into the cleared textbox above.  It can also pasted and copied between chat windows, etc., for easy sharing, or pasted into and saved as a text file (*.TXT) for storage.  These files can be loaded by clicking Choose File (or Browse... or etc., whatever your browser shows).  Or click-and-drag a text file from a file folder into the drop zone, on or around the file input area.  In any case, the text content is loaded into the text box to allow visual confirmation (and possible manual editing).</p>
+	<p>If the text box contains a valid board string, then it will be parsed automatically and rendered as an in-game bingo board.  If corrections are needed, or manual edits made, do them in the text box, then press Parse Text.</p>
+	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, all parameters, and their descriptions in turn.</p>
+	<p>Shoutouts to: Videocult and friends for Rain World, Nacu for Bingo, ICED37 for making Bingo happen, and alphappy and diedirl for tips and help.</p>
+	<script src="bingovista.js"></script>
+	<script src="extdata.js"></script>
+  </body>
+</html>
