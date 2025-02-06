@@ -38,7 +38,7 @@ const SQUARE_MARGIN = 4;
 const SQUARE_BORDER = 2;
 const SQUARE_COLOR = "#ffffff";
 const SQUARE_BACKGROUND = "#020204";
-const SQUARE_FONT = "bolder 16px \"Arial Narrow\", sans-serif";
+const SQUARE_FONT = "600 10pt \"Segoe UI\", sans-serif";
 
 var board;
 
@@ -221,7 +221,7 @@ function boardEncodeToText(s) {
  */
 function parseText(e) {
 	var s = document.getElementById(ids.textbox).value;
-	
+	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
 	var goals = s.split(/bChG/);
 	var size = Math.ceil(Math.sqrt(goals.length));
 	board = { size: size, width: size, height: size, goals: [] };
@@ -241,17 +241,17 @@ function parseText(e) {
 				board.goals.push(defaultGoal(type, desc));
 			}
 		} else {
-			board.goals.push(defaultGoal("null", goals[i]));
+			board.goals.push(CHALLENGES["BingoChallenge"]());
 		}
 	}
 
 	function defaultGoal(t, d) {
 		return {
 			name: t,
-			category: "null",
-			item: "",
-			description: "There was an error generating this goal; desc: '" + d + "'",
-			value: "",
+			category: "error",
+			items: [],
+			description: "Unable to generate this goal; descriptor: " + d.join("><"),
+			values: [],
 			paint: [
 				{ type: "verse", value: "∅", scale: 1, color: "#ffffff", rotation: 0 }
 			]
@@ -267,7 +267,7 @@ function parseText(e) {
 				(i % board.height) * (SQUARE_HEIGHT + SQUARE_MARGIN + SQUARE_BORDER) + (SQUARE_BORDER + SQUARE_MARGIN) / 2);
 	}
 
-	console.log(board);
+	//console.log(board);
 }
 
 /**
@@ -289,15 +289,22 @@ function selectSquare(e) {
 	if (x >=0 && y >= 0 && (x % sqWidth) < (sqWidth - SQUARE_MARGIN)
 			&& (y % sqHeight) < (sqHeight - SQUARE_MARGIN)
 			&& row < board.height && col < board.width) {
+		var goal = board.goals[row + col * board.height];
+		if (goal === undefined) {
+			clearDescription();
+			return;
+		}
 		ctx.fillStyle = SQUARE_BACKGROUND;
 		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		var goal = board.goals[row + col * board.height];
 		drawSquare(ctx, goal, (SQUARE_BORDER + SQUARE_MARGIN) / 2, (SQUARE_BORDER + SQUARE_MARGIN) / 2);
 		while (el.firstChild)
 			el.removeChild(el.firstChild);
-		el.innerHTML = "Challenge: " + goal.category + "<br>"
-				+ goal.item + ": " + goal.value + "<br>"
-				+ goal.description;
+		var s = "Challenge: " + goal.category;
+		for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
+			s += (goal.items[i].length > 0) ? ("<br>" + goal.items[i] + ": " + goal.values[i]) : "";
+		}
+		s += "<br>" + goal.description;
+		el.innerHTML = s;
 		return;
 	}
 	clearDescription();
@@ -368,35 +375,41 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 	ctx.translate(x, y);
 	ctx.rotate(rot * Math.PI / 180);
 	ctx.scale(scale, scale);
-	//	Search atlases for sprite
 	var spri, src;
-	for (var i = 0; i < atlases.length; i++) {
-		spri = atlases[i].frames[icon + ".png"];
-		src = atlases[i].canv;
-		if (spri !== undefined)
-			break;
-	}
-	if (spri === undefined) {
-		//	Can't find it, draw dummy square
+	if (icon === undefined) {
+		//	Doesn't exist, draw dummy square
 		ctx.fillStyle = colr;
 		ctx.fillRect(-8, -8, 16, 16);
 	} else {
-		var composite = document.createElement("canvas");
-		composite.width = spri.frame.w; composite.height = spri.frame.h;
-		var ctx2 = composite.getContext("2d");
-		ctx2.globalCompositeOperation = "source-over";
-		ctx2.clearRect(0, 0, spri.frame.w, spri.frame.h);
-		ctx2.drawImage(src, spri.frame.x, spri.frame.y, spri.frame.w, spri.frame.h,
-				0, 0, spri.frame.w, spri.frame.h);
-		ctx2.globalCompositeOperation = "multiply";
-		ctx2.fillStyle = colr;
-		ctx2.fillRect(0, 0, spri.frame.w, spri.frame.h);
-		ctx2.globalCompositeOperation = "destination-in";
-		ctx2.drawImage(src, spri.frame.x, spri.frame.y, spri.frame.w, spri.frame.h,
-				0, 0, spri.frame.w, spri.frame.h);
-		ctx.imageSmoothingEnabled = false;
-		ctx.drawImage(composite, 0, 0, spri.frame.w, spri.frame.h,
-				Math.round(-spri.frame.w / 2), Math.round(-spri.frame.h / 2), spri.frame.w, spri.frame.h);
+		//	Search atlases for sprite
+		for (var i = 0; i < atlases.length; i++) {
+			spri = atlases[i].frames[icon + ".png"];
+			src = atlases[i].canv;
+			if (spri !== undefined)
+				break;
+		}
+		if (spri === undefined) {
+			//	Can't find it, draw dummy square
+			ctx.fillStyle = colr;
+			ctx.fillRect(-8, -8, 16, 16);
+		} else {
+			var composite = document.createElement("canvas");
+			composite.width = spri.frame.w; composite.height = spri.frame.h;
+			var ctx2 = composite.getContext("2d");
+			ctx2.globalCompositeOperation = "source-over";
+			ctx2.clearRect(0, 0, spri.frame.w, spri.frame.h);
+			ctx2.drawImage(src, spri.frame.x, spri.frame.y, spri.frame.w, spri.frame.h,
+					0, 0, spri.frame.w, spri.frame.h);
+			ctx2.globalCompositeOperation = "multiply";
+			ctx2.fillStyle = colr;
+			ctx2.fillRect(0, 0, spri.frame.w, spri.frame.h);
+			ctx2.globalCompositeOperation = "destination-in";
+			ctx2.drawImage(src, spri.frame.x, spri.frame.y, spri.frame.w, spri.frame.h,
+					0, 0, spri.frame.w, spri.frame.h);
+			ctx.imageSmoothingEnabled = false;
+			ctx.drawImage(composite, 0, 0, spri.frame.w, spri.frame.h,
+					Math.round(-spri.frame.w / 2), Math.round(-spri.frame.h / 2), spri.frame.w, spri.frame.h);
+		}
 	}
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
@@ -407,38 +420,17 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 const CHALLENGES = {
 	BingoAchievementChallenge: function(desc) {
 		const thisname = "BingoAchievementChallenge";
-		/** Game extract: WinState::PassageDisplayName */
-		const DisplayName = {
-			"Survivor":     "The Survivor",
-			"Hunter":       "The Hunter",
-			"Saint":        "The Saint",
-			"Traveller":    "The Wanderer",
-			"Chieftain":    "The Chieftain",
-			"Monk":         "The Monk",
-			"Outlaw":       "The Outlaw",
-			"DragonSlayer": "The Dragon Slayer",
-			"Scholar":      "The Scholar",
-			"Friend":       "The Friend",
-			"Nomad":        "The Nomad",
-			"Martyr":       "The Martyr",
-			"Pilgrim":      "The Pilgrim",
-			"Mother":       "The Mother"
-		};
-		//	assert: desc similar to "System.String|Traveller|Passage|0|passage", "0", "0"
-		var items = desc[0].split("|");
-		checkDescriptors(thisname, items.length, 5, "descriptor item count");
-		checkDescriptors(thisname, items[0], "System.String", "assert failed, type");
-		checkDescriptors(thisname, items[2], "Passage", "item list name");
-		if (DisplayName[items[1]] === undefined)
-			throw new TypeError(thisname + ": goal name '" + items[1] + "' not found in item list");
-		if (items[2] != "Passage")
-			throw new TypeError(thisname + ": item list name '" + items[2] + "' is not 'Passage'");
+		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Passage", , "passage"], "goal selection");
+		if (passageToDisplayNameMap[items[1]] === undefined)
+			throw new TypeError(thisname + ": error, '" + items[1] + "' not passageable");
 		return {
 			name: thisname,
 			category: "Obtaining passages",
-			item: "Passage",
-			value: items[1],
-			description: "Earn " + DisplayName[items[1]] + " passage",
+			items: ["Passage"],
+			values: [items[1]],
+			description: "Earn " + passageToDisplayNameMap[items[1]] + " passage.",
 			paint: [
 				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: "#ffffff", rotation: 0 },
 				{ type: "icon", value: items[1] + "A", scale: 1, color: "#ffffff", rotation: 0 },
@@ -452,8 +444,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -466,9 +458,23 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
+			paint: [
+				{ type: "text", value: "∅", color: "#ffffff" }
+			]
+		};
+	},
+	BingoChallenge: function() {
+		const thisname = "BingoChallenge";
+		//	Keep as template and default
+		return {
+			name: thisname,
+			category: "null",
+			items: [],
+			values: [],
+			description: "Unimplemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -480,8 +486,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -494,8 +500,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -508,8 +514,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -522,8 +528,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -536,8 +542,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -550,8 +556,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -564,8 +570,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -578,8 +584,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -592,8 +598,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -606,8 +612,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -620,8 +626,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -634,8 +640,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -648,8 +654,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -662,8 +668,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -676,8 +682,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -690,8 +696,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -704,8 +710,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -718,8 +724,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -732,8 +738,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -746,8 +752,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -760,8 +766,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -774,8 +780,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -788,8 +794,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -802,8 +808,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -816,8 +822,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -830,8 +836,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -844,8 +850,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -858,8 +864,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -872,8 +878,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -886,8 +892,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -896,21 +902,56 @@ const CHALLENGES = {
 	},
 	BingoStealChallenge: function(desc) {
 		const thisname = "BingoStealChallenge";
-		//
-		return {
+		const theftEnum = [	//	ChallengeUtils.stealableStoable
+			"Spear",
+			"Rock",
+			"ScavengerBomb",
+			"Lantern",
+			"GooieDuck",
+			"GlowWeed",
+			"DataPearl"	//	added by GetCorrectListForChallenge()
+		];
+		//	assert: desc of format ["System.String|Rock|Item|1|theft",
+		//	"System.Boolean|false|From Scavenger Toll|0|NULL",
+		//	"0", "System.Int32|3|Amount|2|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var r = {
 			name: thisname,
-			category: "null",
-			item: "",
-			value: "",
-			description: "Not yet implemented.",
+			category: "Stealing items",
+			items: [],
+			values: [],
+			description: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "steal_item", scale: 1, color: "#ffffff", rotation: 0 }
 			]
 		};
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item", , "theft"], "item selection");
+		if (!theftEnum.includes(items[1]))
+			throw new TypeError(thisname + ": error, " + items[1] + " not theftable");
+		r.items.push(items[2]); r.values.push(items[1]);
+		r.paint.push( { type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1,
+				color: itemToColor(items[1]), rotation: 0 } );
+		r.description += ItemNameToDisplayTextMap[items[1]] + " from ";
+		items = checkSettingbox(thisname, desc[1], ["System.Boolean", , "From Scavenger Toll", , "NULL"], "venue flag");
+		r.items.push(items[2]); r.values.push(items[1]);
+		if (items[1] == "true") {
+			r.paint.push( { type: "icon", value: "scavtoll", scale: 0.8, color: "#ffffff", rotation: 0 } );
+			r.description += "a Scavenger Toll";
+		} else {
+			r.paint.push( { type: "icon", value: creatureNameToIconAtlasMap["Scavenger"], scale: 1,
+					color: creatureToColor("Scavenger"), rotation: 0 } );
+			r.description += "Scavengers";
+		}
+		items = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], " item count");
+		r.items.splice(1, 0, items[2]); r.values.splice(1, 0, items[1]);
+		r.paint.push( { type: "break" } );
+		r.paint.push( { type: "text", value: "[0/" + items[1] + "]", color: "#ffffff" } );
+		r.description = "Steal [0/" + items[1] + "] " + r.description + ".";
+		return r;
 	},
 	BingoTameChallenge: function(desc) {
 		const thisname = "BingoTameChallenge";
-		//	assert: desc similar to "System.String|EelLizard|Creature Type|0|friend", "0", "0"
+		//	assert: desc of format ["System.String|EelLizard|Creature Type|0|friend", "0", "0"]
 		checkDescriptors(thisname, desc.length, 3, "parameter item count");
 		var items = desc[0].split("|");
 		checkDescriptors(thisname, items.length, 5, "descriptor item count");
@@ -927,13 +968,13 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "Befriending a creature",
-			item: "Creature Type",
-			value: items[1],
-			description: "Befriend a" + anVowel + " " + d,
+			items: ["Creature Type"],
+			values: [items[1]],
+			description: "Befriend a" + anVowel + " " + d + ".",
 			paint: [
 				{ type: "icon", value: "FriendB", scale: 1, color: "#ffffff", rotation: 0 },
 				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1,
-						color: colorFloatToString(...creatureNameToIconColorMap[items[1]]), rotation: 0 }
+						color: creatureToColor(items[1]), rotation: 0 }
 			]
 		};
 	},
@@ -943,8 +984,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -957,8 +998,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -971,8 +1012,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -985,8 +1026,8 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "null",
-			item: "",
-			value: "",
+			items: [],
+			values: [],
 			description: "Not yet implemented.",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
@@ -995,42 +1036,47 @@ const CHALLENGES = {
 	},
 	BingoVistaChallenge: function(desc) {
 		const thisname = "BingoVistaChallenge";
-		//	desc is of format ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
+		//	desc of format ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
 		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Room", , "vista"], "item selection");
 		//	desc[0] is region code
 		var v = (regionCodeToDisplayName[desc[0]] || "") + " / " + (regionCodeToDisplayNameSaint[desc[0]] || "");
 		v = v.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (v == "") v = "Unknown Region";
-//		var v = "";
-//		if (regionCodeToDisplayName[desc[0]] === undefined
-//				&& regionCodeToDisplayNameSaint[desc[0]] === undefined) {
-//			v = "Unknown Region";
-//		} else {
-//			if (regionCodeToDisplayName[desc[0]] !== undefined
-//					&& regionCodeToDisplayNameSaint[desc[0]] !== undefined)
-//				v = regionCodeToDisplayName[desc[0]] + " / " + regionCodeToDisplayNameSaint[desc[0]];
-//			else
-//				v = regionCodeToDisplayName[desc[0]] || regionCodeToDisplayNameSaint[desc[0]];
-//		}
-		//	assert: desc[1] similar to "System.String|CC_A10|Room|0|vista"
-		var items = desc[1].split("|");
-		checkDescriptors(thisname, items.length, 5, "descriptor item count");
-		checkDescriptors(thisname, items[0], "System.String", "assert failed, type");
-		checkDescriptors(thisname, items[2], "Room", "item list name");
+		v = v || "Unknown Region";
 		return {
 			name: thisname,
 			category: "Visiting vistas",
-			item: (kibitzing ? "Room" : "Region"),
-			value: (kibitzing ? items[1] : v),
-			description: "Reach the vista point in " + v + (kibitzing ? ("; in room: " + items[1] + " at x: " + desc[2] + ", y: " + desc[3]) : ""),
+			items: ["Region"],
+			values: [desc[0]],
+			description: "Reach the vista point in " + v + "." + (kibitzing ? ("<br>Room: " + items[1] + " at x: " + desc[2] + ", y: " + desc[3]) : ""),
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: "#ffffff", rotation: 0 },
 				{ type: "break" },
-				{ type: "text", value: items[1].substring(0, items[1].search("_")), color: "#ffffff" }
+				{ type: "text", value: desc[0], color: "#ffffff" }
 			]
 		};
 	}
 };
+
+/**
+ *	Check if the specified challenge descriptor SettingBox string matches
+ *	the asserted value.  Helper function for CHALLENGES functions.
+ *	@param t    string, name of calling object/junction
+ *	@param d    string to parse and verify (e.g. "System.String|selectedItem|LabelText|itemIndex|list")
+ *	@param f    array of values to compare to; length must match, empty elements are ignored
+ *	@param err  string, text to include in the error
+ *	@throws TypeError if invalid
+ */
+function checkSettingbox(t, d, f, err) {
+	var items = d.split("|");
+	if (items.length != f.length) throw new TypeError(t + ": " + err + ", found "
+			+ String(items.length) + " items, expected: " + String(f.length));
+	for (var i = 0; i < items.length; i++) {
+		if (f[i] !== undefined && items[i] != f[i])
+			throw new TypeError(t + ": " + err + ", found " + items[i] + ", expected: " + String(f[i]));
+	}
+	return items;
+}
 
 /**
  *	Check if the specified challenge descriptor matches the asserted value.
@@ -1049,6 +1095,17 @@ function checkDescriptors(t, d, g, err) {
 }
 
 /* * * Utility Functions * * */
+
+
+function itemToColor(i) {
+	var colr = itemNameToIconColorMap[i] || itemNameToIconColorMap["Default"];
+	return colorFloatToString(...colr);
+}
+
+function creatureToColor(c) {
+	var colr = creatureNameToIconColorMap[c] || creatureNameToIconColorMap["Default"];
+	return colorFloatToString(...colr);
+}
 
 /**
  *	Convert floating point triple to HTML color string.
@@ -1117,6 +1174,27 @@ function HSL2RGB(h, s, l) {
 }
 
 /**
+ *	Possible Passages (achievements)
+ *	Game extract: WinState::PassageDisplayName
+ */
+const passageToDisplayNameMap = {
+	"Survivor":     "The Survivor",
+	"Hunter":       "The Hunter",
+	"Saint":        "The Saint",
+	"Traveller":    "The Wanderer",
+	"Chieftain":    "The Chieftain",
+	"Monk":         "The Monk",
+	"Outlaw":       "The Outlaw",
+	"DragonSlayer": "The Dragon Slayer",
+	"Scholar":      "The Scholar",
+	"Friend":       "The Friend",
+	"Nomad":        "The Nomad",
+	"Martyr":       "The Martyr",
+	"Pilgrim":      "The Pilgrim",
+	"Mother":       "The Mother"
+};
+
+/**
  *	Convert region code to display name.
  *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
  */
@@ -1167,56 +1245,56 @@ const regionCodeToDisplayNameSaint = {
  *	Game extract: ChallengeTools::CreatureName
  */
 const creatureNameToDisplayTextMap = {
-	"Slugcat":        	"Slugcats",
-	"GreenLizard":    	"Green Lizards",
-	"PinkLizard":     	"Pink Lizards",
-	"BlueLizard":     	"Blue Lizards",
-	"WhiteLizard":    	"White Lizards",
-	"BlackLizard":    	"Black Lizards",
-	"YellowLizard":   	"Yellow Lizards",
-	"CyanLizard":     	"Cyan Lizards",
-	"RedLizard":      	"Red Lizards",
-	"Salamander":     	"Salamander",
-	"CicadaA":        	"White Cicadas",
-	"CicadaB":        	"Black Cicadas",
-	"Snail":          	"Snails",
-	"PoleMimic":      	"Pole Mimics",
-	"TentaclePlant":  	"Monster Kelp",
-	"Scavenger":      	"Scavengers",
-	"Vulture":        	"Vultures",
-	"KingVulture":    	"King Vultures",
-	"SmallCentipede": 	"Small Centipedes",
-	"Centipede":      	"Large Centipedes",
-	"RedCentipede":   	"Red Centipedes",
-	"Centiwing":      	"Centiwings",
-	"LanternMouse":   	"Lantern Mice",
-	"BigSpider":      	"Large Spiders",
-	"SpitterSpider":  	"Spitter Spiders",
-	"MirosBird":      	"Miros Birds",
-	"BrotherLongLegs":	"Brother Long Legs",
-	"DaddyLongLegs":  	"Daddy Long Legs",
-	"TubeWorm":       	"Tube Worms",
-	"EggBug":         	"Egg Bugs",
-	"DropBug":        	"Dropwigs",
-	"BigNeedleWorm":  	"Large Noodleflies",
-	"JetFish":        	"Jetfish",
-	"BigEel":         	"Leviathans",
-	"Deer":           	"Rain Deer",
-	"Fly":            	"Batflies",
-	"MirosVulture":   	"Miros Vultures",
-	"MotherSpider":   	"Mother Spiders",
-	"EelLizard":      	"Eel Lizards",
-	"SpitLizard":     	"Caramel Lizards",
-	"TerrorLongLegs": 	"Terror Long Legs",
-	"AquaCenti":      	"Aquapedes",
-	"FireBug":        	"Firebugs",
-	"Inspector":      	"Inspectors",
-	"Yeek":           	"Yeek",
-	"BigJelly":       	"Large Jellyfish",
-	"StowawayBug":    	"Stowaway Bugs",
-	"ZoopLizard":     	"Strawberry Lizards",
-	"ScavengerElite": 	"Elite Scavengers",
-	"SlugNPC":        	"Slugcats"
+	"Slugcat":         "Slugcats",
+	"GreenLizard":     "Green Lizards",
+	"PinkLizard":      "Pink Lizards",
+	"BlueLizard":      "Blue Lizards",
+	"WhiteLizard":     "White Lizards",
+	"BlackLizard":     "Black Lizards",
+	"YellowLizard":    "Yellow Lizards",
+	"CyanLizard":      "Cyan Lizards",
+	"RedLizard":       "Red Lizards",
+	"Salamander":      "Salamander",
+	"CicadaA":         "White Cicadas",
+	"CicadaB":         "Black Cicadas",
+	"Snail":           "Snails",
+	"PoleMimic":       "Pole Mimics",
+	"TentaclePlant":   "Monster Kelp",
+	"Scavenger":       "Scavengers",
+	"Vulture":         "Vultures",
+	"KingVulture":     "King Vultures",
+	"SmallCentipede":  "Small Centipedes",
+	"Centipede":       "Large Centipedes",
+	"RedCentipede":    "Red Centipedes",
+	"Centiwing":       "Centiwings",
+	"LanternMouse":    "Lantern Mice",
+	"BigSpider":       "Large Spiders",
+	"SpitterSpider":   "Spitter Spiders",
+	"MirosBird":       "Miros Birds",
+	"BrotherLongLegs": "Brother Long Legs",
+	"DaddyLongLegs":   "Daddy Long Legs",
+	"TubeWorm":        "Tube Worms",
+	"EggBug":          "Egg Bugs",
+	"DropBug":         "Dropwigs",
+	"BigNeedleWorm":   "Large Noodleflies",
+	"JetFish":         "Jetfish",
+	"BigEel":          "Leviathans",
+	"Deer":            "Rain Deer",
+	"Fly":             "Batflies",
+	"MirosVulture":    "Miros Vultures",
+	"MotherSpider":    "Mother Spiders",
+	"EelLizard":       "Eel Lizards",
+	"SpitLizard":      "Caramel Lizards",
+	"TerrorLongLegs":  "Terror Long Legs",
+	"AquaCenti":       "Aquapedes",
+	"FireBug":         "Firebugs",
+	"Inspector":       "Inspectors",
+	"Yeek":            "Yeek",
+	"BigJelly":        "Large Jellyfish",
+	"StowawayBug":     "Stowaway Bugs",
+	"ZoopLizard":      "Strawberry Lizards",
+	"ScavengerElite":  "Elite Scavengers",
+	"SlugNPC":         "Slugcats"
 };
 
 /**
@@ -1426,29 +1504,28 @@ const creatureNameToIconAtlasMap = {
 	"BigJelly":       	"Kill_BigJellyFish",
 	"SlugNPC":        	"Kill_Slugcat",
 	"Default":        	"Futile_White"
-}
+};
 
 /**
  *	Convert creature value string to HTML color.
  *	TODOs: same as creatureNameToIconAtlas().
  */
 function creatureNameToIconColor(type) {
-	var c;
 	//	values excerpted from LizardBreeds::BreedTemplate; returns array [r, g, b]
 	//	(base body colors, not necessarily icon colors? hence the unused values?)
 	const standardColor = {
-		"GreenLizard":  [0.2,  1,    0   ],
-		"PinkLizard":   [1,    0,    1   ],
-		"BlueLizard":   [0,    0.5,  1   ],
-		"YellowLizard": [1,    0.6,  0   ],
-		"WhiteLizard":  [1,    1,    1   ],
-		"RedLizard":    [1,    0,    0   ],	//	unused
-		"BlackLizard":  [0.1,  0.1,  0.1 ],	//	unused
-		"Salamander":   [1,    1,    1   ],	//	unused
-		"CyanLizard":   [0,    1,    0.9 ],	//	unused
-		"SpitLizard":   [0.55, 0.4,  0.2 ],
-		"ZoopLizard":   [0.95, 0.73, 0.73],	//	unused
-		"TrainLizard":  [0.25490195, 0, 0.21568628]	//	unused
+		"GreenLizard":  [0.2,      1,       0       ],
+		"PinkLizard":   [1,        0,       1       ],
+		"BlueLizard":   [0,        0.5,     1       ],
+		"YellowLizard": [1,        0.6,     0       ],
+		"WhiteLizard":  [1,        1,       1       ],
+		"RedLizard":    [1,        0,       0       ],	//	unused
+		"BlackLizard":  [0.1,      0.1,     0.1     ],	//	unused
+		"Salamander":   [1,        1,       1       ],	//	unused
+		"CyanLizard":   [0,        1,       0.9     ],	//	unused
+		"SpitLizard":   [0.55,     0.4,     0.2     ],
+		"ZoopLizard":   [0.95,     0.73,    0.73    ],	//	unused
+		"TrainLizard":  [0.254902, 0,       0.215686]	//	unused
 	};
 	/*
 	 *	Game extract: CreatureSymbol::ColorOfCreature
@@ -1469,7 +1546,7 @@ function creatureNameToIconColor(type) {
 	 *	- Assumes CreatureTemplate enums use symbols equal to string contents; this appears to
 	 *		always be the case, but may vary with future updates, or modded content.  Beware!
 	 */
-	c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu.Menu::MenuColor (default value hoisted from end)
+	var c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu.Menu::MenuColor (default value hoisted from end)
 	if (type == "Slugcat")
 		c = [1, 1, 1];	//	PlayerGraphics::DefaultSlugcatColor (White)
 	if (type == "GreenLizard")
@@ -1556,50 +1633,595 @@ function creatureNameToIconColor(type) {
  *	Refactoring of creatureNameToIconColor() to associative array.
  */
 const creatureNameToIconColorMap = {
-	"Slugcat":        	[1, 1, 1],
-	"GreenLizard":    	[0.2, 1, 0],
-	"PinkLizard":     	[1, 0, 1],
-	"BlueLizard":     	[0, 0.5, 1],
-	"WhiteLizard":    	[1, 1, 1],
-	"RedLizard":      	[0.9019608, 0.05490196, 0.05490196],
-	"BlackLizard":    	[0.36862746, 0.36862746, 0.43529412],
-	"YellowLizard":	  	[1, 0.6, 0],
-	"SmallCentipede": 	[1, 0.6, 0],
-	"Centipede":      	[1, 0.6, 0],
-	"RedCentipede":   	[0.9019608, 0.05490196, 0.05490196],
-	"CyanLizard":     	[0, 0.9098039, 0.9019608],
-	"Overseer":       	[0, 0.9098039, 0.9019608],
-	"Salamander":     	[0.93333334, 0.78039217, 0.89411765],
-	"CicadaB":        	[0.36862746, 0.36862746, 0.43529412],
-	"CicadaA":        	[1, 1, 1],
-	"SpitterSpider":  	[0.68235296, 0.15686275, 0.11764706],
-	"Leech":          	[0.68235296, 0.15686275, 0.11764706],
-	"SeaLeech":       	[0.05, 0.3, 0.7],
-	"TubeWorm":       	[0.05, 0.3, 0.7],
-	"Centiwing":      	[0.05490196, 0.69803923, 0.23529412],
-	"BrotherLongLegs":	[0.45490196, 0.5254902, 0.30588236],
-	"DaddyLongLegs":  	[0, 0, 1],
-	"VultureGrub":    	[0.83137256, 0.7921569, 0.43529412],
-	"EggBug":         	[0, 1, 0.47058824],
-	"BigNeedleWorm":  	[1, 0.59607846, 0.59607846],
-	"SmallNeedleWorm":	[1, 0.59607846, 0.59607846],
-	"Hazer":          	[0.21176471, 0.7921569, 0.3882353],
-	"Vulture":        	[0.83137256, 0.7921569, 0.43529412],
-	"KingVulture":    	[0.83137256, 0.7921569, 0.43529412],
-	"ZoopLizard":     	[0.95, 0.73, 0.73],
-	"StowawayBug":    	[0.36862746, 0.36862746, 0.43529412],
-	"AquaCenti":      	[0, 0, 1],
-	"TerrorLongLegs": 	[0.3, 0, 1],
-	"TrainLizard":    	[0.3, 0, 1],
-	"MotherSpider":   	[0.1, 0.7, 0.1],
-	"JungleLeech":    	[0.1, 0.7, 0.1],
-	"HunterDaddy":    	[0.8, 0.47058824, 0.47058824],
-	"MirosVulture":   	[0.9019608, 0.05490196, 0.05490196],
-	"FireBug":        	[1, 0.47058824, 0.47058824],
-	"SpitLizard":     	[0.55, 0.4, 0.2],
-	"EelLizard":      	[0.02, 0.78039217, 0.2],
-	"Inspector":      	[0.44705883, 0.9019608, 0.76862746],
-	"Yeek":           	[0.9, 0.9, 0.9],
-	"BigJelly":       	[1, 0.85, 0.7],
-	"Default":        	[0.66383999, 0.6436, 0.6964]
+	"Slugcat":        	[1,        1,        1       ],
+	"GreenLizard":    	[0.2,      1,        0       ],
+	"PinkLizard":     	[1,        0,        1       ],
+	"BlueLizard":     	[0,        0.5,      1       ],
+	"WhiteLizard":    	[1,        1,        1       ],
+	"RedLizard":      	[0.901961, 0.054902, 0.054902],
+	"BlackLizard":    	[0.368627, 0.368627, 0.435294],
+	"YellowLizard":	  	[1,        0.6,      0       ],
+	"SmallCentipede": 	[1,        0.6,      0       ],
+	"Centipede":      	[1,        0.6,      0       ],
+	"RedCentipede":   	[0.901961, 0.054902, 0.054902],
+	"CyanLizard":     	[0,        0.909804, 0.901961],
+	"Overseer":       	[0,        0.909804, 0.901961],
+	"Salamander":     	[0.933333, 0.780392, 0.894118],
+	"CicadaB":        	[0.368627, 0.368627, 0.435294],
+	"CicadaA":        	[1,        1,        1       ],
+	"SpitterSpider":  	[0.682353, 0.156863, 0.117647],
+	"Leech":          	[0.682353, 0.156863, 0.117647],
+	"SeaLeech":       	[0.05,     0.3,      0.7     ],
+	"TubeWorm":       	[0.05,     0.3,      0.7     ],
+	"Centiwing":      	[0.054902, 0.698039, 0.235294],
+	"BrotherLongLegs":	[0.454902, 0.52549,  0.305882],
+	"DaddyLongLegs":  	[0,        0,        1       ],
+	"VultureGrub":    	[0.831373, 0.792157, 0.435294],
+	"EggBug":         	[0,        1,        0.470588],
+	"BigNeedleWorm":  	[1,        0.596078, 0.596078],
+	"SmallNeedleWorm":	[1,        0.596078, 0.596078],
+	"Hazer":          	[0.211765, 0.792157, 0.388235],
+	"Vulture":        	[0.831373, 0.792157, 0.435294],
+	"KingVulture":    	[0.831373, 0.792157, 0.435294],
+	"ZoopLizard":     	[0.95,     0.73,     0.73    ],
+	"StowawayBug":    	[0.368627, 0.368627, 0.435294],
+	"AquaCenti":      	[0,        0,        1       ],
+	"TerrorLongLegs": 	[0.3,      0,        1       ],
+	"TrainLizard":    	[0.3,      0,        1       ],
+	"MotherSpider":   	[0.1,      0.7,      0.1     ],
+	"JungleLeech":    	[0.1,      0.7,      0.1     ],
+	"HunterDaddy":    	[0.8,      0.470588, 0.470588],
+	"MirosVulture":   	[0.901961, 0.054902, 0.054902],
+	"FireBug":        	[1,        0.470588, 0.470588],
+	"SpitLizard":     	[0.55,     0.4,      0.2     ],
+	"EelLizard":      	[0.02,     0.780392, 0.2     ],
+	"Inspector":      	[0.447059, 0.901961, 0.768627],
+	"Yeek":           	[0.9,      0.9,    0.9       ],
+	"BigJelly":       	[1,        0.85,   0.7       ],
+	"Default":        	[0.66384,  0.6436, 0.6964    ]
+};
+
+/**
+ *	Convert item value string to display text string.
+ */
+const ItemNameToDisplayTextMap = {
+	//	base game, Expedition::ChallengeTools.ItemName
+	"FirecrackerPlant": "Firecracker Plants",
+	"FlareBomb":        "Flare Bombs",
+	"FlyLure":          "Fly Lures",
+	"JellyFish":        "Jellyfish",
+	"Lantern":          "Scavenger Lanterns",
+	"Mushroom":         "Mushrooms",
+	"PuffBall":         "Puff Balls",
+	"ScavengerBomb":    "Scavenger Bombs",
+	"VultureMask":      "Vulture Masks",
+	"VultureMask1":     "King Vulture Masks",	//	appended intData for completeness
+	"VultureMask2":     "Chieftan Masks",
+	//	bingo, ChallengeUtils::ChallengeTools_ItemName
+	"Spear":            "Spears",
+	"Spear1":           "Explosive Spears",	//	appended intData for completeness
+	"Spear2":           "Electric Spears",
+	"Spear3":           "Fire Spears",
+	"Rock":             "Rocks",
+	"SporePlant":       "Bee Hives",
+	"DataPearl":        "Pearls",
+	"DangleFruit":      "Blue Fruit",
+	"EggBugEgg":        "Eggbug Eggs",
+	"WaterNut":         "Bubble Fruit",
+	"SlimeMold":        "Slime Mold",
+	"BubbleGrass":      "Bubble Grass",
+	"GlowWeed":         "Glow Weed",
+	"DandelionPeach":   "Dandelion Peaches",
+	"LillyPuck":        "Lillypucks",
+	"GooieDuck":        "Gooieducks",
+	"OverseerCarcass":  "Overseer Eye"	//	manual add (maybe sometime?)
+};
+
+/**
+ *	Convert item value string to atlas name string.
+ */
+const itemNameToIconAtlasMap = {
+	//	base game, ItemSymbol.SpriteNameForItem
+	"Rock":             "Symbol_Rock",
+	"Spear":            "Symbol_Spear",
+	"Spear1":           "Symbol_FireSpear",
+	"Spear2":           "Symbol_ElectricSpear",
+	"Spear3":           "Symbol_HellSpear",
+	"ScavengerBomb":    "Symbol_StunBomb",
+	"SporePlant":       "Symbol_SporePlant",
+	"Lantern":          "Symbol_Lantern",
+	"FlareBomb":        "Symbol_FlashBomb",
+	"PuffBall":         "Symbol_PuffBall",
+	"WaterNut":         "Symbol_WaterNut",
+	"FirecrackerPlant": "Symbol_Firecracker",
+	"DangleFruit":      "Symbol_DangleFruit",
+	"BubbleGrass":      "Symbol_BubbleGrass",
+	"SlimeMold":        "Symbol_SlimeMold",
+	"Mushroom":         "Symbol_Mushroom",
+	"JellyFish":        "Symbol_JellyFish",
+	"VultureMask":      "Kill_Vulture",
+	"VultureMask1":     "Kill_KingVulture",
+	"VultureMask2":     "Symbol_ChieftainMask",
+	"FlyLure":          "Symbol_FlyLure",
+	"SLOracleSwarmer":  "Symbol_Neuron",
+	"SSOracleSwarmer":  "Symbol_Neuron",
+	"NSHSwarmer":       "Symbol_Neuron",
+	"EggBugEgg":        "Symbol_EggBugEgg",
+	"OverseerCarcass":  "Kill_Overseer",
+	"DataPearl":        "Symbol_Pearl",
+	"PebblesPearl":     "Symbol_Pearl",
+	"NeedleEgg":        "needleEggSymbol",
+	"Spearmasterpearl": "Symbol_Pearl",
+	"HalcyonPearl":     "Symbol_Pearl",
+	"EnergyCell":       "Symbol_EnergyCell",
+	"GooieDuck":        "Symbol_GooieDuck",
+	"GlowWeed":         "Symbol_GlowWeed",
+	"LillyPuck":        "Symbol_LillyPuck",
+	"DandelionPeach":   "Symbol_DandelionPeach",
+	"MoonCloak":        "Symbol_MoonCloak",
+	"FireEgg":          "Symbol_FireEgg",
+	"JokeRifle":        "Symbol_JokeRifle",
+	"Seed":             "Symbol_Seed",
+	"SingularityBomb":  "Symbol_Singularity",
+	"Default":          "Futile_White"
+};
+
+/**
+ *	Convert item value string to HTML color.
+ *	TODOs: same as creatureNameToIconAtlas().
+ */
+function itemNameToIconColor(type) {
+	/*
+	 *	Game extract: ItemSymbol::ColorForItem
+	 *	Paste in verbatim, then make these changes:
+	 *	- Adjust tabbing level to current scope
+	 *	- Search and replace:
+	 *		/itemType == AbstractPhysicalObject\.AbstractObjectType\./ --> "type == \""
+	 *		/ModManager.MSC && itemType == MoreSlugcatsEnums.AbstractObjectType./ --> "type == \""
+	 *		/\)\r\n\t{1,2}\{\r\n\t{2,3}/ --> "\"\)\r\n\t\t"
+	 *		/\t{1,2}\}\r\n\t{1,2}if/ --> "\tif"
+	 *		/ \|\| / --> "\" || "
+	 *		/return new Color\(/ --> "c = ["
+	 *		/\);\r\n\t+\}/ --> "];"
+	 *		/return\s\(StaticWorld\.GetCreatureTemplate\(iconData\.critType\)\.breedParameters\sas\sLizardBreedParams\)\.standardColor;\r\n\t\}/ --> "c = standardColor\[type\];"
+	 *	- ummm doing this one after creatureNameToIconColor, kinda don't care about exact refactoring notes
+	 *	- For items with intData, append the value to type; these are enumerated individually
+	 *	- except for PebblesPearl3 (includes any intData >= 3), PebblesPearl (intData < 0)
+	 */
+	var c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu::MenuColors.MediumGrey
+	if (type == "SporePlant")
+		c = [0.68235296, 0.15686275, 0.11764706];
+	if (type == "FirecrackerPlant")
+		c = [0.68235296, 0.15686275, 0.11764706];
+	if (type == "ScavengerBomb")
+		c = [0.9019608, 0.05490196, 0.05490196];
+	if (type == "Spear1")
+		c = [0.9019608, 0.05490196, 0.05490196];
+	if (type == "Spear2")
+		c = [0, 0, 1];
+	if (type == "Spear3")
+		c = [1, 0.47058824, 0.47058824];
+	if (type == "Lantern")
+		c = [1, 0.57254905, 0.31764707];
+	if (type == "FlareBomb")
+		c = [0.73333335, 0.68235296, 1];
+	if (type == "SlimeMold")
+		c = [1, 0.6, 0];
+	if (type == "BubbleGrass")
+		c = [0.05490196, 0.69803923, 0.23529412];
+	if (type == "DangleFruit")
+		c = [0, 0, 1];
+	if (type == "Mushroom")
+		c = [1, 1, 1];
+	if (type == "WaterNut")
+		c = [0.05, 0.3, 0.7];
+	if (type == "EggBugEgg")
+		c = [0, 1, 0.47058824];
+	if (type == "FlyLure")
+		c = [0.6784314, 0.26666668, 0.21176471];
+	if (type == "SSOracleSwarmer")
+		c = [1, 1, 1];
+	if (type == "NSHSwarmer")
+		c = [0, 1, 0.3];
+	if (type == "NeedleEgg")
+		c = [0.5764706, 0.16078432, 0.2509804];
+	if (type == "PebblesPearl1")
+		c = [0.7, 0.7, 0.7];
+	if (type == "PebblesPearl2")
+		c = HSL2RGB(0.73055553, 0.08, 0.3);
+	if (type == "PebblesPearl3")	//	intData >= 3
+		c = [1, 0.47843137, 0.007843138];
+	if (type == "PebblesPearl") 	//	intData < 0
+		c = [0, 0.45490196, 0.6392157];
+	if (type == "DataPearl" || itemType == "HalcyonPearl") {
+		if (intData > 1 && intData < DataPearlList.length) {
+				var mc = UniquePearlMainColor(intData);
+				var hc = UniquePearlHighLightColor(intData);
+				if (hc != null)
+					mc = ColorScreen(mc, ColorQuickSaturation(hc, 0.5));
+				else
+					mc = ColorLerp(mc, [1, 1, 1], 0.15);
+				if (mc[0] < 0.1 && mc[1] < 0.1 && mc[2] < 0.1)
+					mc = ColorLerp(mc, HSL2RGB(0.73055553, 0.08, 0.67), 0.3);
+				c = mc;
+		} else if (intData == 1)
+			c = [1, 0.6, 0.9];
+		else
+			c = [0.7, 0.7, 0.7];
+	} else {
+		if (type == "Spearmasterpearl")
+			c = ColorLerp([0.45, 0.01, 0.04], [1, 1, 1], 0.15);
+		if (type == "EnergyCell")
+			c = [0.01961, 0.6451, 0.85];
+		if (type == "SingularityBomb")
+			c = [0.01961, 0.6451, 0.85];
+		if (type == "GooieDuck")
+			c = [0.44705883, 0.9019608, 0.76862746];
+		if (type == "LillyPuck")
+			c = [0.17058827, 0.9619608, 0.9986275];
+		if (type == "GlowWeed")
+			c = [0.94705886, 1, 0.26862746];
+		if (type == "DandelionPeach")
+			c = [0.59, 0.78, 0.96];
+		if (type == "MoonCloak")
+			c = [0.95, 1, 0.96];
+		if (type == "FireEgg")
+			c = [1, 0.47058824, 0.47058824];
+	}
+	return c;
+}
+
+/**
+ *	Helper functions:
+ *	Port of various functions to enumerate and calculate pearl colors.
+ */
+function makePearlColors() {
+	for (var intData = 2; intData < DataPearlList.length; intData++) {
+		var name = DataPearlList[intData];
+		var mc = UniquePearlMainColor(intData);
+		var hc = UniquePearlHighLightColor(intData);
+		if (hc !== undefined)
+			mc = ColorScreen(mc, ColorQuickSaturation(hc, 0.5));
+		else
+			mc = ColorLerp(mc, [1, 1, 1], 0.15);
+		if (mc[0] < 0.1 && mc[1] < 0.1 && mc[2] < 0.1)
+			mc = ColorLerp(mc, HSL2RGB(0.73055553, 0.08, 0.67), 0.3);
+		var s = "\t\"" + name + "\": [";
+		s += ((Math.round(mc[0] * 1e6) / 1e6).toString() + "       ").substring(0, 8);
+		for (var i = 1; i < mc.length; i++)
+			s += ", " + ((Math.round(mc[i] * 1e6) / 1e6).toString() + "       ").substring(0, 8);
+		s += "],";
+		console.log(s);
+	}
+
+	/**
+	 *	From base game, DataPearl
+	 *	s/DataPearl\.AbstractDataPearl\.DataPearlType\.|MoreSlugcatsEnums\.DataPearlType\./\"/
+	 *	s/ \|\| /\" || /
+	 *	s/\)\r\n\t+\{/\"\) \{/
+	 *	etc.
+	 */
+	function UniquePearlMainColor(intData) {
+		var pearlType = DataPearlList[intData];
+		var c = [0.7, 0.7, 0.7];
+		if (pearlType == "SI_west")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SI_top")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SI_chat3")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SI_chat4")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SI_chat5")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "Spearmasterpearl")
+			c = [0.04, 0.01, 0.04];
+		if (pearlType == "SU_filt")
+			c = [1, 0.75, 0.9];
+		if (pearlType == "DM")
+			c = [0.95686275, 0.92156863, 0.20784314];
+		if (pearlType == "LC")
+			c = HSL2RGB(0.34, 1, 0.2);
+		if (pearlType == "LC_second")
+			c = [0.6, 0, 0];
+		if (pearlType == "OE")
+			c = [0.54901963, 0.36862746, 0.8];
+		if (pearlType == "MS")
+			c = [0.8156863, 0.89411765, 0.27058825];
+		if (pearlType == "RM")
+			c = [0.38431373, 0.18431373, 0.9843137];
+		if (pearlType == "Rivulet_stomach")
+			c = [0.5882353, 0.87058824, 0.627451];
+		if (pearlType == "CL")
+			c = [0.48431373, 0.28431374, 1];
+		if (pearlType == "VS")
+			c = [0.53, 0.05, 0.92];
+		if (pearlType == "BroadcastMisc")
+			c = [0.9, 0.7, 0.8];
+		if (pearlType == "CC")
+			c = [0.9, 0.6, 0.1];
+		if (pearlType == "DS")
+			c = [0, 0.7, 0.1];
+		if (pearlType == "GW")
+			c = [0, 0.7, 0.5];
+		if (pearlType == "HI")
+			c = [0.007843138, 0.19607843, 1];
+		if (pearlType == "LF_bottom")
+			c = [1, 0.1, 0.1];
+		if (pearlType == "LF_west")
+			c = [1, 0, 0.3];
+		if (pearlType == "SB_filtration")
+			c = [0.1, 0.5, 0.5];
+		if (pearlType == "SH")
+			c = [0.2, 0, 0.1];
+		if (pearlType == "SI_top")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SI_west")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SL_bridge")
+			c = [0.4, 0.1, 0.9];
+		if (pearlType == "SL_moon")
+			c = [0.9, 0.95, 0.2];
+		if (pearlType == "SB_ravine")
+			c = [0.01, 0.01, 0.01];
+		if (pearlType == "SU")
+			c = [0.5, 0.6, 0.9];
+		if (pearlType == "UW")
+			c = [0.4, 0.6, 0.4];
+		if (pearlType == "SL_chimney")
+			c = [1, 0, 0.55];
+		if (pearlType == "Red_stomach")
+			c = [0.6, 1, 0.9];
+		return c;
+	}
+
+	function UniquePearlHighLightColor(intData) {
+		var pearlType = DataPearlList[intData];
+		var c;
+		if (pearlType == "SI_chat3")
+			c = [0.4, 0.1, 0.6];
+		if (pearlType == "SI_chat4")
+			c = [0.4, 0.6, 0.1];
+		if (pearlType == "SI_chat5")
+			c = [0.6, 0.1, 0.4];
+		if (pearlType == "Spearmasterpearl")
+			c = [0.95, 0, 0];
+		if (pearlType == "RM")
+			c = [1, 0, 0];
+		if (pearlType == "LC_second")
+			c = [0.8, 0.8, 0];
+		if (pearlType == "CL")
+			c = [1, 0, 0];
+		if (pearlType == "VS")
+			c = [1, 0, 1];
+		if (pearlType == "BroadcastMisc")
+			c = [0.4, 0.9, 0.4];
+		if (pearlType == "CC")
+			c = [1, 1, 0];
+		if (pearlType == "GW")
+			c = [0.5, 1, 0.5];
+		if (pearlType == "HI")
+			c = [0.5, 0.8, 1];
+		if (pearlType == "SH")
+			c = [1, 0.2, 0.6];
+		if (pearlType == "SI_top")
+			c = [0.1, 0.4, 0.6];
+		if (pearlType == "SI_west")
+			c = [0.1, 0.6, 0.4];
+		if (pearlType == "SL_bridge")
+			c = [1, 0.4, 1];
+		if (pearlType == "SB_ravine")
+			c = [0.6, 0.1, 0.4];
+		if (pearlType == "UW")
+			c = [1, 0.7, 1];
+		if (pearlType == "SL_chimney")
+			c = [0.8, 0.3, 1];
+		if (pearlType == "Red_stomach")
+			c = [1, 1, 1];
+		return c;
+	}
+
+	function ColorScreen(a, b) {
+		return [1 - (1 - a[0]) * (1 - b[0]), 1 - (1 - a[1]) * (1 - b[1]), 1 - (1 - a[2]) * (1 - b[2])];
+	}
+
+	function ColorLerp(a, b, t) {
+		return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+	}
+	function ColorQuickSaturation(hc, value) {
+		var a = QuickSaturation(hc) * value;
+		return [hc[0] * a, hc[1] * a, hc[2] * a];
+	}
+
+	function QuickSaturation(col) {
+		return InverseLerp(Math.max(...col), 0, Math.min(...col));
+	}
+
+	function InverseLerp(a, b, value) {
+		var result;
+		if (a != b)
+			result = Math.min(Math.max((value - a) / (b - a), 0), 1);
+		else
+			result = 0;
+		return result;
+	}
+}
+
+//	Colored data pearl types, indexed by intData
+const DataPearlList = [
+	,
+	,
+	//	From DataPearl::AbstractDataPearl.DataPearlType
+	"Misc",
+	"Misc2",
+	"CC",
+	"SI_west",
+	"SI_top",
+	"LF_west",
+	"LF_bottom",
+	"HI",
+	"SH",
+	"DS",
+	"SB_filtration",
+	"SB_ravine",
+	"GW",
+	"SL_bridge",
+	"SL_moon",
+	"SU",
+	"UW",
+	"PebblesPearl",
+	"SL_chimney",
+	"Red_stomach",
+	//	from MoreSlugcats::MoreSlugcatsEnums::DataPearlType.RegisterValues()
+	"Spearmasterpearl",
+	"SU_filt",
+	"SI_chat3",
+	"SI_chat4",
+	"SI_chat5",
+	"DM",
+	"LC",
+	"OE",
+	"MS",
+	"RM",
+	"Rivulet_stomach",
+	"LC_second",
+	"CL",
+	"VS",
+	"BroadcastMisc"
+];
+
+const dataPearlToDisplayTextMap = {
+	//	bingo, ChallengeUtils::NameForPearl()
+	"CC":            "Gold",
+	"DS":            "Bright Green",
+	"GW":            "Viridian",
+	"HI":            "Bright Blue",
+	"LF_bottom":     "Bright Red",
+	"LF_west":       "Deep Pink",
+	"SH":            "Deep Magenta",
+	"SI_chat3":      "Dark Purple",
+	"SI_chat4":      "Olive Green",
+	"SI_chat5":      "Dark Magenta",
+	"SI_top":        "Dark Blue",
+	"SI_west":       "Dark Green",
+	"SL_bridge":     "Bright Purple",
+	"SL_chimney":    "Bright Magenta",
+	"SL_moon":       "Pale Yellow",
+	"SB_filtration": "Teal",
+	"SB_ravine":     "Dark Magenta",
+	"SU":            "Light Blue",
+	"UW":            "Pale Green",
+	"VS":            "Deep Purple",
+};
+
+const dataPearlToColorMap = {
+	"Misc":             [0.745,    0.745,    0.745   ],
+	"Misc2":            [0.745,    0.745,    0.745   ],
+	"CC":               [0.95,     0.8,      0.1     ],
+	"SI_west":          [0.05125,  0.2575,   0.175   ],
+	"SI_top":           [0.05125,  0.175,    0.2575  ],
+	"LF_west":          [1,        0.15,     0.405   ],
+	"LF_bottom":        [1,        0.235,    0.235   ],
+	"HI":               [0.131863, 0.356863, 1       ],
+	"SH":               [0.52,     0.08,     0.316   ],
+	"DS":               [0.15,     0.745,    0.235   ],
+	"SB_filtration":    [0.235,    0.575,    0.575   ],
+	"SB_ravine":        [0.2575,   0.05125,  0.175   ],
+	"GW":               [0.125,    0.775,    0.5625  ],
+	"SL_bridge":        [0.58,     0.208,    0.93    ],
+	"SL_moon":          [0.915,    0.9575,   0.32    ],
+	"SU":               [0.575,    0.66,     0.915   ],
+	"UW":               [0.49,     0.642,    0.49    ],
+	"PebblesPearl":     [0.745,    0.745,    0.745   ],
+	"SL_chimney":       [1,        0.105,    0.7075  ],
+	"Red_stomach":      [0.6,      1,        0.9     ],
+	"Spearmasterpearl": [0.496,    0.01,     0.04    ],
+	"SU_filt":          [1,        0.7875,   0.915   ],
+	"SI_chat3":         [0.175,    0.05125,  0.2575  ],
+	"SI_chat4":         [0.175,    0.2575,   0.05125 ],
+	"SI_chat5":         [0.2575,   0.05125,  0.175   ],
+	"DM":               [0.963333, 0.933333, 0.326667],
+	"LC":               [0.15,     0.49,     0.1636  ],
+	"OE":               [0.616667, 0.463333, 0.83    ],
+	"MS":               [0.843333, 0.91,     0.38    ],
+	"RM":               [0.692157, 0.184314, 0.984314],
+	"Rivulet_stomach":  [0.65,     0.89,     0.683333],
+	"LC_second":        [0.76,     0.4,      0       ],
+	"CL":               [0.742157, 0.284314, 1       ],
+	"VS":               [0.765,    0.05,     0.96    ],
+	"BroadcastMisc":    [0.911111, 0.775,    0.822222]
+};
+
+const itemNameToIconColorMap = {
+	"Default":                [0.66384,  0.6436,   0.6964  ],
+	"SporePlant":             [0.682353, 0.156862, 0.117647],
+	"FirecrackerPlant":       [0.682353, 0.156862, 0.117647],
+	"ScavengerBomb":          [0.90196,  0.054902, 0.054902],
+	"Spear1":                 [0.90196,  0.054902, 0.054902],
+	"Spear2":                 [0,        0,        1       ],
+	"Spear3":                 [1,        0.470588, 0.470588],
+	"Lantern":                [1,        0.572549, 0.317647],
+	"FlareBomb":              [0.733333, 0.682353, 1       ],
+	"SlimeMold":              [1,        0.6,      0       ],
+	"BubbleGrass":            [0.054902, 0.698039, 0.235294],
+	"DangleFruit":            [0,        0,        1       ],
+	"Mushroom":               [1,        1,        1       ],
+	"WaterNut":               [0.05,     0.3,      0.7     ],
+	"EggBugEgg":              [0,        1,        0.470588],
+	"FlyLure":                [0.678431, 0.266667, 0.211765],
+	"SSOracleSwarmer":        [1,        1,        1       ],
+	"NSHSwarmer":             [0,        1,        0.3     ],
+	"NeedleEgg":              [0.57647,  0.160784, 0.25098 ],
+	"PebblesPearl1":          [0.7,      0.7,      0.7     ],
+	"PebblesPearl2":          [0.2944,   0.276,    0.324   ],
+	"PebblesPearl3":          [1,        0.478431, 0.007843],
+	"PebblesPearl":           [0,        0.454902, 0.639216],
+	"DataPearl":              [0.7,      0.7,      0.7     ],	//	default values -- access special values by using key:
+	"HalcyonPearl":           [0.7,      0.7,      0.7     ],	//	"Pearl" + DataPearlList[intData]
+	"DataPearl1":             [1,        0.6,      0.9     ],	//	intData = 1
+	"Spearmasterpearl":       [0.5325,   0.1585,   0.184   ],
+	"EnergyCell":             [0.01961,  0.6451,   0.85    ],
+	"SingularityBomb":        [0.01961,  0.6451,   0.85    ],
+	"GooieDuck":              [0.447059, 0.90196,  0.768627],
+	"LillyPuck":              [0.170588, 0.96196,  0.998627],
+	"GlowWeed":               [0.947059, 1,        0.268627],
+	"DandelionPeach":         [0.59,     0.78,     0.96    ],
+	"MoonCloak":              [0.95,     1,        0.96    ],
+	"FireEgg":                [1,        0.470588, 0.470588],
+	//	Prepend "Pearl_" to a special DataPearl type to access its color
+	"Pearl_Misc":             [0.745,    0.745,    0.745   ],
+	"Pearl_Misc2":            [0.745,    0.745,    0.745   ],
+	"Pearl_CC":               [0.95,     0.8,      0.1     ],
+	"Pearl_SI_west":          [0.05125,  0.2575,   0.175   ],
+	"Pearl_SI_top":           [0.05125,  0.175,    0.2575  ],
+	"Pearl_LF_west":          [1,        0.15,     0.405   ],
+	"Pearl_LF_bottom":        [1,        0.235,    0.235   ],
+	"Pearl_HI":               [0.131863, 0.356863, 1       ],
+	"Pearl_SH":               [0.52,     0.08,     0.316   ],
+	"Pearl_DS":               [0.15,     0.745,    0.235   ],
+	"Pearl_SB_filtration":    [0.235,    0.575,    0.575   ],
+	"Pearl_SB_ravine":        [0.2575,   0.05125,  0.175   ],
+	"Pearl_GW":               [0.125,    0.775,    0.5625  ],
+	"Pearl_SL_bridge":        [0.58,     0.208,    0.93    ],
+	"Pearl_SL_moon":          [0.915,    0.9575,   0.32    ],
+	"Pearl_SU":               [0.575,    0.66,     0.915   ],
+	"Pearl_UW":               [0.49,     0.642,    0.49    ],
+	"Pearl_PebblesPearl":     [0.745,    0.745,    0.745   ],
+	"Pearl_SL_chimney":       [1,        0.105,    0.7075  ],
+	"Pearl_Red_stomach":      [0.6,      1,        0.9     ],
+	"Pearl_Spearmasterpearl": [0.496,    0.01,     0.04    ],
+	"Pearl_SU_filt":          [1,        0.7875,   0.915   ],
+	"Pearl_SI_chat3":         [0.175,    0.05125,  0.2575  ],
+	"Pearl_SI_chat4":         [0.175,    0.2575,   0.05125 ],
+	"Pearl_SI_chat5":         [0.2575,   0.05125,  0.175   ],
+	"Pearl_DM":               [0.963333, 0.933333, 0.326667],
+	"Pearl_LC":               [0.15,     0.49,     0.1636  ],
+	"Pearl_OE":               [0.616667, 0.463333, 0.83    ],
+	"Pearl_MS":               [0.843333, 0.91,     0.38    ],
+	"Pearl_RM":               [0.692157, 0.184314, 0.984314],
+	"Pearl_Rivulet_stomach":  [0.65,     0.89,     0.683333],
+	"Pearl_LC_second":        [0.76,     0.4,      0       ],
+	"Pearl_CL":               [0.742157, 0.284314, 1       ],
+	"Pearl_VS":               [0.765,    0.05,     0.96    ],
+	"Pearl_BroadcastMisc":    [0.911111, 0.775,    0.822222]
 };
