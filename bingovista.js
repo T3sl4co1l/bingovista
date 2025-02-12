@@ -8,12 +8,14 @@ const ids = {
 	load: "fileload",
 	drop: "droptarget",
 	board: "board",
+	cursor: "cursor",
 	square: "square",
 	desc: "desctxt",
 	message: "errorbox",
 	darkstyle: "darkmode",
 	radio1: "dark",
-	radio2: "light"
+	radio2: "light",
+	detail: "kibitzing"
 };
 
 /**
@@ -26,24 +28,29 @@ const ids = {
  *	The named targets are not themselves referenced directly elsewhere.
  */
 const atlases = [
-	{ img: "bingoicons.png",   txt: "bingoicons.txt",   canv: undefined, frames: undefined },	/**< from Bingo mod */
-	{ img: "uispritesmsc.png", txt: "uispritesmsc.txt", canv: undefined, frames: undefined }, 	/**< from DLC */
-	{ img: "uiSprites.png",    txt: "uiSprites.txt",    canv: undefined, frames: undefined } 	/**< from base game */
+	{ img: "bingoicons.png",   txt: "bingoicons.txt",   canv: undefined, frames: {} },	/**< from Bingo mod */
+	{ img: "uispritesmsc.png", txt: "uispritesmsc.txt", canv: undefined, frames: {} }, 	/**< from DLC */
+	{ img: "uiSprites.png",    txt: "uiSprites.txt",    canv: undefined, frames: {} } 	/**< from base game */
 ];
 
-/* Bingo square graphics constants (dimensions in px) */
-const SQUARE_WIDTH = 85;
-const SQUARE_HEIGHT = 85;
-const SQUARE_MARGIN = 4;
-const SQUARE_BORDER = 2;
-const SQUARE_COLOR = "#ffffff";
-const SQUARE_BACKGROUND = "#020204";
-const SQUARE_FONT = "600 10pt \"Segoe UI\", sans-serif";
+/* Bingo square graphics dimensions (in px) */
+const square = {
+	width: 85,
+	height: 85,
+	margin: 4,
+	border: 2,
+	color: "#ffffff",
+	background: "#020204",
+	font: "600 10pt \"Segoe UI\", sans-serif"
+};
 
 var board;
 
-/** Flag to reveal full detail on otherwise-hidden challenges e.g. Vista Points */
+var selected;
+
+/** Flag to reveal full detail on otherwise-hidden challenges (e.g. Vista Points), and extended commentary */
 var kibitzing = false;
+
 
 /* * * Functions * * */
 
@@ -57,7 +64,12 @@ document.addEventListener("DOMContentLoaded", function() {
 	});
 	document.getElementById(ids.parse).addEventListener("click", parseText);
 	document.getElementById(ids.board).addEventListener("click", selectSquare);
+	document.getElementById(ids.board).addEventListener("keydown", navSquares);
 	document.getElementById(ids.load).addEventListener("change", function() { doLoadFile(this.files) } );
+	document.getElementById(ids.radio1).addEventListener("input", toggleDark);
+	document.getElementById(ids.radio2).addEventListener("input", toggleDark);
+	document.getElementById(ids.detail).addEventListener("input", toggleKibs);
+
 	var d = document.getElementById(ids.drop);
 	d.addEventListener("dragenter", dragEnterOver);
 	d.addEventListener("dragover", dragEnterOver);
@@ -74,9 +86,6 @@ document.addEventListener("DOMContentLoaded", function() {
 				this.style.backgroundColor = "#c8c8c8";
 		}
 	}
-
-	document.getElementById(ids.radio1).addEventListener("change", toggleDark);
-	document.getElementById(ids.radio2).addEventListener("change", toggleDark);
 
 	//	Prepare atlases
 
@@ -139,10 +148,14 @@ document.addEventListener("DOMContentLoaded", function() {
 		console.log("Promise.all(): failed to complete fetches. Error: " + e.message);
 	});
 
+	//	Other housekeeping
+
 	if (document.getElementById(ids.radio1).checked)
 		document.getElementById(ids.darkstyle).media = "screen";
 	else
 		document.getElementById(ids.darkstyle).media = "none";
+
+	kibitzing = !!document.getElementById(ids.detail).checked;
 
 });
 
@@ -154,6 +167,15 @@ function toggleDark(e) {
 		document.getElementById(ids.darkstyle).media = "screen";
 	else
 		document.getElementById(ids.darkstyle).media = "none";
+}
+
+function toggleKibs(e) {
+	kibitzing = !!document.getElementById(ids.detail).checked;
+	if (selected !== undefined)
+		selectSquare( {
+			offsetX: selected.col * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1,
+			offsetY: selected.row * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1
+		} );
 }
 
 /**
@@ -222,6 +244,7 @@ function boardEncodeToText(s) {
 function parseText(e) {
 	var s = document.getElementById(ids.textbox).value;
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
+	document.getElementById(ids.textbox).value = s;
 	var goals = s.split(/bChG/);
 	var size = Math.ceil(Math.sqrt(goals.length));
 	board = { size: size, width: size, height: size, goals: [] };
@@ -235,39 +258,62 @@ function parseText(e) {
 					board.goals.push(CHALLENGES[type](desc));
 				} catch (e) {
 					board.goals.push(defaultGoal(type, desc));
-					board.goals[board.goals.length - 1].description = e.message;
+					board.goals[board.goals.length - 1].description = e.message + "<br>Descriptor: " + desc.join("><");
 				}
 			} else {
 				board.goals.push(defaultGoal(type, desc));
 			}
 		} else {
-			board.goals.push(CHALLENGES["BingoChallenge"]());
+			board.goals.push(CHALLENGES["BingoChallenge"](goals[i]));
 		}
 	}
 
 	function defaultGoal(t, d) {
 		return {
 			name: t,
-			category: "error",
+			category: t,
 			items: [],
-			description: "Unable to generate this goal; descriptor: " + d.join("><"),
+			description: "Error generating goal. Descriptor: " + d.join("><"),
 			values: [],
 			paint: [
-				{ type: "verse", value: "∅", scale: 1, color: "#ffffff", rotation: 0 }
+				{ type: "text", value: "∅", scale: 1, color: "#ffffff", rotation: 0 }
 			]
 		};
 	}
 
+	if (selected !== undefined) {
+		//	See if we can re-select the same square (position) in the new board
+		if (selected.row < board.height && selected.col < board.width) {
+			selectSquare( {
+				offsetX: selected.col * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1,
+				offsetY: selected.row * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1
+			} );
+		} else {
+			selected = undefined;
+		}
+	}
+	if (selected === undefined)
+		selectSquare( { offsetX: -1, offsetY: -1 } );
+
+	//	Adjust graphical dimensions based on canvas and board sizes
+	var canv = document.getElementById(ids.board);
+	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
+	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
+	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
+
+	//	Redraw the board
 	var ctx = document.getElementById(ids.board).getContext("2d");
-	ctx.fillStyle = SQUARE_BACKGROUND;
+	ctx.fillStyle = square.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 	for (var i = 0; i < board.goals.length; i++) {
 		drawSquare(ctx, board.goals[i],
-				Math.floor(i / board.height) * (SQUARE_WIDTH + SQUARE_MARGIN + SQUARE_BORDER) + (SQUARE_BORDER + SQUARE_MARGIN) / 2,
-				(i % board.height) * (SQUARE_HEIGHT + SQUARE_MARGIN + SQUARE_BORDER) + (SQUARE_BORDER + SQUARE_MARGIN) / 2);
+				Math.floor(i / board.height) * (square.width + square.margin + square.border)
+					+ (square.border + square.margin) / 2,
+				(i % board.height) * (square.height + square.margin + square.border)
+					+ (square.border + square.margin) / 2,
+				square);
 	}
 
-	//console.log(board);
 }
 
 /**
@@ -276,63 +322,113 @@ function parseText(e) {
 function selectSquare(e) {
 	var el = document.getElementById(ids.desc);
 	var ctx = document.getElementById(ids.square).getContext("2d");
-	if (board === undefined) {
-		clearDescription();
-		return;
-	}
-	var x = e.offsetX - (SQUARE_BORDER + SQUARE_MARGIN) / 2;
-	var y = e.offsetY - (SQUARE_BORDER + SQUARE_MARGIN) / 2;
-	var sqWidth = SQUARE_WIDTH + SQUARE_MARGIN + SQUARE_BORDER;
-	var sqHeight = SQUARE_WIDTH + SQUARE_MARGIN + SQUARE_BORDER;
-	var col = Math.floor(x / sqWidth);
-	var row = Math.floor(y / sqHeight);
-	if (x >=0 && y >= 0 && (x % sqWidth) < (sqWidth - SQUARE_MARGIN)
-			&& (y % sqHeight) < (sqHeight - SQUARE_MARGIN)
-			&& row < board.height && col < board.width) {
-		var goal = board.goals[row + col * board.height];
-		if (goal === undefined) {
-			clearDescription();
+	if (board !== undefined) {
+		var x = e.offsetX - (square.border + square.margin) / 2;
+		var y = e.offsetY - (square.border + square.margin) / 2;
+		var sqWidth = square.width + square.margin + square.border;
+		var sqHeight = square.width + square.margin + square.border;
+		var col = Math.floor(x / sqWidth);
+		var row = Math.floor(y / sqHeight);
+		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - square.margin)
+				&& (y % sqHeight) < (sqHeight - square.margin)
+				&& row < board.height && col < board.width) {
+
+			var goal = board.goals[row + col * board.height];
+			if (goal === undefined) {
+				clearDescription();
+				return;
+			}
+
+			selected = { row: row, col: col };
+			ctx.fillStyle = square.background;
+			ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+			var size = {}; Object.assign(size, square);
+			size.margin = 4;
+			size.width = ctx.canvas.width - size.margin - size.border;
+			size.height = ctx.canvas.height - size.margin - size.border;
+			drawSquare(ctx, goal, (size.border + size.margin) / 2, (size.border + size.margin) / 2, size);
+
+			while (el.firstChild)
+				el.removeChild(el.firstChild);
+			var s = "<div class=\"descch\">Challenge: " + goal.category + "</div>\n";
+			s += "<div class=\"descdesc\">" + goal.description + "</div>";
+			s += "<table class=\"desclist\">\n";
+			s += "<thead><tr><td>Parameter</td><td>Value</td></tr></thead>\n<tbody>\n";
+			for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
+				if (goal.items[i].length > 0) {
+					s += "  <tr><td>" + goal.items[i] + "</td><td>" + goal.values[i] + "</td></tr>\n";
+				}
+			}
+			s += "</tbody></table>\n";
+			if (kibitzing && goal.comments.length > 0)
+				s += "<div class=\"desccomm\">" + goal.comments + "</div>";
+			el.innerHTML = s;
+
+			//	position cursor
+			//<div id="cursor" style="width: 39px; height: 39px; margin: 0; border: 1px solid #b8b8b8; border-radius: 3px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
+			var curSty = document.getElementById(ids.cursor).style;
+			curSty.width = String(square.width + square.border) + "px";
+			curSty.height = String(square.height + square.border) + "px";
+			curSty.left = String(square.margin / 2 - 1 + col * (square.width + square.border + square.margin)) + "px";
+			curSty.top = String(square.margin / 2 - 1 + row * (square.width + square.border + square.margin)) + "px";
+			curSty.display = "initial";
 			return;
 		}
-		ctx.fillStyle = SQUARE_BACKGROUND;
-		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		drawSquare(ctx, goal, (SQUARE_BORDER + SQUARE_MARGIN) / 2, (SQUARE_BORDER + SQUARE_MARGIN) / 2);
-		while (el.firstChild)
-			el.removeChild(el.firstChild);
-		var s = "Challenge: " + goal.category;
-		for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
-			s += (goal.items[i].length > 0) ? ("<br>" + goal.items[i] + ": " + goal.values[i]) : "";
-		}
-		s += "<br>" + goal.description;
-		el.innerHTML = s;
-		return;
 	}
 	clearDescription();
 
 	function clearDescription() {
-		ctx.fillStyle = SQUARE_BACKGROUND;
+		selected = undefined;
+		ctx.fillStyle = square.background;
 		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 		while (el.firstChild)
 			el.removeChild(el.firstChild);
 		el.appendChild(document.createTextNode("Select a square to view details."));
+		document.getElementById(ids.cursor).style.display = "none";
+	}
+}
+
+/**
+ *	Key input to document; pare down to arrow keys for navigating squares
+ */
+function navSquares(e) {
+	if ((e.target.id == ids.board || e.target.id == ids.cursor) && board !== undefined) {
+		var dRow = 0, dCol = 0;
+		if (e.key == "Up"    || e.key == "ArrowUp"   ) dRow = -1;
+		if (e.key == "Down"  || e.key == "ArrowDown" ) dRow = 1;
+		if (e.key == "Left"  || e.key == "ArrowLeft" ) dCol = -1;
+		if (e.key == "Right" || e.key == "ArrowRight") dCol = 1;
+		if (dRow || dCol) {
+			e.preventDefault();
+			if (selected === undefined) selected = { row: 0, col: 0 };
+			selected.row += dRow; selected.col += dCol;
+			if (selected.row < 0) selected.row += board.height;
+			if (selected.row >= board.height) selected.row -= board.height;
+			if (selected.col < 0) selected.col += board.width;
+			if (selected.col >= board.width) selected.col -= board.width;
+			selectSquare( {
+					offsetX: selected.col * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1,
+					offsetY: selected.row * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1
+			} );
+		}
 	}
 }
 
 /**
  *	Draw a challenge square to the specified canvas at the specified location (top-left corner).
  */
-function drawSquare(ctx, goal, x, y) {
+function drawSquare(ctx, goal, x, y, size) {
 	ctx.beginPath();
-	ctx.strokeStyle = SQUARE_COLOR;
-	ctx.lineWidth = SQUARE_BORDER;
+	ctx.strokeStyle = size.color;
+	ctx.lineWidth = size.border;
 	ctx.lineCap = "butt";
 	ctx.moveTo(x, y);
-	ctx.lineTo(x + SQUARE_WIDTH, y);
-	ctx.moveTo(x + SQUARE_WIDTH, y);
-	ctx.lineTo(x + SQUARE_WIDTH, y + SQUARE_HEIGHT);
-	ctx.moveTo(x + SQUARE_WIDTH, y + SQUARE_HEIGHT);
-	ctx.lineTo(x, y + SQUARE_HEIGHT);
-	ctx.moveTo(x, y + SQUARE_HEIGHT);
+	ctx.lineTo(x + size.width, y);
+	ctx.moveTo(x + size.width, y);
+	ctx.lineTo(x + size.width, y + size.height);
+	ctx.moveTo(x + size.width, y + size.height);
+	ctx.lineTo(x, y + size.height);
+	ctx.moveTo(x, y + size.height);
 	ctx.lineTo(x, y);
 	ctx.stroke();
 	ctx.imageSmoothingEnabled = "false";
@@ -346,14 +442,20 @@ function drawSquare(ctx, goal, x, y) {
 		}
 	}
 	if (thisLine.length) lines.push(thisLine);
-	ctx.font = SQUARE_FONT;
+	ctx.font = size.font;
 	ctx.textAlign = "center"; ctx.textBaseline = "middle";
 	var xBase, yBase;
 	for (var i = 0; i < lines.length; i++) {
-		yBase = y + SQUARE_BORDER / 2 + (SQUARE_HEIGHT - SQUARE_BORDER) * (i + 1) / (lines.length + 1);
+		if (lines.length == 2)	//	not sure why this special case, but it seems to better match how the mod has it
+			yBase = y + size.border / 2 + (size.height - size.border) * (i + 1) / (lines.length + 1);
+		else
+			yBase = y + size.border / 2 + (size.height - size.border) * (i + 0.5) / lines.length;
 		yBase = Math.round(yBase);
 		for (var j = 0; j < lines[i].length; j++) {
-			xBase = x + SQUARE_BORDER / 2 + (SQUARE_WIDTH - SQUARE_BORDER) * (j + 1) / (lines[i].length + 1);
+			if (lines[i].length == 2)
+				xBase = x + size.border / 2 + (size.width - size.border) * (j + 1) / (lines[i].length + 1);
+			else
+				xBase = x + size.border / 2 + (size.width - size.border) * (j + 0.5) / lines[i].length;
 			xBase = Math.round(xBase);
 			if (lines[i][j].type == "icon") {
 				drawIcon(ctx, lines[i][j].value, xBase, yBase, lines[i][j].color, lines[i][j].scale, lines[i][j].rotation); 
@@ -418,19 +520,33 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
  *	Challenge classes from Bingomod decomp.
  */
 const CHALLENGES = {
+	BingoChallenge: function(desc) {
+		const thisname = "BingoChallenge";
+		//	Keep as template and default
+		return {
+			name: thisname,
+			category: "Empty challenge class",
+			items: [],
+			values: [],
+			description: "Descriptor: " + desc,
+			comments: "",
+			paint: [
+				{ type: "text", value: "∅", color: "#ffffff" }
+			]
+		};
+	},
 	BingoAchievementChallenge: function(desc) {
 		const thisname = "BingoAchievementChallenge";
 		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
 		checkDescriptors(thisname, desc.length, 3, "parameter item count");
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Passage", , "passage"], "goal selection");
-		if (passageToDisplayNameMap[items[1]] === undefined)
-			throw new TypeError(thisname + ": error, '" + items[1] + "' not passageable");
 		return {
 			name: thisname,
-			category: "Obtaining passages",
+			category: "Obtaining Passages",
 			items: ["Passage"],
 			values: [items[1]],
-			description: "Earn " + passageToDisplayNameMap[items[1]] + " passage.",
+			description: "Earn " + (passageToDisplayNameMap[items[1]] || "unknown") + " passage.",
+			comments: "",
 			paint: [
 				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: "#ffffff", rotation: 0 },
 				{ type: "icon", value: items[1] + "A", scale: 1, color: "#ffffff", rotation: 0 },
@@ -443,10 +559,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -457,24 +574,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
-		};
-	},
-	BingoChallenge: function() {
-		const thisname = "BingoChallenge";
-		//	Keep as template and default
-		return {
-			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Unimplemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -485,10 +589,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -499,10 +604,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -513,10 +619,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -527,10 +634,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -541,10 +649,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -555,10 +664,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -569,10 +679,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -583,10 +694,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -597,10 +709,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -611,10 +724,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -625,10 +739,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -639,10 +754,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -653,10 +769,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -667,10 +784,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -681,10 +799,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -695,10 +814,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -706,30 +826,119 @@ const CHALLENGES = {
 	},
 	BingoKarmaFlowerChallenge: function(desc) {
 		const thisname = "BingoKarmaFlowerChallenge";
-		//
+		//	assert: desc of format ["0", "System.Int32|5|Amount|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "item count");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > 30000)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Consuming Karma Flowers",
+			items: [items[2]],
+			values: [items[1]],
+			description: "Consume " + creatureNameQuantify(amt, "Karma Flowers") + ".",
+			comments: "With this goal present on the board, flowers are spawned in the world in their normal locations. The player obtains the benefit of consuming the flower (protecting karma level). While the goal is in progress, players <em>do not drop</em> the flower on death. After the goal is completed or locked, a flower can drop on death as normal.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "foodSymbol", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "FlowerMarker", scale: 1, color: colorFloatToString(RainWorldColors.SaturatedGold), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + items[1] + "]", color: "#ffffff" }
 			]
 		};
 	},
 	BingoKillChallenge: function(desc) {
 		const thisname = "BingoKillChallenge";
-		//
+		//	assert: desc of format ["System.String|Scavenger|Creature Type|0|creatures",
+		//	"System.String|Any Weapon|Weapon Used|6|weaponsnojelly", "System.Int32|5|Amount|1|NULL", "0",
+		//	"System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions",
+		//	"System.Boolean|false|In one Cycle|3|NULL", "System.Boolean|false|Via a Death Pit|7|NULL",
+		//	"System.Boolean|false|While Starving|2|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 11, "parameter item count");
+		var v = [], i = [];
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Creature Type", , "creatures"], "target selection"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[1], ["System.String", , "Weapon Used", , "weaponsnojelly"], "weapon selection"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[2], ["System.Int32", , "Amount", , "NULL"], "kill count"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[4], ["System.String", , "Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[5], ["System.String", , "Subregion", , "subregions"], "subregion selection"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[6], ["System.Boolean", , "In one Cycle", , "NULL"], "one-cycle flag"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[7], ["System.Boolean", , "Via a Death Pit", , "NULL"], "death pit flag"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[8], ["System.Boolean", , "While Starving", , "NULL"], "starving flag"); v.push(items[1]); i.push(items[2]);
+		var r = "";
+		var amt = parseInt(v[2]);
+		if (isNaN(amt) || amt < 0 || amt > 30000)
+			throw new TypeError(thisname + ": error, amount " + v[2] + " not a number or out of range");
+		var c = String(amt) + " creatures";
+		if (v[0] != "Any Creature") {
+			if (creatureNameToDisplayTextMap[v[0]] === undefined)
+				throw new TypeError(thisname + ": error, creature type '" + v[0] + "' not found in creatureNameToDisplayTextMap[]");
+			c = creatureNameQuantify(amt, creatureNameToDisplayTextMap[v[0]]);
+		}
+		if (v[3] != "Any Region") {
+			r = (regionCodeToDisplayName[v[3]] || "") + " / " + (regionCodeToDisplayNameSaint[v[3]] || "");
+			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r == "")
+				throw new TypeError(thisname + ": error, region selection " + v[3] + " not found in regionCodeToDisplayName[]");
+			r = " in " + r;
+		}
+		if (v[4] != "Any Subregion") {
+			r = " in " + v[4];
+			if (BingoEnum_AllSubregions[v[4]] === undefined)
+				throw new TypeError(thisname + ": error, subregion selection " + v[4] + " not found in BingoEnum_AllSubregions[]");
+		}
+		var w = ", with a death pit";
+		if (!BingoEnum_Weapons.includes(v[1]))
+			throw new TypeError(thisname + ": error, weapon selection " + v[1] + " not found in BingoEnum_Weapons[]");
+		if (v[6] == "false") {
+			if (v[1] != "Any Weapon") {
+				w = " with " + itemNameToDisplayTextMap[v[1]];
+			} else {
+				w = "";
+			}
+		}
+		var p = [];
+		if (v[1] != "Any Weapon" || v[6] == "true") {
+			if (v[6] == "true")
+				p.push( { type: "icon", value: "deathpiticon", scale: 1, color: "#ffffff", rotation: 0 } );
+			else
+				p.push( { type: "icon", value: itemNameToIconAtlasMap[v[1]], scale: 1, color: itemToColor(v[1]), rotation: 0 } );
+		}
+		if (v[5] != "true" && v[5] != "false")
+			throw new TypeError(thisname + ": error, one-cycle flag " + v[5] + " not 'true' or 'false'");
+		if (v[6] != "true" && v[6] != "false")
+			throw new TypeError(thisname + ": error, death pit flag " + v[6] + " not 'true' or 'false'");
+		if (v[7] != "true" && v[7] != "false")
+			throw new TypeError(thisname + ": error, starving flag " + v[7] + " not 'true' or 'false'");
+		p.push( { type: "icon", value: "Multiplayer_Bones", scale: 1, color: "#ffffff", rotation: 0 } );
+		if (v[0] != "Any Creature") {
+			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[0]], scale: 1,
+					color: creatureToColor(v[0]), rotation: 0 } );
+		}
+		p.push( { type: "break" } );
+		if (v[4] == "Any Subregion") {
+			if (v[3] != "Any Region") {
+				p.push( { type: "text", value: v[3], color: "#ffffff" } );
+				p.push( { type: "break" } );
+			}
+		} else {
+			p.push( { type: "text", value: v[4], color: "#ffffff" } );
+			p.push( { type: "break" } );
+		}
+		p.push( { type: "text", value: "[0/" + v[2] + "]", color: "#ffffff" } );
+		if (v[7] == "true")
+			p.push( { type: "icon", value: "Multiplayer_Death", scale: 1, color: "#ffffff", rotation: 0 } );
+		if (v[5] == "true")
+			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: "#ffffff", rotation: 0 } );
 		return {
 			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Killing creatures",
+			items: i,
+			values: v,
+			description: "Kill " + c + r + w
+					+ ((v[7] == "true") ? ", while starving" : "")
+					+ ((v[5] == "true") ? ", in one cycle"   : "") + ".",
+			comments: "(If defined, subregion takes precedence over region. If set, Death Pit takes precedence over weapon selection.)<br>Credit is determined by the last source of 'blame' at time of death. For creatures that take multiple hits, try to \"soften them up\" with more common items, before using limited ammunition to deliver the killing blow.  Creatures that \"bleed out\", can be mortally wounded (brought to or below 0 HP), before being tagged with a specific weapon to obtain credit. Starving: must be in the \"malnourished\" state; this state is cleared after eating to full.",
+			paint: p
 		};
 	},
 	BingoMaulTypesChallenge: function(desc) {
@@ -737,10 +946,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -751,10 +961,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -765,10 +976,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -779,10 +991,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -793,10 +1006,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -807,10 +1021,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -821,10 +1036,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -835,10 +1051,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -849,10 +1066,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -863,10 +1081,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -877,10 +1096,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -891,10 +1111,11 @@ const CHALLENGES = {
 		//
 		return {
 			name: thisname,
-			category: "null",
+			category: thisname,
 			items: [],
 			values: [],
 			description: "Not yet implemented.",
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", color: "#ffffff" }
 			]
@@ -902,75 +1123,65 @@ const CHALLENGES = {
 	},
 	BingoStealChallenge: function(desc) {
 		const thisname = "BingoStealChallenge";
-		const theftEnum = [	//	ChallengeUtils.stealableStoable
-			"Spear",
-			"Rock",
-			"ScavengerBomb",
-			"Lantern",
-			"GooieDuck",
-			"GlowWeed",
-			"DataPearl"	//	added by GetCorrectListForChallenge()
-		];
 		//	assert: desc of format ["System.String|Rock|Item|1|theft",
 		//	"System.Boolean|false|From Scavenger Toll|0|NULL",
 		//	"0", "System.Int32|3|Amount|2|NULL", "0", "0"]
 		checkDescriptors(thisname, desc.length, 6, "parameter item count");
-		var r = {
+		var v = [], i = [];
+		var p = [ { type: "icon", value: "steal_item", scale: 1, color: "#ffffff", rotation: 0 } ];
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item", , "theft"], "item selection"); v.push(items[1]); i.push(items[2]);
+		if (!BingoEnum_theft.includes(v[0]))
+			throw new TypeError(thisname + ": error, item " + v[0] + " not found in BingoEnum_theft[]");
+		items = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "item count"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[1], ["System.Boolean", , "From Scavenger Toll", , "NULL"], "venue flag"); v.push(items[1]); i.push(items[2]);
+		if (itemNameToDisplayTextMap[v[0]] === undefined)
+			throw new TypeError(thisname + ": error, item selection " + v[2] + " not found in itemNameToDisplayTextMap[]");
+		var amt = parseInt(v[1]);
+		if (isNaN(amt) || amt < 0 || amt > 30000)
+			throw new TypeError(thisname + ": error, amount " + v[1] + " not a number or out of range");
+		var d = "Steal " + String(amt) + " " + itemNameToDisplayTextMap[v[0]] + " from ";
+		p.push( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1,
+				color: itemToColor(v[0]), rotation: 0 } );
+		if (v[2] == "true") {
+			p.push( { type: "icon", value: "scavtoll", scale: 0.8, color: "#ffffff", rotation: 0 } );
+			d += "a Scavenger Toll.";
+		} else if (v[2] == "false") {
+			p.push( { type: "icon", value: creatureNameToIconAtlasMap["Scavenger"], scale: 1,
+					color: creatureToColor("Scavenger"), rotation: 0 } );
+			d += "Scavengers.";
+		} else {
+			throw new TypeError(thisname + ": error, venue flag " + v[2] + " not 'true' or 'false'");
+		}
+		p.push( { type: "break" } );
+		p.push( { type: "text", value: "[0/" + v[1] + "]", color: "#ffffff" } );
+		return {
 			name: thisname,
 			category: "Stealing items",
-			items: [],
-			values: [],
-			description: "",
-			paint: [
-				{ type: "icon", value: "steal_item", scale: 1, color: "#ffffff", rotation: 0 }
-			]
+			items: i,
+			values: v,
+			description: d,
+			comments: "",
+			paint: p
 		};
-		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item", , "theft"], "item selection");
-		if (!theftEnum.includes(items[1]))
-			throw new TypeError(thisname + ": error, " + items[1] + " not theftable");
-		r.items.push(items[2]); r.values.push(items[1]);
-		r.paint.push( { type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1,
-				color: itemToColor(items[1]), rotation: 0 } );
-		r.description += ItemNameToDisplayTextMap[items[1]] + " from ";
-		items = checkSettingbox(thisname, desc[1], ["System.Boolean", , "From Scavenger Toll", , "NULL"], "venue flag");
-		r.items.push(items[2]); r.values.push(items[1]);
-		if (items[1] == "true") {
-			r.paint.push( { type: "icon", value: "scavtoll", scale: 0.8, color: "#ffffff", rotation: 0 } );
-			r.description += "a Scavenger Toll";
-		} else {
-			r.paint.push( { type: "icon", value: creatureNameToIconAtlasMap["Scavenger"], scale: 1,
-					color: creatureToColor("Scavenger"), rotation: 0 } );
-			r.description += "Scavengers";
-		}
-		items = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], " item count");
-		r.items.splice(1, 0, items[2]); r.values.splice(1, 0, items[1]);
-		r.paint.push( { type: "break" } );
-		r.paint.push( { type: "text", value: "[0/" + items[1] + "]", color: "#ffffff" } );
-		r.description = "Steal [0/" + items[1] + "] " + r.description + ".";
-		return r;
 	},
 	BingoTameChallenge: function(desc) {
 		const thisname = "BingoTameChallenge";
 		//	assert: desc of format ["System.String|EelLizard|Creature Type|0|friend", "0", "0"]
 		checkDescriptors(thisname, desc.length, 3, "parameter item count");
-		var items = desc[0].split("|");
-		checkDescriptors(thisname, items.length, 5, "descriptor item count");
-		checkDescriptors(thisname, items[0], "System.String", "assert failed, type");
-		checkDescriptors(thisname, items[2], "Creature Type", "item list name");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Creature Type", , "friend"], "creature type");
+		if (!BingoEnum_Befriendable.includes(items[1]))
+			throw new TypeError(thisname + ": error, creature type '" + items[1] + "' not Befriendable");
 		var d = creatureNameToDisplayTextMap[items[1]];
 		if (d === undefined)
-			throw new TypeError("creatureNameToDisplayTextMap: type '" + String(items[1]) + "' not found in list");
-		//	English cleanup (have fun translating this..?)
-		if (d.lastIndexOf("s") > 0) d = d.slice(0, d.lastIndexOf("s"));
-		var anVowel = "";
-		if (["A", "a", "E", "e", "I", "i", "O", "o", "U", "u"].includes(d.substring(0, 1)))
-			anVowel = "n";
+			throw new TypeError(thisname + ": error, creature type '" + items[1] + "' not found in creatureNameToDisplayTextMap[]");
+		d = creatureNameQuantify(1, d);
 		return {
 			name: thisname,
 			category: "Befriending a creature",
 			items: ["Creature Type"],
 			values: [items[1]],
-			description: "Befriend a" + anVowel + " " + d + ".",
+			description: "Befriend " + d + ".",
+			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player. Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. A \"happy lizard noises\" sound indicates success. The creature does not need to den with the item to increase reputation. Stealing the object from the creature's jaws, does not reduce reputation. A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).",
 			paint: [
 				{ type: "icon", value: "FriendB", scale: 1, color: "#ffffff", rotation: 0 },
 				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1,
@@ -980,58 +1191,153 @@ const CHALLENGES = {
 	},
 	BingoTradeChallenge: function(desc) {
 		const thisname = "BingoTradeChallenge";
-		//
+		//	desc of format ["0", "System.Int32|15|Value|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Value", , "NULL"], "points value");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > 30000)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Trading items to Merchants",
+			items: [items[2]],
+			values: [amt],
+			description: "Trade " + String(amt) + " points worth of items to Scavenger Merchants.",
+			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. When the Scavenger is also a Merchant, points will be awarded. Beware that Scavenger vision is very narrow and can easily miss one of these three actions. Try to get and hold their attention and be prompt. Any item can be traded once to award points according to its value; this includes items initially held by (then dropped or traded) by Scavengers. If an item seems to have been ignored or missed, try trading it again. Stealing and murder will not result in points awarded.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "scav_merchant", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + amt + "]", color: "#ffffff" }
 			]
 		};
 	},
 	BingoTradeTradedChallenge: function(desc) {
 		const thisname = "BingoTradeTradedChallenge";
-		//
+		//	desc of format ["0", "System.Int32|3|Amount of Items|0|NULL", "empty", "0", "0"]
+		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount of Items", , "NULL"], "amount of items");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > 30000)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Trading already traded items",
+			items: [items[2]],
+			values: [amt],
+			description: "Trade " + String(amt) + ((amt == 1) ? " item" : " items") + " from Scavenger Merchants to other Scavenger Merchants.",
+			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. Beware that Scavenger vision is very narrow and can easily miss one of these three actions. Try to get and hold their attention and be prompt. While this challenge is active, any item dropped by a Merchant, in trade, will be \"blessed\" and bear a mark indicating its eligibility for this challenge. In a Merchant room, the Merchant bears a '✓' tag to show who you should trade with; other Scavengers in the room are tagged with 'X'. Stealing from or murdering a Merchant will not result in \"blessed\" items dropping. A \"blessed\" item can then be brought to any <em>other</em> Merchant and traded, to obtain credit towards this goal.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "scav_merchant", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "Menu_Symbol_Shuffle", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "scav_merchant", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + amt + "]", color: "#ffffff" }
 			]
 		};
 	},
 	BingoTransportChallenge: function(desc) {
 		const thisname = "BingoTransportChallenge";
-		//
+		//	desc of format ["System.String|Any Region|From Region|0|regions", "System.String|DS|To Region|1|regions", "System.String|CicadaA|Creature Type|2|transport", "", "0", "0"]
+		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var v = [], i = [];
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "From Region", , "regions"], "from region"); v.push(items[1]); i.push(items[2]);
+		var items = checkSettingbox(thisname, desc[1], ["System.String", , "To Region", , "regions"], "to region"); v.push(items[1]); i.push(items[2]);
+		var items = checkSettingbox(thisname, desc[2], ["System.String", , "Creature Type", , "transport"], "transportable creature type"); v.push(items[1]); i.push(items[2]);
+		var r1 = v[0], r2 = v[1];
+		if (r1 != "Any Region") {
+			r1 = (regionCodeToDisplayName[v[0]] || "") + " / " + (regionCodeToDisplayNameSaint[v[0]] || "");
+			r1 = r1.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r1 == "")
+				throw new TypeError(thisname + ": error, region " + v[0] + " not found in regionCodeToDisplayName[]");
+		}
+		if (r2 != "Any Region") {
+			r2 = (regionCodeToDisplayName[v[1]] || "") + " / " + (regionCodeToDisplayNameSaint[v[1]] || "");
+			r2 = r2.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r2 == "")
+				throw new TypeError(thisname + ": error, region " + v[1] + " not found in regionCodeToDisplayName[]");
+		}
+		if (creatureNameToDisplayTextMap[v[2]] === undefined)
+			throw new TypeError(thisname + ": error, creature type " + v[2] + " not found in creatureNameToDisplayTextMap[]");
+		if (!BingoEnum_Transportable.includes(v[2]))
+			throw new TypeError(thisname + ": error, creature type " + v[2] + " not Transportable");
+		var p = [
+			{ type: "icon", value: creatureNameToIconAtlasMap[v[2]], scale: 1, color: creatureToColor(v[2]), rotation: 0 },
+			{ type: "break" }
+		];
+		if (p[0].value === undefined || p[0].color === undefined)
+			throw new TypeError(thisname + ": error, token " + v[2] + " not found in itemNameToIconAtlasMap[] or Color");
+		if (v[0] != "Any Region") p.push( { type: "text", value: v[0], color: "#ffffff" } );
+		p.push( { type: "icon", value: "singlearrow", scale: 1, color: "#ffffff", rotation: 0 } );
+		if (v[1] != "Any Region") p.push( { type: "text", value: v[1], color: "#ffffff" } );
 		return {
 			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Transporting creatures",
+			items: i,
+			values: v,
+			description: "Transport " + creatureNameQuantify(1, creatureNameToDisplayTextMap[v[2]]) + " from " + r1 + " to " + r2,
+			comments: "",
+			paint: p
 		};
 	},
 	BingoUnlockChallenge: function(desc) {
 		const thisname = "BingoUnlockChallenge";
-		//
+		//	desc of format ["System.String|SingularityBomb|Unlock|0|unlocks", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Unlock", , "unlocks"], "unlock selection");
+		var iconName = "", iconColor = [];
+		var p = [
+			{ type: "icon", value: "arenaunlock", scale: 1, color: "#ffffff", rotation: 0 },
+			{ type: "break" }
+		];
+		var d = "Get the ", r;
+		if (BingoEnum_ArenaUnlocksBlue.includes(items[1])) {
+			p[0].color = colorFloatToString(RainWorldColors.AntiGold);
+			iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
+			iconColor = creatureNameToIconColorMap[items[1]] || itemNameToIconColorMap[items[1]] || creatureNameToIconColorMap["Default"];
+			r = creatureNameToDisplayTextMap[items[1]] || itemNameToDisplayTextMap[items[1]];
+			if (iconName === undefined || r === undefined)
+				throw new TypeError(thisname + ": error, token " + items[1] + " not found in itemNameToIconAtlasMap[] (or creature-, or Color or DisplayText)");
+			d += r;
+		} else if (BingoEnum_ArenaUnlocksGold.includes(items[1])) {
+			p[0].color = colorFloatToString(RainWorldColors.TokenDefault);
+			r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
+			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r == "") {
+				r = arenaUnlocksGoldToDisplayName[items[1]];
+				if (r === undefined)
+					throw new TypeError(thisname + ": error, arena " + items[1] + " not found in arenaUnlocksGoldToDisplayName[]");
+			}
+			d += r + " Arenas";
+		} else if (BingoEnum_ArenaUnlocksGreen.includes(items[1])) {
+			p[0].color = colorFloatToString(RainWorldColors.GreenColor);
+			iconName = "Kill_Slugcat";
+			iconColor = RainWorldColors["Slugcat_" + items[1]];
+			if (iconColor === undefined)
+				throw new TypeError(thisname + ": error, token Slugcat_" + items[1] + " not found in RainWorldColors[]");
+			d += items[1] + " character"
+		} else if (BingoEnum_ArenaUnlocksRed.includes(items[1])) {
+			p[0].color = colorFloatToString(RainWorldColors.RedColor);
+			r = items[1].substring(0, items[1].search("-"));
+			r = (regionCodeToDisplayName[r] || "") + " / " + (regionCodeToDisplayNameSaint[r] || "");
+			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r == "")
+				throw new TypeError(thisname + ": error, region " + items[1].substring(0, items[1].search("-")) + " not found in regionCodeToDisplayName[]");
+			d += r + " Safari";
+		} else {
+			throw new TypeError(thisname + ": error, token " + items[1] + " not found in BingoEnum_ArenaUnlocks[]");
+		}
+		if (iconName == "")
+			p.push( { type: "text", value: items[1], color: "#ffffff" } );
+		else
+			p.push( { type: "icon", value: iconName, scale: 1, color: colorFloatToString(iconColor), rotation: 0 } );
 		return {
 			name: thisname,
-			category: "null",
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Getting Arena Unlocks",
+			items: ["Unlock"],
+			values: [items[1]],
+			description: d + " unlock.",
+			comments: "",
+			paint: p
 		};
 	},
 	BingoVistaChallenge: function(desc) {
@@ -1040,15 +1346,19 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 6, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Room", , "vista"], "item selection");
 		//	desc[0] is region code
+		if (desc[0] != items[1].substring(0, items[1].search("_")))
+			throw new TypeError(thisname + ": error, region " + desc[0] + " does not match room " + items[1] + "'s region");
 		var v = (regionCodeToDisplayName[desc[0]] || "") + " / " + (regionCodeToDisplayNameSaint[desc[0]] || "");
 		v = v.replace(/^\s\/\s|\s\/\s$/g, "");
-		v = v || "Unknown Region";
+		if (v == "")
+			throw new TypeError(thisname + ": error, region " + desc[0] + " not found in regionCodeToDisplayName[]");
 		return {
 			name: thisname,
-			category: "Visiting vistas",
+			category: "Visiting Vistas",
 			items: ["Region"],
 			values: [desc[0]],
-			description: "Reach the vista point in " + v + "." + (kibitzing ? ("<br>Room: " + items[1] + " at x: " + desc[2] + ", y: " + desc[3]) : ""),
+			description: "Reach the vista point in " + v + ".",
+			comments: "Room: " + items[1] + " at x: " + desc[2] + ", y: " + desc[3],
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: "#ffffff", rotation: 0 },
 				{ type: "break" },
@@ -1057,6 +1367,1164 @@ const CHALLENGES = {
 		};
 	}
 };
+
+
+/* * * Enum Arrays and Maps * * */
+
+/**
+ *	Possible Passages (achievements); used by BingoAchievementChallenge
+ *	Game extract: WinState::PassageDisplayName
+ */
+const passageToDisplayNameMap = {
+	"Survivor":     "The Survivor",
+	"Hunter":       "The Hunter",
+	"Saint":        "The Saint",
+	"Traveller":    "The Wanderer",
+	"Chieftain":    "The Chieftain",
+	"Monk":         "The Monk",
+	"Outlaw":       "The Outlaw",
+	"DragonSlayer": "The Dragon Slayer",
+	"Scholar":      "The Scholar",
+	"Friend":       "The Friend",
+	"Nomad":        "The Nomad",
+	"Martyr":       "The Martyr",
+	"Pilgrim":      "The Pilgrim",
+	"Mother":       "The Mother"
+};
+
+/**
+ *	Stealable items; used by BingoStealChallenge
+ *	Value type: internal item name
+ */
+const BingoEnum_theft = [
+	//	ChallengeUtils.stealableStoable
+	"Spear",
+	"Rock",
+	"ScavengerBomb",
+	"Lantern",
+	"GooieDuck",
+	"GlowWeed",
+	"DataPearl"	//	added by GetCorrectListForChallenge()
+];
+
+/**
+ *	Expedition items; used by BingoItemHoardChallenge
+ *	Value type: internal item name
+ */
+const BingoEnum_expobject = [
+	"FirecrackerPlant",
+	"SporePlant",
+	"FlareBomb",
+	"FlyLure",
+	"JellyFish",
+	"Lantern",
+	"Mushroom",
+	"PuffBall",
+	"ScavengerBomb",
+	"VultureMask"
+];
+
+/**
+ *	Weapon items; used by BingoKillChallenge
+ *	Value type: internal item name
+ *	Special case: element [0] is used literally (display text)
+ *	Special case: weaponsnojelly removes JellyFish item
+ */
+const BingoEnum_Weapons = [
+	//	ChallengeUtils.Weapons
+	"Any Weapon",
+	"Spear",
+	"Rock",
+	"ScavengerBomb",
+	"JellyFish",
+	"PuffBall",
+	"LillyPuck"
+];
+
+/**
+ *	Don't-use-able items; used by BingoDontUseItemChallenge
+ *	Value type: internal item name
+ */
+const BingoEnum_Bannable = [
+	//	ChallengeUtils.Bannable
+	"Lantern",
+	"PuffBall",
+	"VultureMask",
+	"ScavengerBomb",
+	"FirecrackerPlant",
+	"BubbleGrass",
+	"Rock"
+];
+
+/**
+ *	Tame-able creatures; used by BingoTameChallenge
+ *	Value type: internal creature name
+ */
+const BingoEnum_Befriendable = [
+	//	ChallengeUtils.Befriendable
+	"CicadaA",
+	"CicadaB",
+	"GreenLizard",
+	"PinkLizard",
+	"YellowLizard",
+	"BlackLizard",
+	"CyanLizard",
+	"WhiteLizard",
+	"BlueLizard",
+	"EelLizard",
+	"SpitLizard",
+	"ZoopLizard"
+];
+
+/**
+ *	Craftable items; used by BingoCraftChallenge
+ *	Value type: internal item name
+ */
+const BingoEnum_CraftableItems = [
+	//	ChallengeUtils.CraftableItems
+	"FlareBomb",
+	"SporePlant",
+	"ScavengerBomb",
+	"JellyFish",
+	"DataPearl",
+	"BubbleGrass",
+	"FlyLure",
+	"SlimeMold",
+	"FirecrackerPlant",
+	"PuffBall",
+	"Mushroom",
+	"Lantern",
+	"GlowWeed",
+	"GooieDuck",
+	"FireEgg"
+];
+
+/**
+ *	Edible items; used by BingoEatChallenge
+ *	Value type: internal item or creature name
+ */
+const BingoEnum_FoodTypes = [
+	//	ChallengeUtils.FoodTypes
+	"DangleFruit",
+	"EggBugEgg",
+	"WaterNut",
+	"SlimeMold",
+	"JellyFish",
+	"Mushroom",
+	"GooieDuck",
+	"LillyPuck",
+	"DandelionPeach",
+	"GlowWeed",
+	"VultureGrub",
+	"Hazer",
+	"SmallNeedleWorm",
+	"Fly",
+	"SmallCentipede"
+];
+
+/**
+ *	Subregions; used by BingoKillChallenge
+ *	Value type: string, display text
+ */
+const BingoEnum_Subregions = [
+	//	ChallengeUtils.AllSubregions
+	"Any Subregion",
+	"Chimney Canopy",
+	"Drainage System",
+	"Garbage Wastes",
+	"Industrial Complex",
+	"Farm Arrays",
+	"Subterranean",
+	"Depths",
+	"Filtration System",
+	"Shaded Citadel",
+	"Memory Crypts",
+	"Sky Islands",
+	"Communications Array",
+	"Shoreline",
+	"Looks to the Moon",
+	"Five Pebbles",
+	"Five Pebbles (Memory Conflux)",
+	"Five Pebbles (Recursive Transform Array)",
+	"Five Pebbles (Unfortunate Development)",
+	"Five Pebbles (General Systems Bus)",
+	"Outskirts",
+	"The Leg",
+	"Underhang",
+	"The Wall",
+	"The Gutter",
+	"The Precipice",
+	"Frosted Cathedral",
+	"The Husk",
+	"Silent Construct",
+	"Looks to the Moon (Abstract Convergence Manifold)",
+	"Struts",
+	"Looks to the Moon (Neural Terminus)",
+	"Luna",
+	"Looks to the Moon (Memory Conflux)",
+	"Looks to the Moon (Vents)",
+	"Metropolis",
+	"Atop the Tallest Tower",
+	"The Floor",
+	"12th Council Pillar, the House of Braids",
+	"Waterfront Facility",
+	"Waterfront Facility",
+	"The Shell",
+	"Submerged Superstructure",
+	"Submerged Superstructure (The Heart)",
+	"Auxiliary Transmission Array",
+	"Submerged Superstructure (Vents)",
+	"Bitter Aerie",
+	"Outer Expanse",
+	"Sunken Pier",
+	"Facility Roots (Western Intake)",
+	"Journey's End",
+	"The Rot",
+	"Five Pebbles (Primary Cortex)",
+	"The Rot (Depths)",
+	"The Rot (Cystic Conduit)",
+	"Five Pebbles (Linear Systems Rail)",
+	"Undergrowth",
+	"Pipeyard",
+	"Sump Tunnel"
+];
+
+/**
+ *	Subregions, Saint (where different); used by BingoKillChallenge
+ *	Value type: string, display text
+ */
+const BingoEnum_SubregionsSaint = [
+	//	ChallengeUtils.SaintSubregions
+	"Solitary Towers",
+	"Forgotten Conduit",
+	"Frosted Cathedral",
+	"The Husk",
+	"Silent Construct",
+	"Five Pebbles",
+	"Glacial Wasteland",
+	"Icy Monument",
+	"Desolate Fields",
+	"Primordial Underground",
+	"...",
+	"Ancient Labyrinth",
+	"Windswept Spires",
+	"Frozen Mast",
+	"Frigid Coast",
+	"Looks to the Moon",
+	"The Precipice",
+	"Suburban Drifts",
+	"Undergrowth",
+	"Barren Conduits",
+	"Desolate Canal",
+	"???"
+];
+
+/**
+ *	All subregions; concatenation of BingoEnum_Subregions and
+ *	BingoEnum_SubregionsSaint, sorted alphabetically, duplicates removed.
+ *	Value type: string, display text
+ */
+const BingoEnum_AllSubregions = [
+	"Any Subregion",
+	"...",
+	"???",
+	"12th Council Pillar, the House of Braids",
+	"Ancient Labyrinth",
+	"Atop the Tallest Tower",
+	"Auxiliary Transmission Array",
+	"Barren Conduits",
+	"Bitter Aerie",
+	"Chimney Canopy",
+	"Communications Array",
+	"Depths",
+	"Desolate Canal",
+	"Desolate Fields",
+	"Drainage System",
+	"Facility Roots (Western Intake)",
+	"Farm Arrays",
+	"Filtration System",
+	"Five Pebbles",
+	"Five Pebbles (General Systems Bus)",
+	"Five Pebbles (Linear Systems Rail)",
+	"Five Pebbles (Memory Conflux)",
+	"Five Pebbles (Primary Cortex)",
+	"Five Pebbles (Recursive Transform Array)",
+	"Five Pebbles (Unfortunate Development)",
+	"Forgotten Conduit",
+	"Frigid Coast",
+	"Frosted Cathedral",
+	"Frozen Mast",
+	"Garbage Wastes",
+	"Glacial Wasteland",
+	"Icy Monument",
+	"Industrial Complex",
+	"Journey's End",
+	"Looks to the Moon",
+	"Looks to the Moon (Abstract Convergence Manifold)",
+	"Looks to the Moon (Memory Conflux)",
+	"Looks to the Moon (Neural Terminus)",
+	"Looks to the Moon (Vents)",
+	"Luna",
+	"Memory Crypts",
+	"Metropolis",
+	"Outer Expanse",
+	"Outskirts",
+	"Pipeyard",
+	"Primordial Underground",
+	"Shaded Citadel",
+	"Shoreline",
+	"Silent Construct",
+	"Sky Islands",
+	"Solitary Towers",
+	"Struts",
+	"Submerged Superstructure",
+	"Submerged Superstructure (The Heart)",
+	"Submerged Superstructure (Vents)",
+	"Subterranean",
+	"Suburban Drifts",
+	"Sump Tunnel",
+	"Sunken Pier",
+	"The Floor",
+	"The Gutter",
+	"The Husk",
+	"The Leg",
+	"The Precipice",
+	"The Rot",
+	"The Rot (Cystic Conduit)",
+	"The Rot (Depths)",
+	"The Shell",
+	"The Wall",
+	"Undergrowth",
+	"Underhang",
+	"Waterfront Facility",
+	"Windswept Spires"
+];
+
+/**
+ *	Transportable creature targets; used by BingoTransportChallenge
+ *	Value type: string, creature internal name
+ */
+const BingoEnum_Transportable = [
+	"JetFish",
+	"Hazer",
+	"VultureGrub",
+	"CicadaA",
+	"CicadaB",
+	"Yeek"
+];
+
+/**
+ *	Pinnable creature targets; used by BingoPinChallenge
+ *	Value type: string, creature internal name
+ */
+const BingoEnum_Pinnable = [
+	"CicadaA",
+	"CicadaB",
+	"Scavenger",
+	"BlackLizard",
+	"PinkLizard",
+	"BlueLizard",
+	"YellowLizard",
+	"WhiteLizard",
+	"GreenLizard",
+	"Salamander",
+	"Dropbug",
+	"Snail",
+	"Centipede",
+	"Centiwing",
+	"LanternMouse"
+];
+
+/**
+ *	Bombable toll targets; used by BingoBombTollChallenge
+ *	Value type: string, room name (lowercased)
+ */
+const BingoEnum_BombableOutposts = [
+	"su_c02",
+	"gw_c05",
+	"gw_c11",
+	"lf_e03",
+	"ug_toll"
+];
+
+/**
+ *	Arena unlocks, blue (item/creature); used by BingoUnlockChallenge
+ *	Value type: string, unlock internal name
+ */
+const BingoEnum_ArenaUnlocksBlue = [
+	"AquaCenti",
+	"BigCentipede",
+	"BigEel",
+	"BigJelly",
+	"BigNeedleWorm",
+	"BigSpider",
+	"BlackLizard",
+	"BlueLizard",
+	"BrotherLongLegs",
+	"BubbleGrass",
+	"Centiwing",
+	"CicadaA",
+	"CyanLizard",
+	"DaddyLongLegs",
+	"DandelionPeach",
+	"DangleFruit",
+	"Deer",
+	"DropBug",
+	"EelLizard",
+	"EggBug",
+	"ElectricSpear",
+	"FireSpear",
+	"FirecrackerPlant",
+	"FlareBomb",
+	"FlyLure",
+	"GlowWeed",
+	"GooieDuck",
+	"Hazer",
+	"Inspector",
+	"JellyFish",
+	"JetFish",
+	"JungleLeech",
+	"KingVulture",
+	"Lantern",
+	"LanternMouse",
+	"Leech",
+	"LillyPuck",
+	"MirosBird",
+	"MirosVulture",
+	"MotherSpider",
+	"Mushroom",
+	"Pearl",
+	"PoleMimic",
+	"PuffBall",
+	"RedCentipede",
+	"RedLizard",
+	"Salamander",
+	"Scavenger",
+	"ScavengerBomb",
+	"ScavengerElite",
+	"SeaLeech",
+	"SingularityBomb",
+	"SlimeMold",
+	"SlugNPC",
+	"SmallCentipede",
+	"Snail",
+	"Spider",
+	"SpitLizard",
+	"SpitterSpider",
+	"SporePlant",
+	"TentaclePlant",
+	"TerrorLongLegs",
+	"TubeWorm",
+	"Vulture",
+	"VultureGrub",
+	"VultureMask",
+	"WaterNut",
+	"WhiteLizard",
+	"Yeek",
+	"YellowLizard",
+	"ZoopLizard"
+];
+
+/**
+ *	Arena unlocks, gold (arenas); used by BingoUnlockChallenge
+ *	Value type: string, unlock internal name
+ */
+const BingoEnum_ArenaUnlocksGold = [
+	"CC",
+	"CL",
+	"DM",
+	"DS",
+	"GW",
+	"GWold",
+	"HI",
+	"LC",
+	"LF",
+	"LM",
+	"MS",
+	"OE",
+	"RM",
+	"SB",
+	"SH",
+	"SI",
+	"SL",
+	"SU",
+	"UG",
+	"UW",
+	"VS",
+	"filter",
+	"gutter"
+];
+
+/**
+ *	Gold arena unlocks: additional subregion names; used by BingoUnlockChallenge
+ *	Key type: string, unlock internal name
+ *	Value type: string, arenas unlock display name
+ */
+const arenaUnlocksGoldToDisplayName = {
+	"GWold": "Past Garbage Wastes",
+	"filter": "Filtration System",
+	"gutter": "The Gutter",
+};
+
+/**
+ *	Arena unlocks, green (character); used by BingoUnlockChallenge
+ *	Value type: string, unlock internal name
+ */
+const BingoEnum_ArenaUnlocksGreen = [
+	"Artificer",
+	"Gourmand",
+	"Rivulet",
+	"Saint",
+	"Spearmaster"
+];
+
+/**
+ *	Arena unlocks, red (Safari); used by BingoUnlockChallenge
+ *	Value type: string, unlock internal name
+ */
+const BingoEnum_ArenaUnlocksRed = [
+	"CC-safari",
+	"CL-safari",
+	"DM-safari",
+	"DS-safari",
+	"GW-safari",
+	"HI-safari",
+	"LC-safari",
+	"LF-safari",
+	"LM-safari",
+	"MS-safari",
+	"OE-safari",
+	"RM-safari",
+	"SB-safari",
+	"SH-safari",
+	"SI-safari",
+	"SL-safari",
+	"SS-safari",
+	"SU-safari",
+	"UG-safari",
+	"UW-safari",
+	"VS-safari"
+];
+
+/**
+ *	Convert region code to display name.
+ *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
+ */
+const regionCodeToDisplayName = {
+	"CC": "Chimney Canopy",
+	"DM": "Looks to the Moon",
+	"DS": "Drainage System",
+	"GW": "Garbage Wastes",
+	"HI": "Industrial Complex",
+	"LC": "Metropolis",
+	"LF": "Farm Arrays",
+	"LM": "Waterfront Facility",
+	"MS": "Submerged Superstructure",
+	"OE": "Outer Expanse",
+	"RM": "The Rot",
+	"SB": "Subterranean",
+	"SH": "Shaded Citadel",
+	"SI": "Sky Islands",
+	"SL": "Shoreline",
+	"SS": "Five Pebbles",
+	"SU": "Outskirts",
+	"UW": "The Exterior",
+	"VS": "Pipeyard"
+};
+
+/**
+ *	Convert region code to display name, Saint world state.
+ *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
+ */
+const regionCodeToDisplayNameSaint = {
+	"CC": "Solitary Towers",
+	"CL": "Silent Construct",
+	"GW": "Glacial Wasteland",
+	"HI": "Icy Monument",
+	"HR": "Rubicon",
+	"LF": "Desolate Fields",
+	"SB": "Primordial Underground",
+	"SI": "Windswept Spires",
+	"SL": "Frigid Coast",
+	"SU": "Suburban Drifts",
+	"UG": "Undergrowth",
+	"VS": "Barren Conduits"
+};
+
+/**
+ *	Assorted color constants that don't belong to any
+ *	particular object, type or class.
+ */
+const RainWorldColors = {
+	//	RainWorld (global consts?), HSL2RGB'd and mathed as needed
+	"AntiGold":            [0.2245,   0.519817, 0.8355 ],
+	"GoldHSL":             [0.8355,   0.540183, 0.2245 ],
+	"GoldRGB":             [0.529,    0.365,    0.184  ],
+	"SaturatedGold":       [1,        0.73,     0.368  ],
+	"MapColor":            [0.381333, 0.32,     0.48   ],
+	//	CollectToken
+	"RedColor":            [1,        0,        0      ],
+	"GreenColor":          [0.265234, 0.8355,   0.2245 ],
+	"WhiteColor":          [0.53,     0.53,     0.53   ],
+	"DevColor":            [0.8648,   0,        0.94   ],
+	"TokenDefault":        [1,        0.6,      0.05   ],	//	BingoUnlockChallenge::IconDataForUnlock "gold" default
+	//	PlayerGraphics::DefaultSlugcatColor, prepended with "Slugcat_"
+	"Slugcat_White":       [1,        1,        1      ],
+	"Slugcat_Yellow":      [1,        1,        0.45098],
+	"Slugcat_Red":         [1,        0.45098,  0.45098],
+	"Slugcat_Night":       [0.092,    0.1388,   0.308  ],
+	"Slugcat_Sofanthiel":  [0.09,     0.14,     0.31   ],
+	"Slugcat_Rivulet":     [0.56863,  0.8,      0.94118],
+	"Slugcat_Artificer":   [0.43922,  0.13725,  0.23529],
+	"Slugcat_Saint":       [0.66667,  0.9451,   0.33725],
+	"Slugcat_Spear":       [0.31,     0.18,     0.41   ],
+	"Slugcat_Spearmaster": [0.31,     0.18,     0.41   ],	//	avoid special cases detecting "Spear" vs. "Spearmaster"
+	"Slugcat_Gourmand":    [0.94118,  0.75686,  0.59216]
+};
+
+/**
+ *	Convert creature value string to display text.
+ *	Game extract: ChallengeTools::CreatureName
+ *	Additions patched in from creatureNameToIconAtlasMap and sorted to match
+ *	Note: these are plural; see creatureNameToSingular() for the other case.
+ */
+const creatureNameToDisplayTextMap = {
+	"Slugcat":         "Slugcats",
+	"GreenLizard":     "Green Lizards",
+	"PinkLizard":      "Pink Lizards",
+	"BlueLizard":      "Blue Lizards",
+	"CyanLizard":      "Cyan Lizards",
+	"RedLizard":       "Red Lizards",
+	"WhiteLizard":     "White Lizards",
+	"BlackLizard":     "Black Lizards",
+	"YellowLizard":    "Yellow Lizards",
+	"Salamander":      "Salamanders",
+	"Scavenger":       "Scavengers",
+	"Vulture":         "Vultures",
+	"KingVulture":     "King Vultures",
+	"CicadaA":         "White Squidcadas",
+	"CicadaB":         "Black Squidcadas",
+	"Snail":           "Snails",
+	"Centiwing":       "Centiwings",
+	"SmallCentipede":  "Small Centipedes",
+	"Centipede":       "Large Centipedes",
+	"BigCentipede":    "Overgrown Centipedes",	//	Used by unlock token
+	"RedCentipede":    "Red Centipedes",
+	"BrotherLongLegs": "Brother Long Legs",
+	"DaddyLongLegs":   "Daddy Long Legs",
+	"LanternMouse":    "Lantern Mice",
+	"GarbageWorm":     "Garbage Worms",
+	"Fly":             "Batflies",
+	"Leech":           "Leeches",
+	"SeaLeech":        "Sea Leeches",
+	"JetFish":         "Jetfish",
+	"BigEel":          "Leviathans",
+	"Deer":            "Rain Deer",
+	"TubeWorm":        "Tube Worms",
+	"Spider":          "Coalescipedes",
+	"BigSpider":       "Large Spiders",
+	"SpitterSpider":   "Spitter Spiders",
+	"MirosBird":       "Miros Birds",
+	"TentaclePlant":   "Monster Kelp",
+	"PoleMimic":       "Pole Mimics",
+	"Overseer":        "Overseers",
+	"VultureGrub":     "Vulture Grubs",
+	"EggBug":          "Egg Bugs",
+	"BigNeedleWorm":   "Large Noodleflies",
+	"SmallNeedleWorm": "Baby Noodleflies",
+	"DropBug":         "Dropwigs",
+	"Hazer":           "Hazers",
+	"TrainLizard":     "Train Lizards",
+	"ZoopLizard":      "Strawberry Lizards",
+	"EelLizard":       "Eel Lizards",
+	"JungleLeech":     "Jungle Leeches",
+	"TerrorLongLegs":  "Terror Long Legs",
+	"MotherSpider":    "Mother Spiders",
+	"StowawayBug":     "Stowaway Bugs",
+	"HunterDaddy":     "Hunter Long Legs",
+	"FireBug":         "Firebugs",
+	"AquaCenti":       "Aquapedes",
+	"MirosVulture":    "Miros Vultures",
+	"ScavengerElite":  "Elite Scavengers",
+	"ScavengerKing":   "King Scavengers",
+	"SpitLizard":      "Caramel Lizards",
+	"Inspector":       "Inspectors",
+	"Yeek":            "Yeeks",
+	"BigJelly":        "Large Jellyfish",
+	"SlugNPC":         "Slugpups",
+	"Default":         "Unknown Creatures"
+};
+
+/**
+ *	Refactoring of creatureNameToIconAtlas to associative array.
+ */
+const creatureNameToIconAtlasMap = {
+	"Slugcat":        	"Kill_Slugcat",
+	"GreenLizard":    	"Kill_Green_Lizard",
+	"PinkLizard":     	"Kill_Standard_Lizard",
+	"BlueLizard":     	"Kill_Standard_Lizard",
+	"CyanLizard":     	"Kill_Standard_Lizard",
+	"RedLizard":      	"Kill_Standard_Lizard",
+	"WhiteLizard":    	"Kill_White_Lizard",
+	"BlackLizard":    	"Kill_Black_Lizard",
+	"YellowLizard":   	"Kill_Yellow_Lizard",
+	"Salamander":     	"Kill_Salamander",
+	"Scavenger":      	"Kill_Scavenger",
+	"Vulture":        	"Kill_Vulture",
+	"KingVulture":    	"Kill_KingVulture",
+	"CicadaA":        	"Kill_Cicada",
+	"CicadaB":        	"Kill_Cicada",
+	"Snail":          	"Kill_Snail",
+	"Centiwing":      	"Kill_Centiwing",
+	"SmallCentipede": 	"Kill_Centipede1",
+	"Centipede":      	"Kill_Centipede2",
+	"BigCentipede":     "Kill_Centipede3",	//	Used by unlock token
+	"RedCentipede":   	"Kill_Centipede3",
+	"BrotherLongLegs":	"Kill_Daddy",
+	"DaddyLongLegs":  	"Kill_Daddy",
+	"LanternMouse":   	"Kill_Mouse",
+	"GarbageWorm":    	"Kill_Garbageworm",
+	"Fly":            	"Kill_Bat",
+	"Leech":          	"Kill_Leech",
+	"SeaLeech":       	"Kill_Leech",
+	"JetFish":        	"Kill_Jetfish",
+	"BigEel":         	"Kill_BigEel",
+	"Deer":           	"Kill_RainDeer",
+	"TubeWorm":       	"Kill_Tubeworm",
+	"Spider":         	"Kill_SmallSpider",
+	"BigSpider":      	"Kill_BigSpider",
+	"SpitterSpider":  	"Kill_BigSpider",
+	"MirosBird":      	"Kill_MirosBird",
+	"TentaclePlant":  	"Kill_TentaclePlant",
+	"PoleMimic":      	"Kill_PoleMimic",
+	"Overseer":       	"Kill_Overseer",
+	"VultureGrub":    	"Kill_VultureGrub",
+	"EggBug":         	"Kill_EggBug",
+	"BigNeedleWorm":  	"Kill_NeedleWorm",
+	"SmallNeedleWorm":	"Kill_SmallNeedleWorm",
+	"DropBug":        	"Kill_DropBug",
+	"Hazer":          	"Kill_Hazer",
+	"TrainLizard":    	"Kill_Standard_Lizard",
+	"ZoopLizard":     	"Kill_White_Lizard",
+	"EelLizard":      	"Kill_Salamander",
+	"JungleLeech":    	"Kill_Leech",
+	"TerrorLongLegs": 	"Kill_Daddy",
+	"MotherSpider":   	"Kill_BigSpider",
+	"StowawayBug":    	"Kill_Stowaway",
+	"HunterDaddy":    	"Kill_Slugcat",
+	"FireBug":        	"Kill_FireBug",
+	"AquaCenti":      	"Kill_Centiwing",
+	"MirosVulture":   	"Kill_MirosBird",
+	"ScavengerElite": 	"Kill_ScavengerElite",
+	"ScavengerKing":  	"Kill_ScavengerKing",
+	"SpitLizard":     	"Kill_Spit_Lizard",
+	"Inspector":      	"Kill_Inspector",
+	"Yeek":           	"Kill_Yeek",
+	"BigJelly":       	"Kill_BigJellyFish",
+	"SlugNPC":        	"Kill_Slugcat",
+	"Default":        	"Futile_White"
+};
+
+/**
+ *	Convert creature to color.
+ *	Refactoring of creatureNameToIconColor() to associative array.
+ *	Sorted to match creatureNameToIconAtlasMap (with defaults removed).
+ *	Key type: internal creature name
+ *	Value type: array, 3 elements, numeric; RGB float color
+ *	Note: use colorFloatToString() to obtain HTML colors.
+ */
+const creatureNameToIconColorMap = {
+	"Slugcat":        	[1,        1,        1       ],
+	"GreenLizard":    	[0.2,      1,        0       ],
+	"PinkLizard":     	[1,        0,        1       ],
+	"BlueLizard":     	[0,        0.5,      1       ],
+	"CyanLizard":     	[0,        0.909804, 0.901961],
+	"RedLizard":      	[0.901961, 0.054902, 0.054902],
+	"WhiteLizard":    	[1,        1,        1       ],
+	"BlackLizard":    	[0.368627, 0.368627, 0.435294],
+	"YellowLizard":	  	[1,        0.6,      0       ],
+	"Salamander":     	[0.933333, 0.780392, 0.894118],
+	"Vulture":        	[0.831373, 0.792157, 0.435294],
+	"KingVulture":    	[0.831373, 0.792157, 0.435294],
+	"CicadaA":        	[1,        1,        1       ],
+	"CicadaB":        	[0.368627, 0.368627, 0.435294],
+	"Centiwing":      	[0.054902, 0.698039, 0.235294],
+	"SmallCentipede": 	[1,        0.6,      0       ],
+	"Centipede":      	[1,        0.6,      0       ],
+	"BigCentipede":   	[1,        0.6,      0       ],	//	Used by unlock token
+	"RedCentipede":   	[0.901961, 0.054902, 0.054902],
+	"BrotherLongLegs":	[0.454902, 0.52549,  0.305882],
+	"DaddyLongLegs":  	[0,        0,        1       ],
+	"Leech":          	[0.682353, 0.156863, 0.117647],
+	"SeaLeech":       	[0.05,     0.3,      0.7     ],
+	"TubeWorm":       	[0.05,     0.3,      0.7     ],
+	"SpitterSpider":  	[0.682353, 0.156863, 0.117647],
+	"Overseer":       	[0,        0.909804, 0.901961],
+	"VultureGrub":    	[0.831373, 0.792157, 0.435294],
+	"EggBug":         	[0,        1,        0.470588],
+	"BigNeedleWorm":  	[1,        0.596078, 0.596078],
+	"SmallNeedleWorm":	[1,        0.596078, 0.596078],
+	"Hazer":          	[0.211765, 0.792157, 0.388235],
+	"TrainLizard":    	[0.3,      0,        1       ],
+	"ZoopLizard":     	[0.95,     0.73,     0.73    ],
+	"EelLizard":      	[0.02,     0.780392, 0.2     ],
+	"JungleLeech":    	[0.1,      0.7,      0.1     ],
+	"TerrorLongLegs": 	[0.3,      0,        1       ],
+	"MotherSpider":   	[0.1,      0.7,      0.1     ],
+	"StowawayBug":    	[0.368627, 0.368627, 0.435294],
+	"HunterDaddy":    	[0.8,      0.470588, 0.470588],
+	"FireBug":        	[1,        0.470588, 0.470588],
+	"AquaCenti":      	[0,        0,        1       ],
+	"MirosVulture":   	[0.901961, 0.054902, 0.054902],
+	"SpitLizard":     	[0.55,     0.4,      0.2     ],
+	"Inspector":      	[0.447059, 0.901961, 0.768627],
+	"Yeek":           	[0.9,      0.9,    0.9       ],
+	"BigJelly":       	[1,        0.85,   0.7       ],
+	"Default":        	[0.66384,  0.6436, 0.6964    ]
+};
+
+/**
+ *	Convert items to display text.
+ *	Key type: internal item name
+ *	Value type: display text (English)
+ *	Note: two items with intData parameters have been integrated for completeness.
+ *	Append the intData parameter (if present or nonzero) to the item name.
+ *	These are:
+ *	"VultureMask1", "VultureMask2", "Spear1", "Spear2", "Spear3"
+ */
+const itemNameToDisplayTextMap = {
+	//	base game, Expedition::ChallengeTools.ItemName
+	"FirecrackerPlant": "Firecracker Plants",
+	"FlareBomb":        "Flare Bombs",
+	"FlyLure":          "Fly Lures",
+	"JellyFish":        "Jellyfish",
+	"Lantern":          "Scavenger Lanterns",
+	"Mushroom":         "Mushrooms",
+	"PuffBall":         "Puff Balls",
+	"ScavengerBomb":    "Scavenger Bombs",
+	"VultureMask":      "Vulture Masks",
+	"VultureMask1":     "King Vulture Masks",	//	appended intData for completeness
+	"VultureMask2":     "Chieftan Masks",
+	//	bingo, ChallengeUtils::ChallengeTools_ItemName
+	"Spear":            "Spears",
+	"Spear1":           "Explosive Spears",	//	appended intData for completeness
+	"Spear2":           "Electric Spears",
+	"Spear3":           "Fire Spears",
+	"Rock":             "Rocks",
+	"SporePlant":       "Bee Hives",
+	"DataPearl":        "Pearls",
+	"DangleFruit":      "Blue Fruit",
+	"EggBugEgg":        "Eggbug Eggs",
+	"WaterNut":         "Bubble Fruit",
+	"SlimeMold":        "Slime Mold",
+	"BubbleGrass":      "Bubble Grass",
+	"GlowWeed":         "Glow Weed",
+	"DandelionPeach":   "Dandelion Peaches",
+	"LillyPuck":        "Lillypucks",
+	"GooieDuck":        "Gooieducks",
+	//	manual adds
+	"NeedleEgg":        "Noodlefly Eggs",
+	"OverseerCarcass":  "Overseer Eyes",
+	"KarmaFlower":      "Karma Flowers",
+	//	Used by unlock tokens (why are they different :agony:)
+	"ElectricSpear":    "Electric Spears",
+	"FireSpear":        "Fire Spears",
+	"Pearl":            "Pearls",
+	//	entries in itemNameToIconAtlasMap missing from above
+	"SLOracleSwarmer":  "Neuron Flies",
+	"SSOracleSwarmer":  "Neuron Flies",
+	"NSHSwarmer":       "Green Neuron Flies",
+	"PebblesPearl":     "Pearls",
+	"HalcyonPearl":     "Pearls",
+	"Spearmasterpearl": "Pearls",
+	"EnergyCell":       "Rarefaction Cells",
+	"SingularityBomb":  "Singularity Bombs",
+	"MoonCloak":        "Moon's Cloak",
+	"FireEgg":          "Firebug Eggs",
+	"JokeRifle":        "Joke Rifles",
+	"Seed":             "Popcorn Seeds",
+	"Default":          "Unknown Item"
+};
+
+/**
+ *	Convert items to atlas icons.
+ *	Key type: internal item name
+ *	Value type: atlas icon name
+ *	Sorted approximately from itemNameToIconColorMap.
+ */
+const itemNameToIconAtlasMap = {
+	//	base game, ItemSymbol.SpriteNameForItem
+	"Rock":             "Symbol_Rock",
+	"SporePlant":       "Symbol_SporePlant",
+	"FirecrackerPlant": "Symbol_Firecracker",
+	"ScavengerBomb":    "Symbol_StunBomb",
+	"Spear":            "Symbol_Spear",
+	"Spear1":           "Symbol_FireSpear",
+	"Spear2":           "Symbol_ElectricSpear",
+	"Spear3":           "Symbol_HellSpear",
+	"Lantern":          "Symbol_Lantern",
+	"FlareBomb":        "Symbol_FlashBomb",
+	"PuffBall":         "Symbol_PuffBall",
+	"SlimeMold":        "Symbol_SlimeMold",
+	"BubbleGrass":      "Symbol_BubbleGrass",
+	"DangleFruit":      "Symbol_DangleFruit",
+	"Mushroom":         "Symbol_Mushroom",
+	"WaterNut":         "Symbol_WaterNut",
+	"EggBugEgg":        "Symbol_EggBugEgg",
+	"FlyLure":          "Symbol_FlyLure",
+	"JellyFish":        "Symbol_JellyFish",
+	"VultureMask":      "Kill_Vulture",
+	"VultureMask1":     "Kill_KingVulture",
+	"VultureMask2":     "Symbol_ChieftainMask",
+	"SLOracleSwarmer":  "Symbol_Neuron",
+	"SSOracleSwarmer":  "Symbol_Neuron",
+	"NSHSwarmer":       "Symbol_Neuron",
+	"NeedleEgg":        "needleEggSymbol",
+	"OverseerCarcass":  "Kill_Overseer",
+	"PebblesPearl":     "Symbol_Pearl",
+	"DataPearl":        "Symbol_Pearl",
+	"HalcyonPearl":     "Symbol_Pearl",
+	"Spearmasterpearl": "Symbol_Pearl",
+	"EnergyCell":       "Symbol_EnergyCell",
+	"SingularityBomb":  "Symbol_Singularity",
+	"GooieDuck":        "Symbol_GooieDuck",
+	"LillyPuck":        "Symbol_LillyPuck",
+	"GlowWeed":         "Symbol_GlowWeed",
+	"DandelionPeach":   "Symbol_DandelionPeach",
+	"MoonCloak":        "Symbol_MoonCloak",
+	"FireEgg":          "Symbol_FireEgg",
+	"JokeRifle":        "Symbol_JokeRifle",
+	"Seed":             "Symbol_Seed",
+	"Default":          "Futile_White",
+	//	Used by unlock tokens
+	"FireSpear":        "Symbol_FireSpear",
+	"ElectricSpear":    "Symbol_ElectricSpear",
+	"Pearl":            "Symbol_Pearl"
+};
+
+/**
+ *	Colored data pearl types, indexed by intData parameter
+ *	Use to convert pearl index to expanded text name, for use with:
+ *	dataPearlToDisplayTextMap[DataPearlList[intData]] and,
+ *	dataPearlToColorMap[DataPearlList[intData]] or
+ *	itemNameToIconColorMap["Pearl_" + DataPearlList[intData]]
+ */
+const DataPearlList = [
+	,
+	,
+	//	From DataPearl::AbstractDataPearl.DataPearlType
+	"Misc",
+	"Misc2",
+	"CC",
+	"SI_west",
+	"SI_top",
+	"LF_west",
+	"LF_bottom",
+	"HI",
+	"SH",
+	"DS",
+	"SB_filtration",
+	"SB_ravine",
+	"GW",
+	"SL_bridge",
+	"SL_moon",
+	"SU",
+	"UW",
+	"PebblesPearl",
+	"SL_chimney",
+	"Red_stomach",
+	//	from MoreSlugcats::MoreSlugcatsEnums::DataPearlType.RegisterValues()
+	"Spearmasterpearl",
+	"SU_filt",
+	"SI_chat3",
+	"SI_chat4",
+	"SI_chat5",
+	"DM",
+	"LC",
+	"OE",
+	"MS",
+	"RM",
+	"Rivulet_stomach",
+	"LC_second",
+	"CL",
+	"VS",
+	"BroadcastMisc"
+];
+
+/**
+ *	Pearl display names.
+ *	Key type: internal pearl name
+ *	Value type: display name
+ *	Note: use colorFloatToString() to obtain HTML colors.
+ */
+const dataPearlToDisplayTextMap = {
+	//	Bingo, ChallengeUtils::NameForPearl()
+	"CC":               "Gold",
+	"DS":               "Bright Green",
+	"GW":               "Viridian",
+	"HI":               "Bright Blue",
+	"LF_bottom":        "Bright Red",
+	"LF_west":          "Deep Pink",
+	"SH":               "Deep Magenta",
+	"SI_chat3":         "Dark Purple",
+	"SI_chat4":         "Olive Green",
+	"SI_chat5":         "Dark Magenta",
+	"SI_top":           "Dark Blue",
+	"SI_west":          "Dark Green",
+	"SL_bridge":        "Bright Purple",
+	"SL_chimney":       "Bright Magenta",
+	"SL_moon":          "Pale Yellow",
+	"SB_filtration":    "Teal",
+	"SB_ravine":        "Dark Magenta",
+	"SU":               "Light Blue",
+	"UW":               "Pale Green",
+	"VS":               "Deep Purple",
+	//	Additional names from Wiki
+	"CL":               "Music (faded)",
+	"DM":               "Light Yellow",
+	"LC":               "Deep Green",
+	"LC_second":        "Bronze",
+	"MS":               "Dull Yellow",
+	"OE":               "Light Purple",
+	"Red_stomach":      "Aquamarine",
+	"Rivulet_stomach":  "Celadon",
+	"RM":               "Music",
+	"SL_moon":          "Pale Yellow",
+	"Spearmasterpearl": "Dark Red",
+	"SU_filt":          "Light Pink"
+};
+
+/**
+ *	Pearl colors.
+ *	Key type: internal pearl name
+ *	Value type: array, 3 elements, numeric; RGB float color
+ *	Note: use colorFloatToString() to obtain HTML colors.
+ */
+const dataPearlToColorMap = {
+	"Misc":             [0.745,    0.745,    0.745   ],
+	"Misc2":            [0.745,    0.745,    0.745   ],
+	"CC":               [0.95,     0.8,      0.1     ],
+	"SI_west":          [0.05125,  0.2575,   0.175   ],
+	"SI_top":           [0.05125,  0.175,    0.2575  ],
+	"LF_west":          [1,        0.15,     0.405   ],
+	"LF_bottom":        [1,        0.235,    0.235   ],
+	"HI":               [0.131863, 0.356863, 1       ],
+	"SH":               [0.52,     0.08,     0.316   ],
+	"DS":               [0.15,     0.745,    0.235   ],
+	"SB_filtration":    [0.235,    0.575,    0.575   ],
+	"SB_ravine":        [0.2575,   0.05125,  0.175   ],
+	"GW":               [0.125,    0.775,    0.5625  ],
+	"SL_bridge":        [0.58,     0.208,    0.93    ],
+	"SL_moon":          [0.915,    0.9575,   0.32    ],
+	"SU":               [0.575,    0.66,     0.915   ],
+	"UW":               [0.49,     0.642,    0.49    ],
+	"PebblesPearl":     [0.745,    0.745,    0.745   ],
+	"SL_chimney":       [1,        0.105,    0.7075  ],
+	"Red_stomach":      [0.6,      1,        0.9     ],
+	"Spearmasterpearl": [0.496,    0.01,     0.04    ],
+	"SU_filt":          [1,        0.7875,   0.915   ],
+	"SI_chat3":         [0.175,    0.05125,  0.2575  ],
+	"SI_chat4":         [0.175,    0.2575,   0.05125 ],
+	"SI_chat5":         [0.2575,   0.05125,  0.175   ],
+	"DM":               [0.963333, 0.933333, 0.326667],
+	"LC":               [0.15,     0.49,     0.1636  ],
+	"OE":               [0.616667, 0.463333, 0.83    ],
+	"MS":               [0.843333, 0.91,     0.38    ],
+	"RM":               [0.692157, 0.184314, 0.984314],
+	"Rivulet_stomach":  [0.65,     0.89,     0.683333],
+	"LC_second":        [0.76,     0.4,      0       ],
+	"CL":               [0.742157, 0.284314, 1       ],
+	"VS":               [0.765,    0.05,     0.96    ],
+	"BroadcastMisc":    [0.911111, 0.775,    0.822222]
+};
+
+/**
+ *	Complete list of items' colors, including pearls.
+ *	Key type: internal item name, or pearl name with "Pearl_" prepended
+ *	Value type: array, 3 elements, numeric; RGB float color
+ *	Note: use colorFloatToString() to obtain HTML colors.
+ *	Any items not found in this list, shall use "Default"'s value instead.
+ */
+const itemNameToIconColorMap = {
+	"Default":                [0.66384,  0.6436,   0.6964  ],
+	"SporePlant":             [0.682353, 0.156862, 0.117647],
+	"FirecrackerPlant":       [0.682353, 0.156862, 0.117647],
+	"ScavengerBomb":          [0.90196,  0.054902, 0.054902],
+	"Spear1":                 [0.90196,  0.054902, 0.054902],
+	"Spear2":                 [0,        0,        1       ],
+	"Spear3":                 [1,        0.470588, 0.470588],
+	"Lantern":                [1,        0.572549, 0.317647],
+	"FlareBomb":              [0.733333, 0.682353, 1       ],
+	"SlimeMold":              [1,        0.6,      0       ],
+	"BubbleGrass":            [0.054902, 0.698039, 0.235294],
+	"DangleFruit":            [0,        0,        1       ],
+	"Mushroom":               [1,        1,        1       ],
+	"WaterNut":               [0.05,     0.3,      0.7     ],
+	"EggBugEgg":              [0,        1,        0.470588],
+	"FlyLure":                [0.678431, 0.266667, 0.211765],
+	"SSOracleSwarmer":        [1,        1,        1       ],
+	"NSHSwarmer":             [0,        1,        0.3     ],
+	"NeedleEgg":              [0.57647,  0.160784, 0.25098 ],
+	"PebblesPearl1":          [0.7,      0.7,      0.7     ],
+	"PebblesPearl2":          [0.2944,   0.276,    0.324   ],
+	"PebblesPearl3":          [1,        0.478431, 0.007843],
+	"PebblesPearl":           [0,        0.454902, 0.639216],
+	"DataPearl":              [0.7,      0.7,      0.7     ],	//	default values -- access special values by using key:
+	"HalcyonPearl":           [0.7,      0.7,      0.7     ],	//	"Pearl" + DataPearlList[intData]
+	"DataPearl1":             [1,        0.6,      0.9     ],	//	intData = 1
+	"Spearmasterpearl":       [0.5325,   0.1585,   0.184   ],
+	"EnergyCell":             [0.01961,  0.6451,   0.85    ],
+	"SingularityBomb":        [0.01961,  0.6451,   0.85    ],
+	"GooieDuck":              [0.447059, 0.90196,  0.768627],
+	"LillyPuck":              [0.170588, 0.96196,  0.998627],
+	"GlowWeed":               [0.947059, 1,        0.268627],
+	"DandelionPeach":         [0.59,     0.78,     0.96    ],
+	"MoonCloak":              [0.95,     1,        0.96    ],
+	"FireEgg":                [1,        0.470588, 0.470588],
+	//	Used by unlock tokens (why are they different :agony:)
+	"ElectricSpear":          [0,        0,        1       ],
+	"FireSpear":              [0.90196,  0.054902, 0.054902],
+	"Pearl":                  [0.7,      0.7,      0.7     ],
+	//	dataPearlToColorMap incorporated here, add "Pearl_" prefix
+	"Pearl_Misc":             [0.745,    0.745,    0.745   ],
+	"Pearl_Misc2":            [0.745,    0.745,    0.745   ],
+	"Pearl_CC":               [0.95,     0.8,      0.1     ],
+	"Pearl_SI_west":          [0.05125,  0.2575,   0.175   ],
+	"Pearl_SI_top":           [0.05125,  0.175,    0.2575  ],
+	"Pearl_LF_west":          [1,        0.15,     0.405   ],
+	"Pearl_LF_bottom":        [1,        0.235,    0.235   ],
+	"Pearl_HI":               [0.131863, 0.356863, 1       ],
+	"Pearl_SH":               [0.52,     0.08,     0.316   ],
+	"Pearl_DS":               [0.15,     0.745,    0.235   ],
+	"Pearl_SB_filtration":    [0.235,    0.575,    0.575   ],
+	"Pearl_SB_ravine":        [0.2575,   0.05125,  0.175   ],
+	"Pearl_GW":               [0.125,    0.775,    0.5625  ],
+	"Pearl_SL_bridge":        [0.58,     0.208,    0.93    ],
+	"Pearl_SL_moon":          [0.915,    0.9575,   0.32    ],
+	"Pearl_SU":               [0.575,    0.66,     0.915   ],
+	"Pearl_UW":               [0.49,     0.642,    0.49    ],
+	"Pearl_PebblesPearl":     [0.745,    0.745,    0.745   ],
+	"Pearl_SL_chimney":       [1,        0.105,    0.7075  ],
+	"Pearl_Red_stomach":      [0.6,      1,        0.9     ],
+	"Pearl_Spearmasterpearl": [0.496,    0.01,     0.04    ],
+	"Pearl_SU_filt":          [1,        0.7875,   0.915   ],
+	"Pearl_SI_chat3":         [0.175,    0.05125,  0.2575  ],
+	"Pearl_SI_chat4":         [0.175,    0.2575,   0.05125 ],
+	"Pearl_SI_chat5":         [0.2575,   0.05125,  0.175   ],
+	"Pearl_DM":               [0.963333, 0.933333, 0.326667],
+	"Pearl_LC":               [0.15,     0.49,     0.1636  ],
+	"Pearl_OE":               [0.616667, 0.463333, 0.83    ],
+	"Pearl_MS":               [0.843333, 0.91,     0.38    ],
+	"Pearl_RM":               [0.692157, 0.184314, 0.984314],
+	"Pearl_Rivulet_stomach":  [0.65,     0.89,     0.683333],
+	"Pearl_LC_second":        [0.76,     0.4,      0       ],
+	"Pearl_CL":               [0.742157, 0.284314, 1       ],
+	"Pearl_VS":               [0.765,    0.05,     0.96    ],
+	"Pearl_BroadcastMisc":    [0.911111, 0.775,    0.822222]
+};
+
+
+/* * * Utility Functions * * */
 
 /**
  *	Check if the specified challenge descriptor SettingBox string matches
@@ -1094,23 +2562,21 @@ function checkDescriptors(t, d, g, err) {
 	if (d != g) throw new TypeError(t + ": error, " + err + " " + s + ", expected: " + h);
 }
 
-/* * * Utility Functions * * */
-
-
 function itemToColor(i) {
 	var colr = itemNameToIconColorMap[i] || itemNameToIconColorMap["Default"];
-	return colorFloatToString(...colr);
+	return colorFloatToString(colr);
 }
 
 function creatureToColor(c) {
 	var colr = creatureNameToIconColorMap[c] || creatureNameToIconColorMap["Default"];
-	return colorFloatToString(...colr);
+	return colorFloatToString(colr);
 }
 
 /**
  *	Convert floating point triple to HTML color string.
  */
-function colorFloatToString(r, g, b) {
+function colorFloatToString(colr) {
+	var r = colr[0], g = colr[1], b = colr[2];
 	return "#" + ("00000" + (
 			(toInt(r) << 16) + (toInt(g) << 8) + toInt(b)
 		).toString(16)).slice(-6);
@@ -1174,134 +2640,30 @@ function HSL2RGB(h, s, l) {
 }
 
 /**
- *	Possible Passages (achievements)
- *	Game extract: WinState::PassageDisplayName
+ *	Default: for n != 1, concatenates number, space, name.
+ *	For n == 1, tests for special cases (ref: creatureNameToDisplayTextMap,
+ *	itemNameToDisplayTextMap), converting it to the English singular case
+ *	("a Batfly", etc.).
  */
-const passageToDisplayNameMap = {
-	"Survivor":     "The Survivor",
-	"Hunter":       "The Hunter",
-	"Saint":        "The Saint",
-	"Traveller":    "The Wanderer",
-	"Chieftain":    "The Chieftain",
-	"Monk":         "The Monk",
-	"Outlaw":       "The Outlaw",
-	"DragonSlayer": "The Dragon Slayer",
-	"Scholar":      "The Scholar",
-	"Friend":       "The Friend",
-	"Nomad":        "The Nomad",
-	"Martyr":       "The Martyr",
-	"Pilgrim":      "The Pilgrim",
-	"Mother":       "The Mother"
-};
+function creatureNameQuantify(n, s) {
+	if (n != 1)
+		return String(n) + " " + s;
+	s = s.replace(/Mice$/, "Mouse").replace(/ies$/, "y").replace(/ches$/, "ch").replace(/s$/, "");
+	if (/^[AEIOU]/i.test(s))
+		s = "an " + s;
+	else
+		s = "a " + s;
+	return s;
+}
 
 /**
- *	Convert region code to display name.
- *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
- */
-const regionCodeToDisplayName = {
-	"CC": "Chimney Canopy",
-	"DM": "Looks to the Moon",
-	"DS": "Drainage System",
-	"GW": "Garbage Wastes",
-	"HI": "Industrial Complex",
-	"LC": "Metropolis",
-	"LF": "Farm Arrays",
-	"LM": "Waterfront Facility",
-	"MS": "Submerged Superstructure",
-	"OE": "Outer Expanse",
-	"RM": "The Rot",
-	"SB": "Subterranean",
-	"SH": "Shaded Citadel",
-	"SI": "Sky Islands",
-	"SL": "Shoreline",
-	"SS": "Five Pebbles",
-	"SU": "Outskirts",
-	"UW": "The Exterior",
-	"VS": "Pipeyard"
-};
-
-/**
- *	Convert region code to display name, Saint world state.
- *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
- */
-const regionCodeToDisplayNameSaint = {
-	"CC": "Solitary Towers",
-	"CL": "Silent Construct",
-	"GW": "Glacial Wasteland",
-	"HI": "Icy Monument",
-	"HR": "Rubicon",
-	"LF": "Desolate Fields",
-	"MS": "Submerged Superstructure",
-	"SB": "Primordial Underground",
-	"SI": "Windswept Spires",
-	"SL": "Frigid Coast",
-	"SU": "Suburban Drifts",
-	"UG": "Undergrowth",
-	"VS": "Barren Conduits"
-};
-
-/**
- *	Convert creature value string to display text.
- *	Game extract: ChallengeTools::CreatureName
- */
-const creatureNameToDisplayTextMap = {
-	"Slugcat":         "Slugcats",
-	"GreenLizard":     "Green Lizards",
-	"PinkLizard":      "Pink Lizards",
-	"BlueLizard":      "Blue Lizards",
-	"WhiteLizard":     "White Lizards",
-	"BlackLizard":     "Black Lizards",
-	"YellowLizard":    "Yellow Lizards",
-	"CyanLizard":      "Cyan Lizards",
-	"RedLizard":       "Red Lizards",
-	"Salamander":      "Salamander",
-	"CicadaA":         "White Cicadas",
-	"CicadaB":         "Black Cicadas",
-	"Snail":           "Snails",
-	"PoleMimic":       "Pole Mimics",
-	"TentaclePlant":   "Monster Kelp",
-	"Scavenger":       "Scavengers",
-	"Vulture":         "Vultures",
-	"KingVulture":     "King Vultures",
-	"SmallCentipede":  "Small Centipedes",
-	"Centipede":       "Large Centipedes",
-	"RedCentipede":    "Red Centipedes",
-	"Centiwing":       "Centiwings",
-	"LanternMouse":    "Lantern Mice",
-	"BigSpider":       "Large Spiders",
-	"SpitterSpider":   "Spitter Spiders",
-	"MirosBird":       "Miros Birds",
-	"BrotherLongLegs": "Brother Long Legs",
-	"DaddyLongLegs":   "Daddy Long Legs",
-	"TubeWorm":        "Tube Worms",
-	"EggBug":          "Egg Bugs",
-	"DropBug":         "Dropwigs",
-	"BigNeedleWorm":   "Large Noodleflies",
-	"JetFish":         "Jetfish",
-	"BigEel":          "Leviathans",
-	"Deer":            "Rain Deer",
-	"Fly":             "Batflies",
-	"MirosVulture":    "Miros Vultures",
-	"MotherSpider":    "Mother Spiders",
-	"EelLizard":       "Eel Lizards",
-	"SpitLizard":      "Caramel Lizards",
-	"TerrorLongLegs":  "Terror Long Legs",
-	"AquaCenti":       "Aquapedes",
-	"FireBug":         "Firebugs",
-	"Inspector":       "Inspectors",
-	"Yeek":            "Yeek",
-	"BigJelly":        "Large Jellyfish",
-	"StowawayBug":     "Stowaway Bugs",
-	"ZoopLizard":      "Strawberry Lizards",
-	"ScavengerElite":  "Elite Scavengers",
-	"SlugNPC":         "Slugcats"
-};
-
-/**
+ *	Helper functions to generate below tables.
  *	Convert creature value string to atlas name string.
+ *	Ported from game/mod.
  *	TODO?: Throws if key not found (currently returns "Futile_White" game default)
  *	TODO?: refactor to associative array (convert ifs, ||s into more properties?
  *	    minor manual edit overhead)
+ *	--> done
  */
 function creatureNameToIconAtlas(type) {
 	/*
@@ -1417,7 +2779,7 @@ function creatureNameToIconAtlas(type) {
 		return "Kill_Centiwing";
 	if (type == "MirosVulture")
 		return "Kill_MirosBird";
-	if (type == "FireBug")
+	if (type == "FireBug")	//	bug in original code, extraneous clause left in, and not optimized out
 		return "Kill_EggBug";
 	if (type == "ScavengerElite")
 		return "Kill_ScavengerElite";
@@ -1437,77 +2799,9 @@ function creatureNameToIconAtlas(type) {
 }
 
 /**
- *	Refactoring of creatureNameToIconAtlas to associative array.
- */
-const creatureNameToIconAtlasMap = {
-	"Slugcat":        	"Kill_Slugcat",
-	"GreenLizard":    	"Kill_Green_Lizard",
-	"PinkLizard":     	"Kill_Standard_Lizard",
-	"BlueLizard":     	"Kill_Standard_Lizard",
-	"CyanLizard":     	"Kill_Standard_Lizard",
-	"RedLizard":      	"Kill_Standard_Lizard",
-	"WhiteLizard":    	"Kill_White_Lizard",
-	"BlackLizard":    	"Kill_Black_Lizard",
-	"YellowLizard":   	"Kill_Yellow_Lizard",
-	"Salamander":     	"Kill_Salamander",
-	"Scavenger":      	"Kill_Scavenger",
-	"Vulture":        	"Kill_Vulture",
-	"KingVulture":    	"Kill_KingVulture",
-	"CicadaA":        	"Kill_Cicada",
-	"CicadaB":        	"Kill_Cicada",
-	"Snail":          	"Kill_Snail",
-	"Centiwing":      	"Kill_Centiwing",
-	"SmallCentipede": 	"Kill_Centipede1",
-	"Centipede":      	"Kill_Centipede2",
-	"RedCentipede":   	"Kill_Centipede3",
-	"BrotherLongLegs":	"Kill_Daddy",
-	"DaddyLongLegs":  	"Kill_Daddy",
-	"LanternMouse":   	"Kill_Mouse",
-	"GarbageWorm":    	"Kill_Garbageworm",
-	"Fly":            	"Kill_Bat",
-	"Leech":          	"Kill_Leech",
-	"SeaLeech":       	"Kill_Leech",
-	"Spider":         	"Kill_SmallSpider",
-	"JetFish":        	"Kill_Jetfish",
-	"BigEel":         	"Kill_BigEel",
-	"Deer":           	"Kill_RainDeer",
-	"TubeWorm":       	"Kill_Tubeworm",
-	"TentaclePlant":  	"Kill_TentaclePlant",
-	"PoleMimic":      	"Kill_PoleMimic",
-	"MirosBird":      	"Kill_MirosBird",
-	"Overseer":       	"Kill_Overseer",
-	"VultureGrub":    	"Kill_VultureGrub",
-	"EggBug":         	"Kill_EggBug",
-	"BigSpider":      	"Kill_BigSpider",
-	"SpitterSpider":  	"Kill_BigSpider",
-	"BigNeedleWorm":  	"Kill_NeedleWorm",
-	"SmallNeedleWorm":	"Kill_SmallNeedleWorm",
-	"DropBug":        	"Kill_DropBug",
-	"Hazer":          	"Kill_Hazer",
-	"TrainLizard":    	"Kill_Standard_Lizard",
-	"ZoopLizard":     	"Kill_White_Lizard",
-	"EelLizard":      	"Kill_Salamander",
-	"JungleLeech":    	"Kill_Leech",
-	"TerrorLongLegs": 	"Kill_Daddy",
-	"MotherSpider":   	"Kill_BigSpider",
-	"StowawayBug":    	"Kill_Stowaway",
-	"HunterDaddy":    	"Kill_Slugcat",
-	"FireBug":        	"Kill_FireBug",
-	"AquaCenti":      	"Kill_Centiwing",
-	"MirosVulture":   	"Kill_MirosBird",
-	"FireBug":        	"Kill_EggBug",
-	"ScavengerElite": 	"Kill_ScavengerElite",
-	"ScavengerKing":  	"Kill_ScavengerKing",
-	"SpitLizard":     	"Kill_Spit_Lizard",
-	"Inspector":      	"Kill_Inspector",
-	"Yeek":           	"Kill_Yeek",
-	"BigJelly":       	"Kill_BigJellyFish",
-	"SlugNPC":        	"Kill_Slugcat",
-	"Default":        	"Futile_White"
-};
-
-/**
+ *	Helper functions to generate below tables.
  *	Convert creature value string to HTML color.
+ *	Converts item value string to HTML color; ported from game/mod.
  *	TODOs: same as creatureNameToIconAtlas().
  */
 function creatureNameToIconColor(type) {
@@ -1626,148 +2920,12 @@ function creatureNameToIconColor(type) {
 		c = [1, 0.85, 0.7];
 	/* end copy */
 
-	return colorFloatToString(...c);
+	return colorFloatToString(c);
 }
 
 /**
- *	Refactoring of creatureNameToIconColor() to associative array.
- */
-const creatureNameToIconColorMap = {
-	"Slugcat":        	[1,        1,        1       ],
-	"GreenLizard":    	[0.2,      1,        0       ],
-	"PinkLizard":     	[1,        0,        1       ],
-	"BlueLizard":     	[0,        0.5,      1       ],
-	"WhiteLizard":    	[1,        1,        1       ],
-	"RedLizard":      	[0.901961, 0.054902, 0.054902],
-	"BlackLizard":    	[0.368627, 0.368627, 0.435294],
-	"YellowLizard":	  	[1,        0.6,      0       ],
-	"SmallCentipede": 	[1,        0.6,      0       ],
-	"Centipede":      	[1,        0.6,      0       ],
-	"RedCentipede":   	[0.901961, 0.054902, 0.054902],
-	"CyanLizard":     	[0,        0.909804, 0.901961],
-	"Overseer":       	[0,        0.909804, 0.901961],
-	"Salamander":     	[0.933333, 0.780392, 0.894118],
-	"CicadaB":        	[0.368627, 0.368627, 0.435294],
-	"CicadaA":        	[1,        1,        1       ],
-	"SpitterSpider":  	[0.682353, 0.156863, 0.117647],
-	"Leech":          	[0.682353, 0.156863, 0.117647],
-	"SeaLeech":       	[0.05,     0.3,      0.7     ],
-	"TubeWorm":       	[0.05,     0.3,      0.7     ],
-	"Centiwing":      	[0.054902, 0.698039, 0.235294],
-	"BrotherLongLegs":	[0.454902, 0.52549,  0.305882],
-	"DaddyLongLegs":  	[0,        0,        1       ],
-	"VultureGrub":    	[0.831373, 0.792157, 0.435294],
-	"EggBug":         	[0,        1,        0.470588],
-	"BigNeedleWorm":  	[1,        0.596078, 0.596078],
-	"SmallNeedleWorm":	[1,        0.596078, 0.596078],
-	"Hazer":          	[0.211765, 0.792157, 0.388235],
-	"Vulture":        	[0.831373, 0.792157, 0.435294],
-	"KingVulture":    	[0.831373, 0.792157, 0.435294],
-	"ZoopLizard":     	[0.95,     0.73,     0.73    ],
-	"StowawayBug":    	[0.368627, 0.368627, 0.435294],
-	"AquaCenti":      	[0,        0,        1       ],
-	"TerrorLongLegs": 	[0.3,      0,        1       ],
-	"TrainLizard":    	[0.3,      0,        1       ],
-	"MotherSpider":   	[0.1,      0.7,      0.1     ],
-	"JungleLeech":    	[0.1,      0.7,      0.1     ],
-	"HunterDaddy":    	[0.8,      0.470588, 0.470588],
-	"MirosVulture":   	[0.901961, 0.054902, 0.054902],
-	"FireBug":        	[1,        0.470588, 0.470588],
-	"SpitLizard":     	[0.55,     0.4,      0.2     ],
-	"EelLizard":      	[0.02,     0.780392, 0.2     ],
-	"Inspector":      	[0.447059, 0.901961, 0.768627],
-	"Yeek":           	[0.9,      0.9,    0.9       ],
-	"BigJelly":       	[1,        0.85,   0.7       ],
-	"Default":        	[0.66384,  0.6436, 0.6964    ]
-};
-
-/**
- *	Convert item value string to display text string.
- */
-const ItemNameToDisplayTextMap = {
-	//	base game, Expedition::ChallengeTools.ItemName
-	"FirecrackerPlant": "Firecracker Plants",
-	"FlareBomb":        "Flare Bombs",
-	"FlyLure":          "Fly Lures",
-	"JellyFish":        "Jellyfish",
-	"Lantern":          "Scavenger Lanterns",
-	"Mushroom":         "Mushrooms",
-	"PuffBall":         "Puff Balls",
-	"ScavengerBomb":    "Scavenger Bombs",
-	"VultureMask":      "Vulture Masks",
-	"VultureMask1":     "King Vulture Masks",	//	appended intData for completeness
-	"VultureMask2":     "Chieftan Masks",
-	//	bingo, ChallengeUtils::ChallengeTools_ItemName
-	"Spear":            "Spears",
-	"Spear1":           "Explosive Spears",	//	appended intData for completeness
-	"Spear2":           "Electric Spears",
-	"Spear3":           "Fire Spears",
-	"Rock":             "Rocks",
-	"SporePlant":       "Bee Hives",
-	"DataPearl":        "Pearls",
-	"DangleFruit":      "Blue Fruit",
-	"EggBugEgg":        "Eggbug Eggs",
-	"WaterNut":         "Bubble Fruit",
-	"SlimeMold":        "Slime Mold",
-	"BubbleGrass":      "Bubble Grass",
-	"GlowWeed":         "Glow Weed",
-	"DandelionPeach":   "Dandelion Peaches",
-	"LillyPuck":        "Lillypucks",
-	"GooieDuck":        "Gooieducks",
-	"OverseerCarcass":  "Overseer Eye"	//	manual add (maybe sometime?)
-};
-
-/**
- *	Convert item value string to atlas name string.
- */
-const itemNameToIconAtlasMap = {
-	//	base game, ItemSymbol.SpriteNameForItem
-	"Rock":             "Symbol_Rock",
-	"Spear":            "Symbol_Spear",
-	"Spear1":           "Symbol_FireSpear",
-	"Spear2":           "Symbol_ElectricSpear",
-	"Spear3":           "Symbol_HellSpear",
-	"ScavengerBomb":    "Symbol_StunBomb",
-	"SporePlant":       "Symbol_SporePlant",
-	"Lantern":          "Symbol_Lantern",
-	"FlareBomb":        "Symbol_FlashBomb",
-	"PuffBall":         "Symbol_PuffBall",
-	"WaterNut":         "Symbol_WaterNut",
-	"FirecrackerPlant": "Symbol_Firecracker",
-	"DangleFruit":      "Symbol_DangleFruit",
-	"BubbleGrass":      "Symbol_BubbleGrass",
-	"SlimeMold":        "Symbol_SlimeMold",
-	"Mushroom":         "Symbol_Mushroom",
-	"JellyFish":        "Symbol_JellyFish",
-	"VultureMask":      "Kill_Vulture",
-	"VultureMask1":     "Kill_KingVulture",
-	"VultureMask2":     "Symbol_ChieftainMask",
-	"FlyLure":          "Symbol_FlyLure",
-	"SLOracleSwarmer":  "Symbol_Neuron",
-	"SSOracleSwarmer":  "Symbol_Neuron",
-	"NSHSwarmer":       "Symbol_Neuron",
-	"EggBugEgg":        "Symbol_EggBugEgg",
-	"OverseerCarcass":  "Kill_Overseer",
-	"DataPearl":        "Symbol_Pearl",
-	"PebblesPearl":     "Symbol_Pearl",
-	"NeedleEgg":        "needleEggSymbol",
-	"Spearmasterpearl": "Symbol_Pearl",
-	"HalcyonPearl":     "Symbol_Pearl",
-	"EnergyCell":       "Symbol_EnergyCell",
-	"GooieDuck":        "Symbol_GooieDuck",
-	"GlowWeed":         "Symbol_GlowWeed",
-	"LillyPuck":        "Symbol_LillyPuck",
-	"DandelionPeach":   "Symbol_DandelionPeach",
-	"MoonCloak":        "Symbol_MoonCloak",
-	"FireEgg":          "Symbol_FireEgg",
-	"JokeRifle":        "Symbol_JokeRifle",
-	"Seed":             "Symbol_Seed",
-	"SingularityBomb":  "Symbol_Singularity",
-	"Default":          "Futile_White"
-};
-
-/**
- *	Convert item value string to HTML color.
+ *	Helper functions to generate below tables.
+ *	Converts item value string to HTML color; ported from game/mod.
  *	TODOs: same as creatureNameToIconAtlas().
  */
 function itemNameToIconColor(type) {
@@ -2046,182 +3204,3 @@ function makePearlColors() {
 		return result;
 	}
 }
-
-//	Colored data pearl types, indexed by intData
-const DataPearlList = [
-	,
-	,
-	//	From DataPearl::AbstractDataPearl.DataPearlType
-	"Misc",
-	"Misc2",
-	"CC",
-	"SI_west",
-	"SI_top",
-	"LF_west",
-	"LF_bottom",
-	"HI",
-	"SH",
-	"DS",
-	"SB_filtration",
-	"SB_ravine",
-	"GW",
-	"SL_bridge",
-	"SL_moon",
-	"SU",
-	"UW",
-	"PebblesPearl",
-	"SL_chimney",
-	"Red_stomach",
-	//	from MoreSlugcats::MoreSlugcatsEnums::DataPearlType.RegisterValues()
-	"Spearmasterpearl",
-	"SU_filt",
-	"SI_chat3",
-	"SI_chat4",
-	"SI_chat5",
-	"DM",
-	"LC",
-	"OE",
-	"MS",
-	"RM",
-	"Rivulet_stomach",
-	"LC_second",
-	"CL",
-	"VS",
-	"BroadcastMisc"
-];
-
-const dataPearlToDisplayTextMap = {
-	//	bingo, ChallengeUtils::NameForPearl()
-	"CC":            "Gold",
-	"DS":            "Bright Green",
-	"GW":            "Viridian",
-	"HI":            "Bright Blue",
-	"LF_bottom":     "Bright Red",
-	"LF_west":       "Deep Pink",
-	"SH":            "Deep Magenta",
-	"SI_chat3":      "Dark Purple",
-	"SI_chat4":      "Olive Green",
-	"SI_chat5":      "Dark Magenta",
-	"SI_top":        "Dark Blue",
-	"SI_west":       "Dark Green",
-	"SL_bridge":     "Bright Purple",
-	"SL_chimney":    "Bright Magenta",
-	"SL_moon":       "Pale Yellow",
-	"SB_filtration": "Teal",
-	"SB_ravine":     "Dark Magenta",
-	"SU":            "Light Blue",
-	"UW":            "Pale Green",
-	"VS":            "Deep Purple",
-};
-
-const dataPearlToColorMap = {
-	"Misc":             [0.745,    0.745,    0.745   ],
-	"Misc2":            [0.745,    0.745,    0.745   ],
-	"CC":               [0.95,     0.8,      0.1     ],
-	"SI_west":          [0.05125,  0.2575,   0.175   ],
-	"SI_top":           [0.05125,  0.175,    0.2575  ],
-	"LF_west":          [1,        0.15,     0.405   ],
-	"LF_bottom":        [1,        0.235,    0.235   ],
-	"HI":               [0.131863, 0.356863, 1       ],
-	"SH":               [0.52,     0.08,     0.316   ],
-	"DS":               [0.15,     0.745,    0.235   ],
-	"SB_filtration":    [0.235,    0.575,    0.575   ],
-	"SB_ravine":        [0.2575,   0.05125,  0.175   ],
-	"GW":               [0.125,    0.775,    0.5625  ],
-	"SL_bridge":        [0.58,     0.208,    0.93    ],
-	"SL_moon":          [0.915,    0.9575,   0.32    ],
-	"SU":               [0.575,    0.66,     0.915   ],
-	"UW":               [0.49,     0.642,    0.49    ],
-	"PebblesPearl":     [0.745,    0.745,    0.745   ],
-	"SL_chimney":       [1,        0.105,    0.7075  ],
-	"Red_stomach":      [0.6,      1,        0.9     ],
-	"Spearmasterpearl": [0.496,    0.01,     0.04    ],
-	"SU_filt":          [1,        0.7875,   0.915   ],
-	"SI_chat3":         [0.175,    0.05125,  0.2575  ],
-	"SI_chat4":         [0.175,    0.2575,   0.05125 ],
-	"SI_chat5":         [0.2575,   0.05125,  0.175   ],
-	"DM":               [0.963333, 0.933333, 0.326667],
-	"LC":               [0.15,     0.49,     0.1636  ],
-	"OE":               [0.616667, 0.463333, 0.83    ],
-	"MS":               [0.843333, 0.91,     0.38    ],
-	"RM":               [0.692157, 0.184314, 0.984314],
-	"Rivulet_stomach":  [0.65,     0.89,     0.683333],
-	"LC_second":        [0.76,     0.4,      0       ],
-	"CL":               [0.742157, 0.284314, 1       ],
-	"VS":               [0.765,    0.05,     0.96    ],
-	"BroadcastMisc":    [0.911111, 0.775,    0.822222]
-};
-
-const itemNameToIconColorMap = {
-	"Default":                [0.66384,  0.6436,   0.6964  ],
-	"SporePlant":             [0.682353, 0.156862, 0.117647],
-	"FirecrackerPlant":       [0.682353, 0.156862, 0.117647],
-	"ScavengerBomb":          [0.90196,  0.054902, 0.054902],
-	"Spear1":                 [0.90196,  0.054902, 0.054902],
-	"Spear2":                 [0,        0,        1       ],
-	"Spear3":                 [1,        0.470588, 0.470588],
-	"Lantern":                [1,        0.572549, 0.317647],
-	"FlareBomb":              [0.733333, 0.682353, 1       ],
-	"SlimeMold":              [1,        0.6,      0       ],
-	"BubbleGrass":            [0.054902, 0.698039, 0.235294],
-	"DangleFruit":            [0,        0,        1       ],
-	"Mushroom":               [1,        1,        1       ],
-	"WaterNut":               [0.05,     0.3,      0.7     ],
-	"EggBugEgg":              [0,        1,        0.470588],
-	"FlyLure":                [0.678431, 0.266667, 0.211765],
-	"SSOracleSwarmer":        [1,        1,        1       ],
-	"NSHSwarmer":             [0,        1,        0.3     ],
-	"NeedleEgg":              [0.57647,  0.160784, 0.25098 ],
-	"PebblesPearl1":          [0.7,      0.7,      0.7     ],
-	"PebblesPearl2":          [0.2944,   0.276,    0.324   ],
-	"PebblesPearl3":          [1,        0.478431, 0.007843],
-	"PebblesPearl":           [0,        0.454902, 0.639216],
-	"DataPearl":              [0.7,      0.7,      0.7     ],	//	default values -- access special values by using key:
-	"HalcyonPearl":           [0.7,      0.7,      0.7     ],	//	"Pearl" + DataPearlList[intData]
-	"DataPearl1":             [1,        0.6,      0.9     ],	//	intData = 1
-	"Spearmasterpearl":       [0.5325,   0.1585,   0.184   ],
-	"EnergyCell":             [0.01961,  0.6451,   0.85    ],
-	"SingularityBomb":        [0.01961,  0.6451,   0.85    ],
-	"GooieDuck":              [0.447059, 0.90196,  0.768627],
-	"LillyPuck":              [0.170588, 0.96196,  0.998627],
-	"GlowWeed":               [0.947059, 1,        0.268627],
-	"DandelionPeach":         [0.59,     0.78,     0.96    ],
-	"MoonCloak":              [0.95,     1,        0.96    ],
-	"FireEgg":                [1,        0.470588, 0.470588],
-	//	Prepend "Pearl_" to a special DataPearl type to access its color
-	"Pearl_Misc":             [0.745,    0.745,    0.745   ],
-	"Pearl_Misc2":            [0.745,    0.745,    0.745   ],
-	"Pearl_CC":               [0.95,     0.8,      0.1     ],
-	"Pearl_SI_west":          [0.05125,  0.2575,   0.175   ],
-	"Pearl_SI_top":           [0.05125,  0.175,    0.2575  ],
-	"Pearl_LF_west":          [1,        0.15,     0.405   ],
-	"Pearl_LF_bottom":        [1,        0.235,    0.235   ],
-	"Pearl_HI":               [0.131863, 0.356863, 1       ],
-	"Pearl_SH":               [0.52,     0.08,     0.316   ],
-	"Pearl_DS":               [0.15,     0.745,    0.235   ],
-	"Pearl_SB_filtration":    [0.235,    0.575,    0.575   ],
-	"Pearl_SB_ravine":        [0.2575,   0.05125,  0.175   ],
-	"Pearl_GW":               [0.125,    0.775,    0.5625  ],
-	"Pearl_SL_bridge":        [0.58,     0.208,    0.93    ],
-	"Pearl_SL_moon":          [0.915,    0.9575,   0.32    ],
-	"Pearl_SU":               [0.575,    0.66,     0.915   ],
-	"Pearl_UW":               [0.49,     0.642,    0.49    ],
-	"Pearl_PebblesPearl":     [0.745,    0.745,    0.745   ],
-	"Pearl_SL_chimney":       [1,        0.105,    0.7075  ],
-	"Pearl_Red_stomach":      [0.6,      1,        0.9     ],
-	"Pearl_Spearmasterpearl": [0.496,    0.01,     0.04    ],
-	"Pearl_SU_filt":          [1,        0.7875,   0.915   ],
-	"Pearl_SI_chat3":         [0.175,    0.05125,  0.2575  ],
-	"Pearl_SI_chat4":         [0.175,    0.2575,   0.05125 ],
-	"Pearl_SI_chat5":         [0.2575,   0.05125,  0.175   ],
-	"Pearl_DM":               [0.963333, 0.933333, 0.326667],
-	"Pearl_LC":               [0.15,     0.49,     0.1636  ],
-	"Pearl_OE":               [0.616667, 0.463333, 0.83    ],
-	"Pearl_MS":               [0.843333, 0.91,     0.38    ],
-	"Pearl_RM":               [0.692157, 0.184314, 0.984314],
-	"Pearl_Rivulet_stomach":  [0.65,     0.89,     0.683333],
-	"Pearl_LC_second":        [0.76,     0.4,      0       ],
-	"Pearl_CL":               [0.742157, 0.284314, 1       ],
-	"Pearl_VS":               [0.765,    0.05,     0.96    ],
-	"Pearl_BroadcastMisc":    [0.911111, 0.775,    0.822222]
-};

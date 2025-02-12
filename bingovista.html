@@ -12,11 +12,53 @@
 	<link rel="preload" as="fetch"href="uispritesmsc.txt" crossorigin="anonymous">
 	<link rel="preload" as="script" href="bingovista.js">
 	<style type="text/css" media="all"><!--
+@font-face {
+    font-family: "Rodondo";
+    src: url(Rodondo.otf) format("OpenType");
+}
 .desctxt {
-	font: 16px "Segoe UI Semibold", sans-serif;
+	text-align: left;
+	font: 16px "Segoe UI Semibold", Verdana, sans-serif;
 	padding-left: 0.6em;
 	vertical-align: top;
-	width: calc(26em);
+	width: 26em;
+}
+.desctxt * {
+	text-align: inherit;
+	margin: 4px 0 0 0;
+}
+.desctxt br {
+	margin: 0 0 6px 0;
+}
+.descch {
+	font: 700 16px "Segoe UI Bold", Verdana, sans-serif;
+}
+.desclist {
+	border-collapse: collapse;
+}
+.desclist tbody tr :first-child {
+	font: 14px "Segoe UI", sans-serif;
+	text-align: right;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+}
+.desclist thead tr td {
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	text-align: center;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+	border-bottom-color: #a0a0a0;
+}
+.desclist tbody tr :last-child {
+	font: 14px "Segoe UI", sans-serif;
+	text-align: left;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+}
+.descdesc {
+}
+.desccomm {
+	font: 14px "Segoe UI", sans-serif;
 }
 .drop {
 	border: 1px solid #a0a0a0;
@@ -49,9 +91,14 @@ div {
 	margin-top: 0.5em;
 }
 h1 {
+	font-family: "Rodondo";
+	font-weight: normal;
+	font-size: xxx-large;
+	margin-bottom: 0.25em;
 	padding-bottom: 8px;
-	line-height: 130%;
+	line-height: 90%;
 	text-align: center;
+	
 }
 input[type=button] {
 	padding: 4px 6px;
@@ -80,19 +127,15 @@ p {
 	max-width: 50em;
 	font-size: inherit;
 }
-@media only screen and (min-width: 700px) {
+@media only screen and (min-width: 830px) {
 	body div {
 		text-align: left;
 		margin-left: 1em;
 	}
 	h1 {
-		padding-bottom: 8px;
-		margin-left: 2em;
-		line-height: 130%;
+		margin-left: 0.7em;
+		line-height: 90%;
 		text-align: left;
-	}
-	h1 br {
-		display: none;
 	}
 	table {
 		margin: 6px auto 0 calc(1em - 2px);
@@ -121,8 +164,11 @@ textarea {
   </head>
   <body>
 	<h1>Rain World: Bingo Mod<br> Board Viewer</h1>
-	<div><canvas width="455" height="455" id="board">Canvas support and scripting are required.</canvas></div>
-	<table><tr><td><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
+	<div style="position: relative; width: 456px; height: 456px;">
+	  <canvas width="454" height="454" id="board" tabindex="1" style="position: absolute; top: 0px; left: 0px; z-index: 1;">Canvas support and scripting are required.</canvas>
+	  <div id="cursor" style="display: none; width: 39px; height: 39px; margin: 0; border: 2px solid #b8b8b8; border-radius: 5px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
+	</div>
+	<table><tr><td style="vertical-align: top; padding-top: 6px;"><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
 	<p>&nbsp;</p>
 	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
 	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text"></div>
@@ -131,6 +177,7 @@ textarea {
 	<p class="errorbox" id="errorbox"></p>
 	<p>&nbsp;</p>
 	<div><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label></div>
+	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
 	<p>&nbsp;</p>
 	<p>Bingo Board Viewer, by T3sl4co1l, 2025/02/04.</p>
 	<p>For use with Rain World Bingo Mod v0.85 (by Nacu).</p>
