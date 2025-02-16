@@ -231,6 +231,14 @@
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":20,"h":34},
 	"sourceSize": {"w":20,"h":34}
+},
+"ShortcutGate.png":
+{
+	"frame": {"x":48,"y":16,"w":14,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":14},
+	"sourceSize": {"w":14,"h":14}
 }},
 "meta": {
 	"app": "https://www.codeandweb.com/texturepacker",

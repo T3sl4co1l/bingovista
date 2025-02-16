@@ -1,6 +1,6 @@
 RW Bingo Board Binary Format
 
-T3sl4co1l, 2025/02/09
+T3sl4co1l, 2025/02/14
 For v0.85 Bingo Mod
 
 
@@ -113,6 +113,8 @@ Length is technically redundant, defined by the goal.  It is provided for two re
 `data` is defined per goal.
 
 Goals generally (always?) use three data types to select options: Boolean, Integer, or String.  In the v0.85 text format, these are obtained from a SettingBox instance, where strings are selected from a goal- and selection-specific list.
+
+A "hidden" flag is desirable, to implement hidden goals similar to base Expedition.  This could be inserted as a new byte in this structure, leeched off the `type` or `length` fields (e.g. take the top bit, reducing the range of the field by half -- it might not prove necessary), or implemented arbitrarily within each goal's `data`.  At this time, more evaluation is necessary to determine which location is most suitable.
 
 Supplementary information is used to parse `data`.  A goal definition specifies which parameters (number, type and order) it's composed of, and provides any sets of strings needed to index names from.  Strings from base game and Bingo Mod are also provided as defaults.
 

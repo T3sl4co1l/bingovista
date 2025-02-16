@@ -8,6 +8,7 @@ const ids = {
 	load: "fileload",
 	drop: "droptarget",
 	board: "board",
+	boardbox: "boardcontainer",
 	cursor: "cursor",
 	square: "square",
 	desc: "desctxt",
@@ -28,9 +29,9 @@ const ids = {
  *	The named targets are not themselves referenced directly elsewhere.
  */
 const atlases = [
-	{ img: "bingoicons.png",   txt: "bingoicons.txt",   canv: undefined, frames: {} },	/**< from Bingo mod */
-	{ img: "uispritesmsc.png", txt: "uispritesmsc.txt", canv: undefined, frames: {} }, 	/**< from DLC */
-	{ img: "uiSprites.png",    txt: "uiSprites.txt",    canv: undefined, frames: {} } 	/**< from base game */
+	{ img: "bingoicons_mod.png", txt: "bingoicons_mod.txt", canv: undefined, frames: {} },	/**< from Bingo mod (with vista additions) */
+	{ img: "uispritesmsc.png",   txt: "uispritesmsc.txt",   canv: undefined, frames: {} }, 	/**< from DLC */
+	{ img: "uiSprites.png",      txt: "uiSprites.txt",      canv: undefined, frames: {} } 	/**< from base game */
 ];
 
 /* Bingo square graphics dimensions (in px) */
@@ -43,6 +44,12 @@ const square = {
 	background: "#020204",
 	font: "600 10pt \"Segoe UI\", sans-serif"
 };
+
+/** Maximum accepted value for Int32 challenge parameters. In-game default seems to be 500; binary format has a hard limit of 32767 (signed) or 65535 (unsigned). Somewhere around 30k seems reasonable enough?  */
+const INT_MAX = 30000;
+
+
+/* * * Global Variables * * */
 
 var board;
 
@@ -58,13 +65,15 @@ var kibitzing = false;
 
 document.addEventListener("DOMContentLoaded", function() {
 
+	square.color = colorFloatToString(RainWorldColors.Unity_white);
+
 	//	File load stuff
 	document.getElementById(ids.clear).addEventListener("click", function(e) {
 		document.getElementById(ids.textbox).value = "";
 	});
 	document.getElementById(ids.parse).addEventListener("click", parseText);
-	document.getElementById(ids.board).addEventListener("click", selectSquare);
-	document.getElementById(ids.board).addEventListener("keydown", navSquares);
+	document.getElementById(ids.boardbox).addEventListener("click", clickBoard);
+	document.getElementById(ids.boardbox).addEventListener("keydown", navSquares);
 	document.getElementById(ids.load).addEventListener("change", function() { doLoadFile(this.files) } );
 	document.getElementById(ids.radio1).addEventListener("input", toggleDark);
 	document.getElementById(ids.radio2).addEventListener("input", toggleDark);
@@ -172,10 +181,7 @@ function toggleDark(e) {
 function toggleKibs(e) {
 	kibitzing = !!document.getElementById(ids.detail).checked;
 	if (selected !== undefined)
-		selectSquare( {
-			offsetX: selected.col * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1,
-			offsetY: selected.row * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1
-		} );
+		selectSquare(selected.col, selected.row);
 }
 
 /**
@@ -276,7 +282,7 @@ function parseText(e) {
 			description: "Error generating goal. Descriptor: " + d.join("><"),
 			values: [],
 			paint: [
-				{ type: "text", value: "∅", scale: 1, color: "#ffffff", rotation: 0 }
+				{ type: "text", value: "∅", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
 			]
 		};
 	}
@@ -284,16 +290,13 @@ function parseText(e) {
 	if (selected !== undefined) {
 		//	See if we can re-select the same square (position) in the new board
 		if (selected.row < board.height && selected.col < board.width) {
-			selectSquare( {
-				offsetX: selected.col * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1,
-				offsetY: selected.row * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1
-			} );
+			selectSquare(selected.col, selected.row);
 		} else {
 			selected = undefined;
 		}
 	}
 	if (selected === undefined)
-		selectSquare( { offsetX: -1, offsetY: -1 } );
+		selectSquare(-1, -1);
 
 	//	Adjust graphical dimensions based on canvas and board sizes
 	var canv = document.getElementById(ids.board);
@@ -319,61 +322,70 @@ function parseText(e) {
 /**
  *	Clicked on canvas.
  */
-function selectSquare(e) {
-	var el = document.getElementById(ids.desc);
-	var ctx = document.getElementById(ids.square).getContext("2d");
+function clickBoard(e) {
 	if (board !== undefined) {
-		var x = e.offsetX - (square.border + square.margin) / 2;
-		var y = e.offsetY - (square.border + square.margin) / 2;
+		var rect = document.getElementById(ids.boardbox).getBoundingClientRect();
+		var x = Math.floor(e.clientX - Math.round(rect.left)) - (square.border + square.margin) / 2;
+		var y = Math.floor(e.clientY - Math.round(rect.top )) - (square.border + square.margin) / 2;
 		var sqWidth = square.width + square.margin + square.border;
-		var sqHeight = square.width + square.margin + square.border;
+		var sqHeight = square.height + square.margin + square.border;
 		var col = Math.floor(x / sqWidth);
 		var row = Math.floor(y / sqHeight);
 		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - square.margin)
-				&& (y % sqHeight) < (sqHeight - square.margin)
-				&& row < board.height && col < board.width) {
+				&& (y % sqHeight) < (sqHeight - square.margin)) {
+			selectSquare(col, row);
+		} else {
+			selectSquare(-1, -1);
+		}
+	}
+}
 
-			var goal = board.goals[row + col * board.height];
-			if (goal === undefined) {
-				clearDescription();
-				return;
-			}
-
-			selected = { row: row, col: col };
-			ctx.fillStyle = square.background;
-			ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-			var size = {}; Object.assign(size, square);
-			size.margin = 4;
-			size.width = ctx.canvas.width - size.margin - size.border;
-			size.height = ctx.canvas.height - size.margin - size.border;
-			drawSquare(ctx, goal, (size.border + size.margin) / 2, (size.border + size.margin) / 2, size);
-
-			while (el.firstChild)
-				el.removeChild(el.firstChild);
-			var s = "<div class=\"descch\">Challenge: " + goal.category + "</div>\n";
-			s += "<div class=\"descdesc\">" + goal.description + "</div>";
-			s += "<table class=\"desclist\">\n";
-			s += "<thead><tr><td>Parameter</td><td>Value</td></tr></thead>\n<tbody>\n";
-			for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
-				if (goal.items[i].length > 0) {
-					s += "  <tr><td>" + goal.items[i] + "</td><td>" + goal.values[i] + "</td></tr>\n";
-				}
-			}
-			s += "</tbody></table>\n";
-			if (kibitzing && goal.comments.length > 0)
-				s += "<div class=\"desccomm\">" + goal.comments + "</div>";
-			el.innerHTML = s;
-
-			//	position cursor
-			//<div id="cursor" style="width: 39px; height: 39px; margin: 0; border: 1px solid #b8b8b8; border-radius: 3px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
-			var curSty = document.getElementById(ids.cursor).style;
-			curSty.width = String(square.width + square.border) + "px";
-			curSty.height = String(square.height + square.border) + "px";
-			curSty.left = String(square.margin / 2 - 1 + col * (square.width + square.border + square.margin)) + "px";
-			curSty.top = String(square.margin / 2 - 1 + row * (square.width + square.border + square.margin)) + "px";
-			curSty.display = "initial";
+/**
+ *	Select the square at (col, row) to show details of.
+ */
+function selectSquare(col, row) {
+	var el = document.getElementById(ids.desc);
+	var ctx = document.getElementById(ids.square).getContext("2d");
+	if (row >= 0 && col >= 0 && row < board.height && col < board.width) {
+		var goal = board.goals[row + col * board.height];
+		if (goal === undefined) {
+			clearDescription();
 			return;
 		}
+		selected = { row: row, col: col };
+		ctx.fillStyle = square.background;
+		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+		var size = {}; Object.assign(size, square);
+		size.margin = 4;
+		size.width = ctx.canvas.width - size.margin - size.border;
+		size.height = ctx.canvas.height - size.margin - size.border;
+		drawSquare(ctx, goal, (size.border + size.margin) / 2, (size.border + size.margin) / 2, size);
+
+		while (el.firstChild)
+			el.removeChild(el.firstChild);
+		var s = "<div class=\"descch\">Challenge: " + goal.category + "</div>\n";
+		s += "<div class=\"descdesc\">" + goal.description + "</div>";
+		s += "<table class=\"desclist\">\n";
+		s += "<thead><tr><td>Parameter</td><td>Value</td></tr></thead>\n<tbody>\n";
+		for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
+			if (goal.items[i].length > 0) {
+				s += "  <tr><td>" + goal.items[i] + "</td><td>" + goal.values[i] + "</td></tr>\n";
+			}
+		}
+		s += "</tbody></table>\n";
+		if (kibitzing && goal.comments.length > 0)
+			s += "<div class=\"desccomm\">" + goal.comments + "</div>";
+		el.innerHTML = s;
+
+		//	position cursor
+		//<div id="cursor" style="width: 39px; height: 39px; margin: 0; border: 1px solid #b8b8b8; border-radius: 3px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
+		var curSty = document.getElementById(ids.cursor).style;
+		curSty.width = String(square.width + square.border) + "px";
+		curSty.height = String(square.height + square.border) + "px";
+		curSty.left = String(square.margin / 2 - 1 + col * (square.width + square.margin + square.border)) + "px";
+		curSty.top = String(square.margin / 2 - 1 + row * (square.height + square.margin + square.border)) + "px";
+		curSty.display = "initial";
+		return;
 	}
 	clearDescription();
 
@@ -392,7 +404,7 @@ function selectSquare(e) {
  *	Key input to document; pare down to arrow keys for navigating squares
  */
 function navSquares(e) {
-	if ((e.target.id == ids.board || e.target.id == ids.cursor) && board !== undefined) {
+	if (board !== undefined && [ids.board, ids.boardbox, ids.cursor].includes(e.target.id)) {
 		var dRow = 0, dCol = 0;
 		if (e.key == "Up"    || e.key == "ArrowUp"   ) dRow = -1;
 		if (e.key == "Down"  || e.key == "ArrowDown" ) dRow = 1;
@@ -400,16 +412,17 @@ function navSquares(e) {
 		if (e.key == "Right" || e.key == "ArrowRight") dCol = 1;
 		if (dRow || dCol) {
 			e.preventDefault();
-			if (selected === undefined) selected = { row: 0, col: 0 };
-			selected.row += dRow; selected.col += dCol;
-			if (selected.row < 0) selected.row += board.height;
-			if (selected.row >= board.height) selected.row -= board.height;
-			if (selected.col < 0) selected.col += board.width;
-			if (selected.col >= board.width) selected.col -= board.width;
-			selectSquare( {
-					offsetX: selected.col * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1,
-					offsetY: selected.row * (square.width + square.margin + square.border) + (square.border + square.margin) / 2 + 1
-			} );
+			var col = 0, row = 0;
+			if (selected !== undefined) {
+				col = selected.col;
+				row = selected.row;
+			}
+			row += dRow; col += dCol;
+			if (row < 0) row += board.height;
+			if (row >= board.height) row -= board.height;
+			if (col < 0) col += board.width;
+			if (col >= board.width) col -= board.width;
+			selectSquare(col, row);
 		}
 	}
 }
@@ -464,7 +477,7 @@ function drawSquare(ctx, goal, x, y, size) {
 				ctx.fillText(lines[i][j].value, xBase, yBase);
 			} else {
 				//	unimplemented
-				drawIcon(ctx, "Futile_White", xBase, yBase, "#ffffff", lines[i][j].scale || 1, lines[i][j].rotation || 0); 
+				drawIcon(ctx, "Futile_White", xBase, yBase, colorFloatToString(RainWorldColors.Unity_white), lines[i][j].scale || 1, lines[i][j].rotation || 0); 
 			}
 		}
 	}
@@ -531,7 +544,7 @@ const CHALLENGES = {
 			description: "Descriptor: " + desc,
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "text", value: "∅", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
@@ -548,279 +561,540 @@ const CHALLENGES = {
 			description: "Earn " + (passageToDisplayNameMap[items[1]] || "unknown") + " passage.",
 			comments: "",
 			paint: [
-				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: "#ffffff", rotation: 0 },
-				{ type: "icon", value: items[1] + "A", scale: 1, color: "#ffffff", rotation: 0 },
-				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: "#ffffff", rotation: 0 }
+				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: items[1] + "A", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
 			]
 		};
 	},
 	BingoAllRegionsExcept: function(desc) {
 		const thisname = "BingoAllRegionsExcept";
-		//
+		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "13", "0", "0"]
+		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
+		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + items[1] + " not found in regionCodeToDisplayName[]");
+		var amt = parseInt(desc[2]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + desc[2] + " not a number or out of range");
+		var amt2 = parseInt(desc[3]);
+		if (isNaN(amt2) || amt2 < 0 || amt2 > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + desc[3] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			category: "Entering all regions except one",
+			items: [items[2], "To Do", "Progress", "Total"],
+			values: [items[1], desc[1], String(amt), String(amt2)],
+			description: "Enter all regions except " + r + ".",
+			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; a lower bar could thus be set, making a \"The Wanderer\"-lite, or setting a specific collection of regions to enter, to entice players towards certain regions. Downside: this is not currently supported in-game, so the region list is something of a mystery unless viewed and manually tracked.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "TravellerA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "break" },
+				{ type: "text", value: "[" + String(amt) + "/" + String(amt2) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoBombTollChallenge: function(desc) {
 		const thisname = "BingoBombTollChallenge";
-		//
+		//	desc of format ["System.String|gw_c05|Scavenger Toll|1|tolls", "System.Boolean|false|Pass the Toll|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Scavenger Toll", , "tolls"], "toll selection");
+		if (!BingoEnum_BombableOutposts.includes(items[1]))
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in BingoEnum_BombableOutposts[]");
+		var pass = checkSettingbox(thisname, desc[1], ["System.Boolean", , "Pass the Toll", , "NULL"], "pass toll flag");
+		if (pass[1] != "true" && pass[1] != "false")
+			throw new TypeError(thisname + ": error, pass toll flag " + speci[1] + " not 'true' or 'false'");
+		var regi = items[1].substring(0, items[1].search("_")).toUpperCase();
+		var r = (regionCodeToDisplayName[regi] || "") + " / " + (regionCodeToDisplayNameSaint[regi] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + regi + " not found in regionCodeToDisplayName[]");
+		if (items[1] == "gw_c11")
+			r += " underground";
+		if (items[1] == "gw_c05")
+			r += " surface";
+		var p = [
+			{ type: "icon", value: "Symbol_StunBomb", scale: 1, color: colorFloatToString(itemNameToIconColorMap["ScavengerBomb"]), rotation: 0 },
+			{ type: "icon", value: "scavtoll", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+			{ type: "break" },
+			{ type: "text", value: items[1].toUpperCase(), color: colorFloatToString(RainWorldColors.Unity_white) }
+		];
+		if (pass[1] == "true")
+			p.splice(2, 0, { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Throwing grenades at Scavenger tolls",
+			items: [items[2], pass[2]],
+			values: [items[1], pass[1]],
+			description: "Throw a grenade at the " + r + " Scavenger toll" + ((pass[1] == "true") ? ", then pass it." : "."),
+			comments: "Bomb and pass must be done in that order, in the same cycle.",
+			paint: p
 		};
 	},
 	BingoCollectPearlChallenge: function(desc) {
 		const thisname = "BingoCollectPearlChallenge";
-		//
+		//	desc of format ["System.Boolean|true|Specific Pearl|0|NULL", "System.String|LF_bottom|Pearl|1|pearls", "0", "System.Int32|1|Amount|3|NULL", "0", "0", ""]
+		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		var speci = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Specific Pearl", , "NULL"], "specific pearl flag");
+		if (speci[1] != "true" && speci[1] != "false")
+			throw new TypeError(thisname + ": error, starving flag " + speci[1] + " not 'true' or 'false'");
+		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Pearl", , "pearls"], "pearl selection");
+		if (!DataPearlList.includes(items[1])) {
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in DataPearlList[]");
+		}
+		if (dataPearlToDisplayTextMap[items[1]] === undefined)
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in dataPearlToDisplayTextMap[]");
+		var amounts = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount selection");
+		var amt = parseInt(amounts[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + amounts[1] + " not a number or out of range");
+		var p;
+		if (speci[1] == "true") {
+			var r;
+			if (items[1] == "MS")
+				r = "Old " + regionCodeToDisplayName["GW"];
+			else {
+				var regi = dataPearlToRegionMap[items[1]];
+				if (regi === undefined)
+					throw new TypeError(thisname + ": error, item " + items[1] + " not found in dataPearlToRegionMap[]");
+				r = regionCodeToDisplayName[regi];
+				if (r === undefined)
+					throw new TypeError(thisname + ": error, region " + regi + " not found in regionCodeToDisplayName[]");
+				if (items[1] == "DM")
+					r = regionCodeToDisplayName["DM"] + " / " + r;
+			}
+			d = "Collect the " + dataPearlToDisplayTextMap[items[1]] + " pearl from " + r + ".";
+			p = [
+				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: colorFloatToString(dataPearlToColorMap[items[1]]), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "break" },
+				{ type: "text", value: "[0/1]", color: colorFloatToString(RainWorldColors.Unity_white) }
+			];
+		} else {
+			d = "Collect " + creatureNameQuantify(amt, "colored pearls") + ".";
+			p = [
+				{ type: "icon", value: "pearlhoard_color", scale: 1, color: colorFloatToString(itemNameToIconColorMap["Pearl"]), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
+			];
+		}
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Collecting pearls",
+			items: [speci[2], items[2], amounts[2]],
+			values: [speci[1], items[1], amounts[1]],
+			description: d,
+			comments: "When collecting multiple pearls, this challenge acts like a flexible The Scholar passage. When collecting single pearls, the amount is unused; when collecting multiple, the location is unused.",
+			paint: p
 		};
 	},
 	BingoCraftChallenge: function(desc) {
 		const thisname = "BingoCraftChallenge";
-		//
+		//	desc of format ["System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
+		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item to Craft", , "craft"], "item selection");
+		if (!BingoEnum_CraftableItems.includes(items[1])) {
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in BingoEnum_CraftableItems[]");
+		}
+		var d = creatureNameToDisplayTextMap[items[1]] || itemNameToDisplayTextMap[items[1]];
+		if (d === undefined)
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in creature- or itemNameToDisplayTextMap[]");
+		var amounts = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "amount selection");
+		var amt = parseInt(amounts[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + amounts[1] + " not a number or out of range");
+		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
+		var iconColor = colorFloatToString(creatureNameToIconColorMap[items[1]] || itemNameToIconColorMap[items[1]] || creatureNameToIconColorMap["Default"]);
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Crafting items",
+			items: [items[2], amounts[2]],
+			values: [items[1], amounts[1]],
+			description: "Craft " + creatureNameQuantify(amt, d) + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "crafticon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoCreatureGateChallenge: function(desc) {
 		const thisname = "BingoCreatureGateChallenge";
-		//
+		//	desc of format ["System.String|CicadaA|Creature Type|1|transport", "0", "System.Int32|4|Amount|0|NULL", "empty", "0", "0"]
+		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Creature Type", , "transport"], "creature selection");
+		if (!BingoEnum_Transportable.includes(items[1])) {
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in BingoEnum_Transportable[]");
+		}
+		var amounts = checkSettingbox(thisname, desc[2], ["System.Int32", , "Amount", , "NULL"], "amount selection");
+		var amt = parseInt(amounts[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + amounts[1] + " not a number or out of range");
+		if (creatureNameToDisplayTextMap[items[1]] === undefined)
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in creature- or itemNameToDisplayTextMap[]");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			category: "Transporting the same creature through gates",
+			items: [items[2], amounts[2], "Dictionary"],
+			values: [items[1], amounts[1], desc[3]],
+			description: "Transport " + creatureNameQuantify(1, creatureNameToDisplayTextMap[items[1]]) + " through " + String(amt) + " gate" + ((amt > 1) ? "s." : "."),
+			comments: "When a creature is taken through a gate, its ID is logged, and its gate-crossing count is incremented. When any logged creature meets the gate count, credit is awarded.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1, color: creatureToColor(items[1]), rotation: 0 },
+				{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "ShortcutGate", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoCycleScoreChallenge: function(desc) {
 		const thisname = "BingoCycleScoreChallenge";
-		//
+		//	desc of format ["System.Int32|126|Target Score|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.Int32", , "Target Score", , "NULL"], "score goal");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Scoring cycle points",
+			items: [items[2]],
+			values: [String(amt)],
+			description: "Earn " + String(amt) + " points from creature kills in a single cycle.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "Multiplayer_Star", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoDamageChallenge: function(desc) {
 		const thisname = "BingoDamageChallenge";
-		//
+		//	desc of format ["System.String|JellyFish|Weapon|0|weapons", "System.String|WhiteLizard|Creature Type|1|creatures", "0", "System.Int32|6|Amount|2|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var v = [], i = [];
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Weapon", , "weapons"], "weapon choice"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[1], ["System.String", , "Creature Type", , "creatures"], "creature choice"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "hit amount"); v.push(items[1]); i.push(items[2]);
+		var amt = parseInt(v[2]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + v[2] + " not a number or out of range");
+		if (!BingoEnum_Weapons.includes(v[0]))
+			throw new TypeError(thisname + ": error, item selection " + v[0] + " not found in BingoEnum_Weapons[]");
+		var p = [
+			{ type: "icon", value: "bingoimpact", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+			{ type: "break" },
+			{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
+		];
+		var d = "Hit ";
+		if (v[1] != "Any Creature") {
+			if (creatureNameToDisplayTextMap[v[1]] === undefined)
+				throw new TypeError(thisname + ": error, creature type '" + v[1] + "' not found in creatureNameToDisplayTextMap[]");
+			p.splice(1, 0, { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: creatureToColor(v[1]), rotation: 0 } );
+		}
+		d += (creatureNameToDisplayTextMap[v[1]] || v[1]) + " with ";
+		if (v[0] != "Any Weapon") {
+			if (itemNameToDisplayTextMap[v[0]] === undefined)
+				throw new TypeError(thisname + ": error, item type '" + v[0] + "' not found in itemNameToDisplayTextMap[]");
+			p.unshift( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1, color: itemToColor(v[0]), rotation: 0 } );
+		}
+		d += itemNameToDisplayTextMap[v[0]] || v[0];
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Hitting creatures with items",
+			items: i,
+			values: v,
+			description: d + " " + String(amt) + ((amt > 1) ? " times." : " time."),
 			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			paint: p
 		};
 	},
 	BingoDepthsChallenge: function(desc) {
 		const thisname = "BingoDepthsChallenge";
-		//
+		//	desc of format ["System.String|VultureGrub|Creature Type|0|depths", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Creature Type", , "depths"], "creature selection");
+		if (!BingoEnum_Depthable.includes(items[1])) {
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in BingoEnum_Depthable[]");
+		}
+		var iconName = creatureNameToIconAtlasMap[items[1]];
+		var iconColor = colorFloatToString(creatureNameToIconColorMap[items[1]] || creatureNameToIconColorMap["Default"]);
+		var d = creatureNameToDisplayTextMap[items[1]];
+		if (d === undefined || iconName === undefined || iconColor === undefined)
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in creatureNameToDisplayTextMap[]");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			category: "Dropping a creature in the depth pit",
+			items: [items[2]],
+			values: [items[1]],
+			description: "Drop a " + d + " into the Depths drop room (SB_D06).",
+			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop.", /* It is perhaps possible&mdash;but extraordinarily unlikely&mdash;that a creature, of target type that normally spawns in Subterranean, migrates all the way over and down, and the player merely needs to show up to get credit.", */
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
+				{ type: "icon", value: "deathpiticon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "SB_D06", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoDodgeLeviathanChallenge: function(desc) {
 		const thisname = "BingoDodgeLeviathanChallenge";
-		//
+		//	desc of format ["0", "0"]
 		return {
 			name: thisname,
-			category: thisname,
+			category: "Dodging a Leviathan",
 			items: [],
 			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			description: "Dodge a Leviathan's bite",
+			comments: "Being in close proximity to a Leviathan, as it's winding up a bite, will activate this goal. (A more direct/literal interpretation&mdash;having to have been physically inside its maw, then surviving after it slams shut&mdash;was found... too challenging by playtesters.)",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "leviathan_dodge", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
 			]
 		};
 	},
 	BingoDontUseItemChallenge: function(desc) {
 		const thisname = "BingoDontUseItemChallenge";
-		//
+		//	desc of format ["System.String|BubbleGrass|Item type|0|banitem", "0", "0", "0", "0"]
+		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item type", , "banitem"], "item selection");
+		if (!(BingoEnum_Bannable.includes(items[1]) || BingoEnum_FoodTypes.includes(items[1]))) {
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in BingoEnum_banitem[]");
+		}
+		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
+		var iconColor = colorFloatToString(creatureNameToIconColorMap[items[1]] || itemNameToIconColorMap[items[1]] || creatureNameToIconColorMap["Default"]);
+		var d = creatureNameToDisplayTextMap[items[1]] || itemNameToDisplayTextMap[items[1]];
+		if (d === undefined)
+			throw new TypeError(thisname + ": error, item " + items[1] + " not found in creature- or itemNameToDisplayTextMap[]");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			category: "Avoiding items",
+			items: [items[2], "isFood", "isCreature"],
+			values: [items[2], desc[1] == "1", desc[4] == "1"],
+			description: "Never " + ((desc[1] == "1") ? "eat" : "use") + " " + d + ".",
+			comments: "\"Using\" an item involves throwing a throwable item, eating a food item, or holding any other type of item for 5 seconds.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
+				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 }
 			]
 		};
 	},
 	BingoEatChallenge: function(desc) {
 		const thisname = "BingoEatChallenge";
-		//
+		//	desc of format ["System.Int32|6|Amount|1|NULL", "0", "0", "System.String|DangleFruit|Food type|0|food", "0", "0"]
+		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		var amounts = checkSettingbox(thisname, desc[0], ["System.Int32", , "Amount", , "NULL"], "eat amount");
+		var amt = parseInt(amounts[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + amounts[1] + " not a number or out of range");
+		var items = checkSettingbox(thisname, desc[3], ["System.String", , "Food type", , "food"], "eat type");
+		if (!BingoEnum_FoodTypes.includes(items[1]))
+			throw new TypeError(thisname + ": error, item selection " + items[1] + " not found in BingoEnum_FoodTypes[]");
+		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
+		var iconColor = colorFloatToString(creatureNameToIconColorMap[items[1]] || itemNameToIconColorMap[items[1]] || creatureNameToIconColorMap["Default"]);
+		var d = creatureNameToDisplayTextMap[items[1]] || itemNameToDisplayTextMap[items[1]];
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Eating specific food",
+			items: [amounts[2], items[2]],
+			values: [amounts[1], items[1]],
+			description: "Eat " + creatureNameQuantify(amt, d) + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "foodSymbol", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoEchoChallenge: function(desc) {
 		const thisname = "BingoEchoChallenge";
-		//
+		//	desc of format ["System.String|SB|Region|0|echoes", "System.Boolean|false|While Starving|1|NULL", "0", "0"]
+		var echor = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "echoes"], "echo region");
+		var r = (regionCodeToDisplayName[echor[1]] || "") + " / " + (regionCodeToDisplayNameSaint[echor[1]] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + echor[1] + " not found in regionCodeToDisplayName[]");
+		items = checkSettingbox(thisname, desc[1], ["System.Boolean", , "While Starving", , "NULL"], "starving flag");
+		if (items[1] != "true" && items[1] != "false")
+			throw new TypeError(thisname + ": error, starving flag " + items[1] + " not 'true' or 'false'");
+		var p = [
+			{ type: "icon", value: "echo_icon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+			{ type: "text", value: echor[1], color: colorFloatToString(RainWorldColors.Unity_white) }
+		];
+		if (items[1] == "true") {
+			p.push( { type: "break" } );
+			p.push( { type: "icon", value: "Multiplayer_Death", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
+		}
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Visiting echoes",
+			items: [echor[2], items[2]],
+			values: [echor[1], items[1]],
+			description: "Visit the " + r + " Echo" + ((items[1] == "true") ? ", while starving." : "."),
 			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			paint: p
 		};
 	},
 	BingoEnterRegionChallenge: function(desc) {
 		const thisname = "BingoEnterRegionChallenge";
-		//
+		//	desc of format ["System.String|CC|Region|0|regionsreal", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "enter region");
+		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + items[1] + " not found in regionCodeToDisplayName[]");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Entering a region",
+			items: [items[2]],
+			values: [items[1]],
+			description: "Enter " + r + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_green), rotation: 90 },
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoGlobalScoreChallenge: function(desc) {
 		const thisname = "BingoGlobalScoreChallenge";
-		//
+		//	desc of format ["0", "System.Int32|271|Target Score|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Target Score", , "NULL"], "score goal");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Scoring global points",
+			items: [items[2]],
+			values: [String(amt)],
+			description: "Earn " + amt + " points from creature kills.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "Multiplayer_Star", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoGreenNeuronChallenge: function(desc) {
 		const thisname = "BingoGreenNeuronChallenge";
-		//
+		//	desc of format ["System.Boolean|true|Looks to the Moon|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Looks to the Moon", , "NULL"], "iterator choice flag");
+		if (items[1] != "true" && items[1] != "false")
+			throw new TypeError(thisname + ": error, iterator choice flag " + items[1] + " not 'true' or 'false'");
+		var d;
+		var p = [
+			{ type: "icon", value: "GuidanceNeuron", scale: 1, color: colorFloatToString([0, 1, 0.3]), rotation: 0 },
+			{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+		]
+		if (items[1] == "true") {
+			d = "Reactivate Looks to the Moon.";
+			p.push( { type: "icon", value: "GuidanceMoon", scale: 1, color: colorFloatToString([1, 0.8, 0.3]), rotation: 0 } );
+		} else {
+			d = "Deliver the green neuron to Five Pebbles.";
+			p.push( { type: "icon", value: "nomscpebble", scale: 1, color: colorFloatToString([0.447059, 0.901961, 0.768627]), rotation: 0 } );
+		}
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Delivering the green neuron",
+			items: [items[2]],
+			values: [items[1]],
+			description: d,
+			comments: "The green neuron only has to enter the screen the iterator is on and start the cutscene; waiting for full dialog/startup is not required for credit.",
+			paint: p
 		};
 	},
 	BingoHatchNoodleChallenge: function(desc) {
 		const thisname = "BingoHatchNoodleChallenge";
-		//
+		//	desc of format ["0", "System.Int32|3|Amount|1|NULL", "System.Boolean|true|At Once|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		var amounts = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "egg count");
+		var amt = parseInt(amounts[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + amounts[1] + " not a number or out of range");
+		items = checkSettingbox(thisname, desc[2], ["System.Boolean", , "At Once", , "NULL"], "one-cycle flag");
+		if (items[1] != "true" && items[1] != "false")
+			throw new TypeError(thisname + ": error, one-cycle flag " + items[1] + " not 'true' or 'false'");
+		var p = [
+			{ type: "icon", value: itemNameToIconAtlasMap["NeedleEgg"], scale: 1, color: colorFloatToString(itemNameToIconColorMap["NeedleEgg"]), rotation: 0 },
+			{ type: "icon", value: creatureNameToIconAtlasMap["SmallNeedleWorm"], scale: 1, color: creatureToColor("SmallNeedleWorm"), rotation: 0 },
+			{ type: "break" },
+			{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) },
+		];
+		if (items[1] == "true")
+			p.splice(2, 0, { type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Hatching noodlefly eggs",
+			items: [amounts[2], items[2]],
+			values: [amounts[1], items[1]],
+			description: "Hatch " + creatureNameQuantify(amt, itemNameToDisplayTextMap["NeedleEgg"]) + ((items[1] == "true") ? " in one cycle." : "."),
+			comments: "Eggs must be hatched where the player is sheltering. Eggs stored in other shelters disappear and do not give credit towards this goal.",
+			paint: p
 		};
 	},
 	BingoHellChallenge: function(desc) {
 		const thisname = "BingoHellChallenge";
-		//
+		//	desc of format ["0", "System.Int32|2|Amount|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "goal count");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Not dying before completing challenges",
+			items: [items[2]],
+			values: [String(amt)],
+			description: "Do not die before completing " + creatureNameQuantify(amt, "bingo challenges") + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "completechallenge", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "break" },
+				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
+				{ type: "icon", value: "Multiplayer_Death", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
 			]
 		};
 	},
 	BingoItemHoardChallenge: function(desc) {
 		const thisname = "BingoItemHoardChallenge";
-		//
+		//	desc of format ["System.Int32|5|Amount|1|NULL", "System.String|PuffBall|Item|0|expobject", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var amounts = checkSettingbox(thisname, desc[0], ["System.Int32", , "Amount", , "NULL"], "item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Item", , "expobject"], "item selection");
+		if (!BingoEnum_expobject.includes(items[1]))
+			throw new TypeError(thisname + ": error, item selection " + items[1] + " not found in BingoEnum_expobject[]");
+		var amt = parseInt(amounts[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Hoarding items in shelters",
+			items: [amounts[2], items[2]],
+			values: [String(amt), items[1]],
+			description: "Store " + creatureNameQuantify(amt, itemNameToDisplayTextMap[items[1]]) + " in " + ((amt == 1) ? "a" : "the same") + " shelter.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1, color: itemToColor(items[1]), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
@@ -830,20 +1104,20 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 4, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "item count");
 		var amt = parseInt(items[1]);
-		if (isNaN(amt) || amt < 0 || amt > 30000)
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
 			category: "Consuming Karma Flowers",
 			items: [items[2]],
-			values: [items[1]],
+			values: [String(amt)],
 			description: "Consume " + creatureNameQuantify(amt, "Karma Flowers") + ".",
 			comments: "With this goal present on the board, flowers are spawned in the world in their normal locations. The player obtains the benefit of consuming the flower (protecting karma level). While the goal is in progress, players <em>do not drop</em> the flower on death. After the goal is completed or locked, a flower can drop on death as normal.",
 			paint: [
-				{ type: "icon", value: "foodSymbol", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "foodSymbol", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: "FlowerMarker", scale: 1, color: colorFloatToString(RainWorldColors.SaturatedGold), rotation: 0 },
 				{ type: "break" },
-				{ type: "text", value: "[0/" + items[1] + "]", color: "#ffffff" }
+				{ type: "text", value: "[0/" + items[1] + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
@@ -866,7 +1140,7 @@ const CHALLENGES = {
 		items = checkSettingbox(thisname, desc[8], ["System.Boolean", , "While Starving", , "NULL"], "starving flag"); v.push(items[1]); i.push(items[2]);
 		var r = "";
 		var amt = parseInt(v[2]);
-		if (isNaN(amt) || amt < 0 || amt > 30000)
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount " + v[2] + " not a number or out of range");
 		var c = String(amt) + " creatures";
 		if (v[0] != "Any Creature") {
@@ -899,7 +1173,7 @@ const CHALLENGES = {
 		var p = [];
 		if (v[1] != "Any Weapon" || v[6] == "true") {
 			if (v[6] == "true")
-				p.push( { type: "icon", value: "deathpiticon", scale: 1, color: "#ffffff", rotation: 0 } );
+				p.push( { type: "icon", value: "deathpiticon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 			else
 				p.push( { type: "icon", value: itemNameToIconAtlasMap[v[1]], scale: 1, color: itemToColor(v[1]), rotation: 0 } );
 		}
@@ -909,7 +1183,7 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, death pit flag " + v[6] + " not 'true' or 'false'");
 		if (v[7] != "true" && v[7] != "false")
 			throw new TypeError(thisname + ": error, starving flag " + v[7] + " not 'true' or 'false'");
-		p.push( { type: "icon", value: "Multiplayer_Bones", scale: 1, color: "#ffffff", rotation: 0 } );
+		p.push( { type: "icon", value: "Multiplayer_Bones", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		if (v[0] != "Any Creature") {
 			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[0]], scale: 1,
 					color: creatureToColor(v[0]), rotation: 0 } );
@@ -917,18 +1191,18 @@ const CHALLENGES = {
 		p.push( { type: "break" } );
 		if (v[4] == "Any Subregion") {
 			if (v[3] != "Any Region") {
-				p.push( { type: "text", value: v[3], color: "#ffffff" } );
+				p.push( { type: "text", value: v[3], color: colorFloatToString(RainWorldColors.Unity_white) } );
 				p.push( { type: "break" } );
 			}
 		} else {
-			p.push( { type: "text", value: v[4], color: "#ffffff" } );
+			p.push( { type: "text", value: v[4], color: colorFloatToString(RainWorldColors.Unity_white) } );
 			p.push( { type: "break" } );
 		}
-		p.push( { type: "text", value: "[0/" + v[2] + "]", color: "#ffffff" } );
+		p.push( { type: "text", value: "[0/" + v[2] + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
 		if (v[7] == "true")
-			p.push( { type: "icon", value: "Multiplayer_Death", scale: 1, color: "#ffffff", rotation: 0 } );
+			p.push( { type: "icon", value: "Multiplayer_Death", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		if (v[5] == "true")
-			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: "#ffffff", rotation: 0 } );
+			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		return {
 			name: thisname,
 			category: "Killing creatures",
@@ -943,181 +1217,301 @@ const CHALLENGES = {
 	},
 	BingoMaulTypesChallenge: function(desc) {
 		const thisname = "BingoMaulTypesChallenge";
-		//
+		//	desc of format "0", "System.Int32|4|Amount|0|NULL", "0", "0", ""
+		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "maul amount");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Mauling different types of creatures",
+			items: ["Amount"],
+			values: [String(amt)],
+			description: "Maul " + String(amt) + " different types of creatures.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "artimaulcrit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoMaulXChallenge: function(desc) {
 		const thisname = "BingoMaulXChallenge";
-		//
+		//	desc of format ["0", "System.Int32|13|Amount|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "maul amount");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Mauling creatures a certain amount of times",
+			items: ["Amount"],
+			values: [String(amt)],
+			description: "Maul creatures " + String(amt) + " times.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "artimaul", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoNeuronDeliveryChallenge: function(desc) {
 		const thisname = "BingoNeuronDeliveryChallenge";
-		//
+		//	desc of format ["System.Int32|2|Amount of Neurons|0|NULL", "0", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.Int32", , "Amount of Neurons", , "NULL"], "neuron amount");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Gifting neurons",
+			items: ["Amount"],
+			values: [String(amt)],
+			description: "Deliver " + creatureNameQuantify(amt, "Neurons") + " to Looks to the Moon.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "Symbol_Neuron", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "GuidanceMoon", scale: 1, color: colorFloatToString([1, 0.8, 0.3]), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoNoNeedleTradingChallenge: function(desc) {
 		const thisname = "BingoNoNeedleTradingChallenge";
-		//
+		//	desc of format ["0", "0"]
+		checkDescriptors(thisname, desc.length, 2, "parameter item count");
 		return {
 			name: thisname,
-			category: thisname,
+			category: "Avoiding gifting Needles to Scavengers",
 			items: [],
 			values: [],
-			description: "Not yet implemented.",
+			description: "Do not gift Needles to Scavengers.",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "spearneedle", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "commerce", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "Kill_Scavenger", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "break" },
+				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
 			]
 		};
 	},
 	BingoNoRegionChallenge: function(desc) {
 		const thisname = "BingoNoRegionChallenge";
-		//
+		//	desc of format ["System.String|SI|Region|0|regionsreal", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "avoid region");
+		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + items[1] + " not found in regionCodeToDisplayName[]");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Avoiding a region",
+			items: [items[2]],
+			values: [items[1]],
+			description: "Do not enter " + r + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoPearlDeliveryChallenge: function(desc) {
 		const thisname = "BingoPearlDeliveryChallenge";
-		//
+		//	desc of format ["System.String|LF|Pearl from Region|0|regions", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Pearl from Region", , "regions"], "pearl region");
+		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + items[1] + " not found in regionCodeToDisplayName[]");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Delivering colored pearls to an Iterator",
+			items: [items[2]],
+			values: [items[1]],
+			description: "Deliver " + r + " colored pearl to Looks To The Moon (Artificer: Five Pebbles)",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: colorFloatToString(itemNameToIconColorMap["Pearl"]), rotation: 0 },
+				{ type: "break" },
+				{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 90 },
+				{ type: "break" },
+/*				{ type: "icon", value: "nomscpebble", scale: 1, color: colorFloatToString([0.447059, 0.90196, 0.768627]), rotation: 0 }, */
+				{ type: "icon", value: "GuidanceMoon", scale: 1, color: colorFloatToString([1, 0.8, 0.3]), rotation: 0 }
 			]
 		};
 	},
 	BingoPearlHoardChallenge: function(desc) {
 		const thisname = "BingoPearlHoardChallenge";
-		//
+		//	desc of format ["System.Boolean|false|Common Pearls|0|NULL", "System.Int32|2|Amount|1|NULL", "System.String|SL|In Region|2|regions", "0", "0"]
+		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		var v = [], i = [];
+		var items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Common Pearls", , "NULL"], "common pearls flag"); v.push(items[1]); i.push(items[2]);
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pearl count"); v.push(items[1]); i.push(items[2]);
+		var items = checkSettingbox(thisname, desc[2], ["System.String", , "In Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
+		if (v[0] != "true" && v[0] != "false")
+			throw new TypeError(thisname + ": error, common pearls flag " + v[9] + " not 'true' or 'false'");
+		var amt = parseInt(v[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + v[1] + " not a number or out of range");
+		var r = (regionCodeToDisplayName[v[2]] || "") + " / " + (regionCodeToDisplayNameSaint[v[2]] || "");
+		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r == "")
+			throw new TypeError(thisname + ": error, region " + v[2] + " not found in regionCodeToDisplayName[]");
+		var pearl = " common pearls";
+		if (v[0] == "false") pearl = " colored pearls";
+		if (amt == 1) pearl = pearl.substring(0, pearl.length - 1);
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			category: "Hoarding pearls in shelters",
+			items: i,
+			values: v,
+			description: "Store " + String(amt) + pearl + " in a shelter in " + r + ".",
+			comments: "Faded pearls (colored pearl spawns in Saint campaign) do not count towards a \"common pearls\" goal.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: ((v[0] == "true") ? "pearlhoard_normal" : "pearlhoard_color"), scale: 1, color: colorFloatToString(itemNameToIconColorMap["Pearl"]), rotation: 0 },
+				{ type: "text", value: v[2], color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoPinChallenge: function(desc) {
 		const thisname = "BingoPinChallenge";
-		//
+		//	desc of format ["0", "System.Int32|5|Amount|0|NULL", "System.String|PinkLizard|Creature Type|1|creatures", "", "System.String|SU|Region|2|regions", "0", "0"]
+		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		var v = [], i = [];
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pin amount"); v.push(items[1]); i.push(items[2]);
+		var items = checkSettingbox(thisname, desc[2], ["System.String", , "Creature Type", , "creatures"], "creature type"); v.push(items[1]); i.push(items[2]);
+		var items = checkSettingbox(thisname, desc[4], ["System.String", , "Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
+		var amt = parseInt(v[0]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + v[0] + " not a number or out of range");
+		var c = "creatures";
+		if (v[1] != "Any Creature") {
+			if (creatureNameToDisplayTextMap[v[1]] === undefined)
+				throw new TypeError(thisname + ": error, creature type '" + v[1] + "' not found in creatureNameToDisplayTextMap[]");
+			c = creatureNameToDisplayTextMap[v[1]];
+		}
+		c = creatureNameQuantify(amt, c);
+		var r = v[2];
+		if (r != "Any Region") {
+			r = (regionCodeToDisplayName[v[2]] || "") + " / " + (regionCodeToDisplayNameSaint[v[2]] || "");
+			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r == "")
+				throw new TypeError(thisname + ": error, region " + v[2] + " not found in regionCodeToDisplayName[]");
+		} else {
+			r = "different regions";
+		}
+		var p = [ { type: "icon", value: "pin_creature", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } ];
+		if (v[1] != "Any Creature") {
+			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: colorFloatToString(creatureNameToIconColorMap[v[1]] || creatureNameToIconColorMap["Default"]), rotation: 0 } );
+		}
+		if (v[2] == "Any Region") {
+			p.push( { type: "icon", value: "TravellerA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
+		} else {
+			p.push( { type: "text", value: v[2], color: colorFloatToString(RainWorldColors.Unity_white) } );
+		}
+		p.push( { type: "break" } );
+		p.push( { type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
-			comments: "",
-			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
-			]
+			category: "Pinning creatures to walls",
+			items: i,
+			values: v,
+			description: "Pin " + c + " to walls or floors in " + r + ".",
+			comments: "A creature does not need to be alive to obtain pin credit. Sometimes a body chunk gets pinned but does not credit the challenge; keep retrying on different parts of a corpse until it works. \"Different regions\" means one pin per region, as many unique regions as pins required.",
+			paint: p
 		};
 	},
 	BingoPopcornChallenge: function(desc) {
 		const thisname = "BingoPopcornChallenge";
-		//
+		//	desc of format ["0", "System.Int32|6|Amount|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pop amount");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Popping popcorn plants",
+			items: [items[2]],
+			values: [String(amt)],
+			description: "Open " + creatureNameQuantify(amt, "popcorn plants") + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "Symbol_Spear", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "popcorn_plant", scale: 1, color: colorFloatToString([0.41, 0.16, 0.23]), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
 	BingoRivCellChallenge: function(desc) {
 		const thisname = "BingoRivCellChallenge";
-		//
+		//	desc of format ["0", "0"]
 		return {
 			name: thisname,
-			category: thisname,
+			category: "Feeding the Rarefaction Cell to a Leviathan",
 			items: [],
 			values: [],
-			description: "Not yet implemented.",
-			comments: "",
+			description: "Feed the Rarefaction Cell to a Leviathan (completes if you die).",
+			comments: "Truly, the Rarefaction Cell's explosion transcends time and space; hence, this goal is awarded even if the player dies in the process.",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "Symbol_EnergyCell", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "Kill_BigEel", scale: 1, color: colorFloatToString(creatureNameToIconColorMap["BigEel"] || creatureNameToIconColorMap["Default"]), rotation: 0 }
 			]
 		};
 	},
 	BingoSaintDeliveryChallenge: function(desc) {
 		const thisname = "BingoSaintDeliveryChallenge";
-		//
+		//	desc of format ["0", "0"]
 		return {
 			name: thisname,
-			category: thisname,
+			category: "Delivering the music pearl to Five Pebbles",
 			items: [],
 			values: [],
-			description: "Not yet implemented.",
+			description: "Deliver the music pearl to Five Pebbles",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "memoriespearl", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "nomscpebble", scale: 1, color: colorFloatToString([0.447059, 0.901961, 0.768627]), rotation: 0 }
 			]
 		};
 	},
 	BingoSaintPopcornChallenge: function(desc) {
 		const thisname = "BingoSaintPopcornChallenge";
-		//
+		//	desc of format ["0", "System.Int32|7|Amount|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "seed amount");
+		var amt = parseInt(items[1]);
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
+			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
-			category: thisname,
-			items: [],
-			values: [],
-			description: "Not yet implemented.",
+			category: "Eating popcorn plant seeds",
+			items: [items[2]],
+			values: [String(amt)],
+			description: "Eat " + creatureNameQuantify(amt, "popcorn plant seeds") + ".",
 			comments: "",
 			paint: [
-				{ type: "text", value: "∅", color: "#ffffff" }
+				{ type: "icon", value: "foodSymbol", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "Symbol_Seed", scale: 1, color: colorFloatToString(itemNameToIconColorMap["Default"]), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
@@ -1128,7 +1522,7 @@ const CHALLENGES = {
 		//	"0", "System.Int32|3|Amount|2|NULL", "0", "0"]
 		checkDescriptors(thisname, desc.length, 6, "parameter item count");
 		var v = [], i = [];
-		var p = [ { type: "icon", value: "steal_item", scale: 1, color: "#ffffff", rotation: 0 } ];
+		var p = [ { type: "icon", value: "steal_item", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } ];
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item", , "theft"], "item selection"); v.push(items[1]); i.push(items[2]);
 		if (!BingoEnum_theft.includes(v[0]))
 			throw new TypeError(thisname + ": error, item " + v[0] + " not found in BingoEnum_theft[]");
@@ -1137,13 +1531,13 @@ const CHALLENGES = {
 		if (itemNameToDisplayTextMap[v[0]] === undefined)
 			throw new TypeError(thisname + ": error, item selection " + v[2] + " not found in itemNameToDisplayTextMap[]");
 		var amt = parseInt(v[1]);
-		if (isNaN(amt) || amt < 0 || amt > 30000)
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount " + v[1] + " not a number or out of range");
 		var d = "Steal " + String(amt) + " " + itemNameToDisplayTextMap[v[0]] + " from ";
 		p.push( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1,
 				color: itemToColor(v[0]), rotation: 0 } );
 		if (v[2] == "true") {
-			p.push( { type: "icon", value: "scavtoll", scale: 0.8, color: "#ffffff", rotation: 0 } );
+			p.push( { type: "icon", value: "scavtoll", scale: 0.8, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 			d += "a Scavenger Toll.";
 		} else if (v[2] == "false") {
 			p.push( { type: "icon", value: creatureNameToIconAtlasMap["Scavenger"], scale: 1,
@@ -1153,7 +1547,7 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, venue flag " + v[2] + " not 'true' or 'false'");
 		}
 		p.push( { type: "break" } );
-		p.push( { type: "text", value: "[0/" + v[1] + "]", color: "#ffffff" } );
+		p.push( { type: "text", value: "[0/" + v[1] + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
 		return {
 			name: thisname,
 			category: "Stealing items",
@@ -1181,9 +1575,9 @@ const CHALLENGES = {
 			items: ["Creature Type"],
 			values: [items[1]],
 			description: "Befriend " + d + ".",
-			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player. Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. A \"happy lizard noises\" sound indicates success. The creature does not need to den with the item to increase reputation. Stealing the object from the creature's jaws, does not reduce reputation. A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).",
+			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. \"Happy lizard noises\" indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).",
 			paint: [
-				{ type: "icon", value: "FriendB", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "FriendB", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1,
 						color: creatureToColor(items[1]), rotation: 0 }
 			]
@@ -1195,19 +1589,19 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 4, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Value", , "NULL"], "points value");
 		var amt = parseInt(items[1]);
-		if (isNaN(amt) || amt < 0 || amt > 30000)
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
 			category: "Trading items to Merchants",
 			items: [items[2]],
-			values: [amt],
+			values: [String(amt)],
 			description: "Trade " + String(amt) + " points worth of items to Scavenger Merchants.",
 			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. When the Scavenger is also a Merchant, points will be awarded. Beware that Scavenger vision is very narrow and can easily miss one of these three actions. Try to get and hold their attention and be prompt. Any item can be traded once to award points according to its value; this includes items initially held by (then dropped or traded) by Scavengers. If an item seems to have been ignored or missed, try trading it again. Stealing and murder will not result in points awarded.",
 			paint: [
-				{ type: "icon", value: "scav_merchant", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
-				{ type: "text", value: "[0/" + amt + "]", color: "#ffffff" }
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
@@ -1217,21 +1611,21 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 5, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount of Items", , "NULL"], "amount of items");
 		var amt = parseInt(items[1]);
-		if (isNaN(amt) || amt < 0 || amt > 30000)
+		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount " + items[1] + " not a number or out of range");
 		return {
 			name: thisname,
 			category: "Trading already traded items",
 			items: [items[2]],
-			values: [amt],
+			values: [String(amt)],
 			description: "Trade " + String(amt) + ((amt == 1) ? " item" : " items") + " from Scavenger Merchants to other Scavenger Merchants.",
 			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. Beware that Scavenger vision is very narrow and can easily miss one of these three actions. Try to get and hold their attention and be prompt. While this challenge is active, any item dropped by a Merchant, in trade, will be \"blessed\" and bear a mark indicating its eligibility for this challenge. In a Merchant room, the Merchant bears a '✓' tag to show who you should trade with; other Scavengers in the room are tagged with 'X'. Stealing from or murdering a Merchant will not result in \"blessed\" items dropping. A \"blessed\" item can then be brought to any <em>other</em> Merchant and traded, to obtain credit towards this goal.",
 			paint: [
-				{ type: "icon", value: "scav_merchant", scale: 1, color: "#ffffff", rotation: 0 },
-				{ type: "icon", value: "Menu_Symbol_Shuffle", scale: 1, color: "#ffffff", rotation: 0 },
-				{ type: "icon", value: "scav_merchant", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "Menu_Symbol_Shuffle", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
-				{ type: "text", value: "[0/" + amt + "]", color: "#ffffff" }
+				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	},
@@ -1266,9 +1660,9 @@ const CHALLENGES = {
 		];
 		if (p[0].value === undefined || p[0].color === undefined)
 			throw new TypeError(thisname + ": error, token " + v[2] + " not found in itemNameToIconAtlasMap[] or Color");
-		if (v[0] != "Any Region") p.push( { type: "text", value: v[0], color: "#ffffff" } );
-		p.push( { type: "icon", value: "singlearrow", scale: 1, color: "#ffffff", rotation: 0 } );
-		if (v[1] != "Any Region") p.push( { type: "text", value: v[1], color: "#ffffff" } );
+		if (v[0] != "Any Region") p.push( { type: "text", value: v[0], color: colorFloatToString(RainWorldColors.Unity_white) } );
+		p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
+		if (v[1] != "Any Region") p.push( { type: "text", value: v[1], color: colorFloatToString(RainWorldColors.Unity_white) } );
 		return {
 			name: thisname,
 			category: "Transporting creatures",
@@ -1286,7 +1680,7 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Unlock", , "unlocks"], "unlock selection");
 		var iconName = "", iconColor = [];
 		var p = [
-			{ type: "icon", value: "arenaunlock", scale: 1, color: "#ffffff", rotation: 0 },
+			{ type: "icon", value: "arenaunlock", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 			{ type: "break" }
 		];
 		var d = "Get the ", r;
@@ -1327,7 +1721,7 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, token " + items[1] + " not found in BingoEnum_ArenaUnlocks[]");
 		}
 		if (iconName == "")
-			p.push( { type: "text", value: items[1], color: "#ffffff" } );
+			p.push( { type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) } );
 		else
 			p.push( { type: "icon", value: iconName, scale: 1, color: colorFloatToString(iconColor), rotation: 0 } );
 		return {
@@ -1360,9 +1754,9 @@ const CHALLENGES = {
 			description: "Reach the vista point in " + v + ".",
 			comments: "Room: " + items[1] + " at x: " + desc[2] + ", y: " + desc[3],
 			paint: [
-				{ type: "icon", value: "vistaicon", scale: 1, color: "#ffffff", rotation: 0 },
+				{ type: "icon", value: "vistaicon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
-				{ type: "text", value: desc[0], color: "#ffffff" }
+				{ type: "text", value: desc[0], color: colorFloatToString(RainWorldColors.Unity_white) }
 			]
 		};
 	}
@@ -1701,6 +2095,20 @@ const BingoEnum_AllSubregions = [
 ];
 
 /**
+ *	Creatures that can be dropped in the Depths pit; used by BingoDepthsChallenge
+ *	Value type: string, creature internal name
+ */
+const BingoEnum_Depthable = [
+	"Hazer",
+	"VultureGrub",
+	"SmallNeedleWorm",
+	"TubeWorm",
+	"SmallCentipede",
+	"Snail",
+	"LanternMouse"
+];
+
+/**
  *	Transportable creature targets; used by BingoTransportChallenge
  *	Value type: string, creature internal name
  */
@@ -1957,29 +2365,40 @@ const regionCodeToDisplayNameSaint = {
  */
 const RainWorldColors = {
 	//	RainWorld (global consts?), HSL2RGB'd and mathed as needed
-	"AntiGold":            [0.2245,   0.519817, 0.8355 ],
-	"GoldHSL":             [0.8355,   0.540183, 0.2245 ],
-	"GoldRGB":             [0.529,    0.365,    0.184  ],
-	"SaturatedGold":       [1,        0.73,     0.368  ],
-	"MapColor":            [0.381333, 0.32,     0.48   ],
+	"AntiGold":            [0.2245,   0.519817, 0.8355   ],
+	"GoldHSL":             [0.8355,   0.540183, 0.2245   ],
+	"GoldRGB":             [0.529,    0.365,    0.184    ],
+	"SaturatedGold":       [1,        0.73,     0.368    ],
+	"MapColor":            [0.381333, 0.32,     0.48     ],
 	//	CollectToken
-	"RedColor":            [1,        0,        0      ],
-	"GreenColor":          [0.265234, 0.8355,   0.2245 ],
-	"WhiteColor":          [0.53,     0.53,     0.53   ],
-	"DevColor":            [0.8648,   0,        0.94   ],
-	"TokenDefault":        [1,        0.6,      0.05   ],	//	BingoUnlockChallenge::IconDataForUnlock "gold" default
-	//	PlayerGraphics::DefaultSlugcatColor, prepended with "Slugcat_"
-	"Slugcat_White":       [1,        1,        1      ],
-	"Slugcat_Yellow":      [1,        1,        0.45098],
-	"Slugcat_Red":         [1,        0.45098,  0.45098],
-	"Slugcat_Night":       [0.092,    0.1388,   0.308  ],
-	"Slugcat_Sofanthiel":  [0.09,     0.14,     0.31   ],
-	"Slugcat_Rivulet":     [0.56863,  0.8,      0.94118],
-	"Slugcat_Artificer":   [0.43922,  0.13725,  0.23529],
-	"Slugcat_Saint":       [0.66667,  0.9451,   0.33725],
-	"Slugcat_Spear":       [0.31,     0.18,     0.41   ],
-	"Slugcat_Spearmaster": [0.31,     0.18,     0.41   ],	//	avoid special cases detecting "Spear" vs. "Spearmaster"
-	"Slugcat_Gourmand":    [0.94118,  0.75686,  0.59216]
+	"RedColor":            [1,        0,        0        ],
+	"GreenColor":          [0.265234, 0.8355,   0.2245   ],
+	"WhiteColor":          [0.53,     0.53,     0.53     ],
+	"DevColor":            [0.8648,   0,        0.94     ],
+	"TokenDefault":        [1,        0.6,      0.05     ],	//	BingoUnlockChallenge::IconDataForUnlock "gold" default
+	//	PlayerGraphics::DefaultSlugcatColor, prefix with "Slugcat_"
+	"Slugcat_White":       [1,        1,        1        ],
+	"Slugcat_Yellow":      [1,        1,        0.45098  ],
+	"Slugcat_Red":         [1,        0.45098,  0.45098  ],
+	"Slugcat_Night":       [0.092,    0.1388,   0.308    ],
+	"Slugcat_Sofanthiel":  [0.09,     0.14,     0.31     ],
+	"Slugcat_Rivulet":     [0.56863,  0.8,      0.94118  ],
+	"Slugcat_Artificer":   [0.43922,  0.13725,  0.23529  ],
+	"Slugcat_Saint":       [0.66667,  0.9451,   0.33725  ],
+	"Slugcat_Spear":       [0.31,     0.18,     0.41     ],
+	"Slugcat_Spearmaster": [0.31,     0.18,     0.41     ],	//	avoid special cases detecting "Spear" vs. "Spearmaster"
+	"Slugcat_Gourmand":    [0.94118,  0.75686,  0.59216  ],
+	//	UnityEngine.Color, prefix with "Unity_"
+	"Unity_red":           [1,        0,        0        ],
+	"Unity_green":         [0,        1,        0        ],
+	"Unity_blue":          [0,        0,        1        ],
+	"Unity_white":         [1,        1,        1        ],
+	"Unity_black":         [0,        0,        0        ],
+	"Unity_yellow":        [1,        0.921569, 0.0156863],
+	"Unity_cyan":          [0,        1,        1        ],
+	"Unity_magenta":       [1,        0,        1        ],
+	"Unity_gray":          [0.5,      0.5,      0.5      ],
+	"Unity_grey":          [0.5,      0.5,      0.5      ]
 };
 
 /**
@@ -2243,7 +2662,7 @@ const itemNameToDisplayTextMap = {
 	"FireEgg":          "Firebug Eggs",
 	"JokeRifle":        "Joke Rifles",
 	"Seed":             "Popcorn Seeds",
-	"Default":          "Unknown Item"
+	"Default":          "Unknown Items"
 };
 
 /**
@@ -2389,9 +2808,45 @@ const dataPearlToDisplayTextMap = {
 	"Red_stomach":      "Aquamarine",
 	"Rivulet_stomach":  "Celadon",
 	"RM":               "Music",
-	"SL_moon":          "Pale Yellow",
 	"Spearmasterpearl": "Dark Red",
 	"SU_filt":          "Light Pink"
+};
+
+/**
+ *	Pearl region codes.
+ *	Key type: internal pearl name
+ *	Value type: region code
+ *	Note: "DM" maps to "MS" by default, but "DM" for Spearmaster.
+ */
+const dataPearlToRegionMap = {
+	"CC":               "CC",
+	"DS":               "DS",
+	"GW":               "GW",
+	"HI":               "HI",
+	"LF_bottom":        "LF",
+	"LF_west":          "LF",
+	"SH":               "SH",
+	"SI_chat3":         "SI",
+	"SI_chat4":         "SI",
+	"SI_chat5":         "SI",
+	"SI_top":           "SI",
+	"SI_west":          "SI",
+	"SL_bridge":        "SL",
+	"SL_chimney":       "SL",
+	"SL_moon":          "SL",
+	"SB_filtration":    "SB",
+	"SB_ravine":        "SB",
+	"SU":               "SU",
+	"UW":               "UW",
+	"VS":               "VS",
+	"CL":               "CL",
+	"DM":               "MS",	//	special case: Spear only: DM
+	"LC":               "LC",
+	"LC_second":        "LC",
+	"MS":               "GW",
+	"OE":               "OE",
+	"RM":               "RM",
+	"SU_filt":          "SU"
 };
 
 /**
