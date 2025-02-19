@@ -4786,6 +4786,23 @@ function setMeta(comm = "Untitled", character = "Any", shelter = "", perks = [])
 	parseText();
 }
 
+function enumeratePerks() {
+	var a = [];
+	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+		el = document.getElementById(ids.perks + String(i));
+		if (el !== null) {
+			if (el.checked)
+				a.push(i);
+		} else
+			break;
+	}
+	return a;
+}
+
+function compressionRatio() {
+	return Math.round(1000 - 1000 * board.toBin.length / document.getElementById(ids.textbox).value.length) / 10;
+}
+
 function itemToColor(i) {
 	var colr = itemNameToIconColorMap[i] || itemNameToIconColorMap["Default"];
 	return colorFloatToString(colr);
