@@ -629,10 +629,10 @@ function selectSquare(col, row) {
 
 		//	position cursor
 		var curSty = document.getElementById(ids.cursor).style;
-		curSty.width = String(square.width + square.border) + "px";
-		curSty.height = String(square.height + square.border) + "px";
-		curSty.left = String(square.margin / 2 - 1 + col * (square.width + square.margin + square.border)) + "px";
-		curSty.top = String(square.margin / 2 - 1 + row * (square.height + square.margin + square.border)) + "px";
+		curSty.width  = String(square.width  + square.border - 4) + "px";
+		curSty.height = String(square.height + square.border - 4) + "px";
+		curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
+		curSty.top  = String(square.margin / 2 - 0 + row * (square.height + square.margin + square.border)) + "px";
 		curSty.display = "initial";
 		return;
 	}
