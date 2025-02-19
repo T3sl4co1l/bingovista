@@ -1,6 +1,6 @@
 RW Bingo Board Binary Format
 
-T3sl4co1l, 2025/02/14
+T3sl4co1l, 2025/02/19
 For v0.85 Bingo Mod
 
 
@@ -26,16 +26,16 @@ File Format
 
 Top-level file structure:
 
-.  +----------------- Header and Metadata ----------------+--
-.  + +--------+----- . . . --------+- . . -+--- . . . --+ |
-.  | | Fixed  | Variable Header    | free  |  Mods and  | |
-.  | | Header | Comments/etc.    0 | space |  settings  | |
-.  | +--------+----- . . . --------+- . . -+--- . . . --+ |
-.  |  ^        ^                 ^          ^             |
-.  |  0        17               ZTS        mods           |
-.  +------------------------------------------------------+--
-.                                                        ^
-.  (ZTS = zero-terminated string terminator)          goals-1
+.  +---------------- Header and Metadata ---------------------+--
+.  + +--------+--- . . --+-- . . --+-------- . . . ---------+ |
+.  | | Fixed  | comments | GW_S02  | free    Mods and   etc | |
+.  | | Header |        Z |       Z | space   settings       | |
+.  | +--------+--- . . --+-- . . --+-------- . . . ---------+ |
+.  |  ^        ^          ^                  ^                |
+.  |  0       21       shelter              mods              |
+.  +----------------------------------------------------------+--
+.  (Z = zero-terminated string terminator)                   ^
+.                                                         goals-1
 .
 .  --+---------------------- Goals ---------------------
 .    |    ---- goal 0 ----      ---- goal 1, etc. ----
@@ -62,12 +62,14 @@ struct bingo_header_s {
 	uint8_t version_minor;
 	uint8_t boardWidth;   	//	Normally, width = height for a square board, but leaving open the
 	uint8_t boardHeight;  	//	option for other sizes. A 255x255 board is fearsomely large, anyway..
-	uint8_t character;    	//	CHARACTERS index
+	uint8_t character;    	//	CHARACTERS index + 1 (0: any / undefined)
+	uint16_t shelter;     	//	Starting shelter (offset to string)
 	uint32_t perks;       	//	Bit vector of enabled perks and burdens; see EXPEDITION_FLAGS
 	uint16_t goals;       	//	Starting offset where challenges are stored
 	uint16_t mods;        	//	Starting offset where mods are listed; 0 = no mods
+	uint16_t reserved;    	//	Reserved for future use; set to 0
 	uint8_t[] comments;   	//	Variable length header contents; logging, comments, additional data, etc.
-};	//	sizeof(bingo_header_s) == 17
+};	//	sizeof(bingo_header_s) == 21
 
 - Within a major version, files must be backwards compatible; minor versions may add optional features that can be ignored by lower versions without loss of data.
 - If the list of goals is shorter than (width * height), remainders shall be filled with dummy squares (hard-coded or user-chosen default, "free" or "never" square, randomly generated, etc.).  A warning may be emitted.
@@ -78,9 +80,11 @@ struct bingo_header_s {
 
 Limits: offsets are 16-bit, limiting the header to about 64kiB; goals list is incremental and could be more or less indefinite.  I would suggest using at least 32-bit integers to handle file navigation, and mainly out of convenience as files per se can be quite large.  I suppose header size or comment string length could be subtracted to stretch the maximum header size a couple bytes further, or just use uint_32s or more, uniformly -- but 64kiB should be enough for a *lot* of games at least, and honestly I prefer a smaller size restriction?  It's not supposed to be anything elaborate, just play the game and have fun ok? :)
 
+`shelter` is the offset to a string, the name of the starting shelter (e.g. "GW_S02", zero terminated).  String shall be placed after comments.  If not set, a zero-length string (points to a NUL byte) or zero offset (NULL pointer) can be used; this shall be interpreted as random shelter start.
+
 Recommended `comments` format is line (CRLF) separated, with the first two lines being title, and sub-title or name or description.  Subsequent lines can add flavor text, commentary, s..story content I guess?, or whatever; or store more variables, perhaps as `"key: value\r\n"` pairs.  Possible uses may evolve over time; I would generally suggest to keep it clean, well formatted, and human-read/writable.
 
-The `mods` section is a list of mod packs, in order added to the viewer context.  Mods must match exactly the hash and key specified; this may prove inconvenient as updates are made from time to time (mod pack creators are encouraged to keep all released versions available and accessible).
+The `mods` section is a list of mod packs, in order added to the viewer context.  Mods must match exactly the hash and key specified; this may prove inconvenient as updates are made from time to time (mod pack creators are encouraged to keep all released versions available and accessible).  A possible structure for an entry is:
 
 struct bingo_mod_s {
 	uint32_t hash;
@@ -88,7 +92,9 @@ struct bingo_mod_s {
 	uint8_t[] name;
 };
 
-`name` is a descriptive name of the modpack to be loaded: this is suggested to have at least a title and version number included.  `hash` is a hash of the modpack file (full JSON plaintext as provided by its creator).  (`name` is a property included in the file itself, so doesn't need to be added to the hashed content.)  Somewhat longer strings are allowed here, but again with the usual cautions: avoid obnoxiously long titles or data stored here.  A hash algorithm is not defined at this time.
+These may be taken as filling the remaining space from `mods` to `goals`; or perhaps a few bytes at `mods` indicates number of entries; or the hash must be nonzero and a zero field indicates end of list.   TBD.
+
+`name` is a descriptive name of the modpack to be loaded: this is suggested to have at least a title and version number included.  `hash` is a hash of the modpack file (full JSON plaintext as provided by its creator).  Somewhat longer strings are allowed here, but again with the usual cautions: avoid obnoxiously long titles or data stored here.  A hash algorithm is not defined at this time.
 
 On loading a board, any mod packs available to the reader will be checked for exact match (hash, then name), and loaded automatically.  (Various sources are envisioned: local files in a native viewer app; server-side or localstorage for a web app; externally hosted (URL) sources; etc.  No source requirements are defined at this time.)   The user will be prompted to supply any missing packs.
 
@@ -102,19 +108,21 @@ A goal has the prototype:
 
 struct bingo_goal_s {
 	uint8_t type;   	//	BINGO_GOALS index
+	uint8_t flags;  	//	GOAL_FLAGS bit vector
 	uint8_t length; 	//	Length of data[]
 	uint8_t[] data; 	//	defined by the goal
 };
 
-Length is technically redundant, defined by the goal.  It is provided for two reasons:
+Length is technically redundant, defined by the goal.  It is provided for three reasons:
 1. Convenience: while scanning a file, length doesn't need to be looked up at every stop;
 2. An undefined goal type could not be scanned past, dooming all subsequent goals to a fate of data loss or corruption.
+3. Simplicity: corollary to (1), variable-length goals (containing one or more [variable] strings, lists, etc.) might require deeper inspection (summing length bytes, finding zeros, etc.).  Would rather spend an extra byte than have to functionalize that.
 
 `data` is defined per goal.
 
 Goals generally (always?) use three data types to select options: Boolean, Integer, or String.  In the v0.85 text format, these are obtained from a SettingBox instance, where strings are selected from a goal- and selection-specific list.
 
-A "hidden" flag is desirable, to implement hidden goals similar to base Expedition.  This could be inserted as a new byte in this structure, leeched off the `type` or `length` fields (e.g. take the top bit, reducing the range of the field by half -- it might not prove necessary), or implemented arbitrarily within each goal's `data`.  At this time, more evaluation is necessary to determine which location is most suitable.
+A "hidden" flag is desirable, to implement hidden goals similar to base Expedition.  This could be inserted as a new byte in this structure (as shown), leeched off the `type` or `length` fields (e.g. take the top bit, reducing the range of the field by half -- it might not prove necessary), or implemented arbitrarily within each goal's `data`.  For now, it's being placed here; the lower nibble shall be reserved for future use, while the upper nibble can be shared with challenge flags (consequently, boolean parameters can read starting from this region of the goal object).
 
 Supplementary information is used to parse `data`.  A goal definition specifies which parameters (number, type and order) it's composed of, and provides any sets of strings needed to index names from.  Strings from base game and Bingo Mod are also provided as defaults.
 
@@ -132,9 +140,9 @@ Compare to the text format (split by "><"'s): ["System.String|Rock|Item|1|theft"
 
 BingoStealChallenge: {
 	params: [
-		{ type: "select", name: "Item", enum: "steal_theft", size: 1, offset: 0 },
-		{ type: "bool", name: "From Scavenger Toll", bit: 0, size: 1, offset: 1 },
-		{ type: "number", name: "Amount", size: 2, offset: 2 }
+		{ type: "select", name: "Item",   enum: "steal_theft", size: 1, offset: 0 },
+		{ type: "bool",   name: "From Scavenger Toll", bit: 4, size: 1, offset: 0 },
+		{ type: "number", name: "Amount",                      size: 2, offset: 2 }
 	],
 	desc: "some format string incorporating replacement tags and conditionals",
 	draw: {
@@ -142,7 +150,7 @@ BingoStealChallenge: {
 	}
 }
 
-`params` lists parameters in any order, and creates a parameter of the same `name` which can be referenced by `desc` and `draw`.  `type` is one of: "select", "number", "bool" or "string".  `name` is also the text label displayed for that parameter.  `enum` is the list a `type: "select"` is `select`ing from.
+`params` lists parameters in any order, and creates a parameter of the same `name` which can be referenced by `desc` and `draw`.  `type` is one of: "select", "number", "bool" or "string".  `name` is also the text label displayed for that parameter.  `enum` is the list a `type: "select"` is `select`ing from.  `offset` is the offset within `data` (`bool`: `data`-2) to read from.  `bit` is the bit position to check (`bool` only).
 
 Enums are provided "pre-installed" in the viewer (and, obviously, in the game itself), and include all sets of in-game items, creatures, regions, and Expedition and Bingo goal targets.  The names of these lists are given in the Enums section.  Mod packs can add their own global enums, and append to existing global enums; indices beyond pre-installed ranges therefore depend on which mods are loaded, and in what order.  Mod packs can also add to the list of parsers, or replace existing 
 
@@ -151,7 +159,7 @@ Another example:
 struct goal_vista_s {
 	uint16_t x;
 	uint16_t y;
-	uint8_t[] room;	//	example, "CC_A10" (ZTS)
+	uint8_t[] room;	//	example, "CC_A10"
 };
 
 Text format example: ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
@@ -422,6 +430,23 @@ const char* const BINGOGOAL_NAMES[] = {
 ​	"BingoUnlockChallenge",
 ​	"Visiting vistas"
 };
+
+---
+
+Bingo goal `flags`:
+
+A bit vector of flags relevant to the goal.  At this time, only one flag is defined:
+
+enum GOAL_FLAGS {	/*	min size: uint8_t  */
+	GOALFLAG_HIDDEN    = 0x01,
+	GOALFLAG_RESERVED1 = 0x02,
+	GOALFLAG_RESERVED2 = 0x04,
+	GOALFLAG_RESERVED3 = 0x08,
+};
+
+Reserved flags are kept for future use; avoid placing challenge flags here.  The remaining upper nibble is free to use.
+
+The hidden flag functions as it does in Expedition.  What's necessary to reveal goals is up to implementation. (Possible example: complete all other goals in a row/col/diag to reveal the hidden goals in that row/col/diag.)
 
 ---
 
