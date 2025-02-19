@@ -1,9 +1,5 @@
 /*
-
 some more TODOs:
-- create the whole binary format
-- binary format converters from/to text format
-- URL parsing if compact enough to pass as query
 - nudge around board view by a couple pixels to spread out rounding errors
 - board server to...basically URL-shorten?
 - ???
@@ -36,7 +32,10 @@ const ids = {
 	darkstyle: "darkmode",
 	radio1: "dark",
 	radio2: "light",
-	detail: "kibitzing"
+	detail: "kibitzing",
+	charsel: "charselect",
+	shelter: "shelter",
+	perks: "perkscheck"
 };
 
 /**
@@ -84,11 +83,10 @@ const GOAL_LENGTH = 3;
  *	When not initialized / in gross error: undefined
  *	Else, this structure:
  *	{
- *		title: <string>,    	// "Untitled" by default
+ *		comments: <string>, 	//	"Untitled" by default
  *		character: <string>,	//	one of BingoEnum_CHARACTERS
  *		perks: <int>,       	//	bitmask of BingoEnum_PERKS
  *		shelter: <string>,  	//	starting shelter (blank if random)
- *		comments: <string>,
  *		mods: [],           	//	TODO: list of modpacks (hash, name, reference?) in order of addition
  *		size: <int>,
  *		width: <int>,       	//	for now, width = height = size, but this allows
@@ -103,7 +101,7 @@ const GOAL_LENGTH = 3;
  *				comments: <string>,
  *				paint: [
  *					//	any of the following, in any order:
- *					{ type: "icon", value: <string>, scale: <number>, color: <string>, rotation: <number> },
+ *					{ type: "icon", value: <string>, scale: <number>, color: <HTMLColorString>, rotation: <number> },
  *					{ type: "break" },
  *					{ type: "text", value: <string>, color: <HTMLColorString> },
  *				],
@@ -225,7 +223,9 @@ document.addEventListener("DOMContentLoaded", function() {
 			//	Binary string, base64 encoded
 			var s = "";
 			try {
-				var ar = new Uint8Array(atob(u.get("b")).split("").map( c=> c.charCodeAt(0) ));
+				//	Undo URL-safe escapes...
+				s = u.get("b").replace(/-/g, "+").replace(/_/g, "/");
+				var ar = new Uint8Array(atob(s).split("").map( c => c.charCodeAt(0) ));
 				board = binToString(ar);
 			} catch (e) {
 				setError("Error parsing URL: " + e.message);
@@ -337,8 +337,8 @@ function parseText(e) {
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
 	document.getElementById(ids.textbox).value = s;
 	var goals = s.split(/bChG/);
+	var size = Math.ceil(Math.sqrt(goals.length));
 	if (board === undefined) {
-		var size = Math.ceil(Math.sqrt(goals.length));
 		board = {
 			comments: "Untitled",
 			character: "Any",
@@ -352,7 +352,27 @@ function parseText(e) {
 			toBin: undefined
 		};
 	} else {
+		//	Board already exists, parse meta from the document
+		if (document.getElementById(ids.meta).firstChild !== null)
+			board.comments = document.getElementById(ids.meta).firstChild.lastChild.innerText || "Untitled";
+		if (document.getElementById(ids.charsel) !== null)
+			board.character = document.getElementById(ids.charsel).value;
+		if (document.getElementById(ids.shelter) !== null) {
+			board.shelter = document.getElementById(ids.shelter).innerText;
+			if (board.shelter == "random") board.shelter = "";
+		}
+		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+			el = document.getElementById(ids.perks + String(i));
+			if (el !== null) {
+				if (el.checked)
+					board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
+				else
+					board.perks &= ~Object.values(BingoEnum_EXPFLAGS)[i];
+			} else
+				break;
+		}
 		board.goals = [];
+		board.size = size; board.width = size; board.height = size;
 	}
 
 	for (var i = 0; i < goals.length; i++) {
@@ -423,46 +443,90 @@ function parseText(e) {
 	var el = document.getElementById(ids.meta);
 	while (el.firstChild)
 		el.removeChild(el.firstChild);
-	addRow(el, "Title", board.comments);
-	addRow(el, "Character", BingoEnum_CharToDisplayText[board.character] || "Any");
-	addRow(el, "Perks", perksToString(board.perks));
-	addRow(el, "Size", String(board.width) + " x " + String(board.height));
-	addRow(el, "Mods", modsToString(board.mods));
+	addRow(el, document.createTextNode("Title"), document.createTextNode(board.comments));
+	addRow(el, document.createTextNode("Size"),
+			document.createTextNode(String(board.width) + " x " + String(board.height)));
+	addRow(el, document.createTextNode("Character"), enumToSelectBox(
+			board.character, Object.values(BingoEnum_CharToDisplayText), ids.charsel)
+			);
+	addRow(el, document.createTextNode("Shelter"), document.createTextNode(board.shelter || "random"));
+	el.lastChild.lastChild.setAttribute("id", ids.shelter);
+	addRow(el, document.createTextNode("Perks"), perksToChecksList(board.perks));
+	addRow(el, document.createTextNode("Mods"), document.createTextNode(modsToString(board.mods)));
 
 	//	prepare board binary encoding
 	board.toBin = boardToBin(board);
+	//	Avoid some URL escaping with a simple substitution...
+	var s = btoa(String.fromCharCode.apply(null, board.toBin));
+	s = s.replace(/\+/g, "-").replace(/\//g, "_");
+	var u = new URL(document.URL);
+	u.searchParams.set("b", s);
+	history.replaceState(null, "", u.href);
 
 	return;
 
-	function addRow(e, d1, d2) {
+	function addRow(par, e1, e2) {
 		var tr = document.createElement("tr");
 		var td = document.createElement("td");
-		td.appendChild(document.createTextNode(d1));
+		td.appendChild(e1);
 		tr.appendChild(td);
 		td = document.createElement("td");
-		td.appendChild(document.createTextNode(d2));
+		td.appendChild(e2);
 		tr.appendChild(td);
-		e.appendChild(tr);
+		par.appendChild(tr);
 	}
 
-	function perksToString(p) {
-		let s = "None";
-		for (key in BingoEnum_EXPFLAGS) {
-			if (p & BingoEnum_EXPFLAGS[key])
-				s += ", " + BingoEnum_EXPFLAGSNames[key];
+	function enumToSelectBox(item, list, id) {
+		var elem = document.createElement("select");
+		elem.setAttribute("id", id);
+		var elem2 = document.createElement("option");
+		elem2.innerHTML = "Any";
+		elem.appendChild(elem2);
+		for (var i = 0; i < list.length; i++) {
+			elem2 = document.createElement("option");
+			elem2.innerHTML = list[i];
+			elem.appendChild(elem2);
+			if (item == list[i])
+				elem.value = item;
 		}
-		if (s.length > "None".length)
-			s.replace(/^None\, /, "");
-		return s;
+		return elem;
+	}
+
+	function perksToChecksList(p) {
+		//var elem = document.createElement("table");
+		var elem = document.createElement("div");
+		elem.style.marginLeft = "0px";
+		elem.style.marginTop = "0px";
+		//elem.setAttribute("class", "perklist");
+		//var elem2 = document.createElement("tbody");
+		//elem.appendChild(elem2);
+		var l = Object.keys(BingoEnum_EXPFLAGS);
+		for (var i = 0; i < l.length; i++) {
+			//var tr = document.createElement("tr");
+			//elem2.appendChild(tr);
+			//var td = document.createElement("td");
+			//tr.appendChild(td);
+			var label = document.createElement("label");
+			var check = document.createElement("input");
+			check.setAttribute("type", "checkbox");
+			check.setAttribute("id", ids.perks + String(i));
+			if (p & BingoEnum_EXPFLAGS[l[i]])
+				check.setAttribute("checked", "");
+			label.appendChild(check);
+			label.appendChild(document.createTextNode(BingoEnum_EXPFLAGSNames[l[i]]));
+			//td.appendChild(label);
+			elem.appendChild(label);
+		}
+		return elem;
 	}
 
 	function modsToString(m) {
-		let s = "None";
+		let s = "none";
 		for (var i = 0; i < m.length; i++) {
 			s += "; Name: \"" + m.name + "\", Hash: " + m.hash;
 		}
-		if (s.length > "None".length)
-			s.replace(/None^\; /, "");
+		if (s.length > "none".length)
+			s.replace(/^none\; /, "");
 		return s;
 	}
 }
@@ -722,7 +786,7 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 }
 
 /**
- *	Converts a validated board to binary format.
+ *	Converts a validated board in text, to binary format.
  */
 function boardToBin(b) {
 	var e = new TextEncoder();
@@ -738,7 +802,7 @@ function boardToBin(b) {
 	//	uint8_t boardWidth; uint8_t boardHeight;
 	hdr[6] = b.width; hdr[7] = b.height;
 	//	uint8_t character;
-	hdr[8] = BingoEnum_CHARACTERS.indexOf(b.character) + 1;
+	hdr[8] = Object.values(BingoEnum_CharToDisplayText).indexOf(b.character) + 1;
 	//	uint16_t shelter;
 	applyShort(hdr, 9, hdr.length + comm.length);
 	//	uint32_t perks;
@@ -809,7 +873,7 @@ function binToString(a) {
 				+ " is newer than viewer v" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR)
 				+ "; some goals or features may be unsupported.";
 	//	uint8_t character;
-	b.character = (a[8] == 0) ? "Any" : BingoEnum_CHARACTERS[a[8] - 1];
+	b.character = (a[8] == 0) ? "Any" : Object.values(BingoEnum_CharToDisplayText)[a[8] - 1];
 	//	uint16_t shelter;
 	var ptr = readShort(a, 9);
 	if (ptr > 0)
@@ -999,7 +1063,8 @@ const CHALLENGES = {
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + desc[2] + "\" not a number or out of range");
 		var amt2 = parseInt(desc[3]);
-		if (isNaN(amt2) || amt2 < 0 || amt2 > INT_MAX || (amt2 - amt) >= CHAR_MAX)
+		amt2 = Math.min(amt2, amt + CHAR_MAX);
+		if (isNaN(amt2) || amt2 < 0 || amt2 > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + desc[3] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1340,7 +1405,7 @@ const CHALLENGES = {
 		//	desc of format ["System.String|BubbleGrass|Item type|0|banitem", "0", "0", "0", "0"]
 		checkDescriptors(thisname, desc.length, 5, "parameter item count");
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Item type", , "banitem"], "item selection");
-		if (!(BingoEnum_Bannable.includes(items[1]) || BingoEnum_FoodTypes.includes(items[1]))) {
+		if (!ALL_ENUMS["banitem"].includes(items[1])) {
 			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in BingoEnum_banitem[]");
 		}
 		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
@@ -1534,7 +1599,8 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 5, "parameter item count");
 		var amounts = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "egg count");
 		var amt = parseInt(amounts[1]);
-		if (isNaN(amt) || amt < 0 || amt >= CHAR_MAX)
+		amt = Math.min(amt, CHAR_MAX);
+		if (isNaN(amt) || amt < 0)
 			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
 		items = checkSettingbox(thisname, desc[2], ["System.Boolean", , "At Once", , "NULL"], "one-cycle flag");
 		if (items[1] != "true" && items[1] != "false")
@@ -1569,7 +1635,8 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 4, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "goal count");
 		var amt = parseInt(items[1]);
-		if (isNaN(amt) || amt < 0 || amt >= CHAR_MAX)
+		amt = Math.min(amt, CHAR_MAX);
+		if (isNaN(amt) || amt < 0)
 			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1601,7 +1668,8 @@ const CHALLENGES = {
 		if (!BingoEnum_expobject.includes(items[1]))
 			throw new TypeError(thisname + ": error, item selection \"" + items[1] + "\" not found in BingoEnum_expobject[]");
 		var amt = parseInt(amounts[1]);
-		if (isNaN(amt) || amt < 0 || amt > CHAR_MAX)
+		amt = Math.min(amt, CHAR_MAX);
+		if (isNaN(amt) || amt < 0)
 			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2157,11 +2225,11 @@ const CHALLENGES = {
 		}
 		p.push( { type: "break" } );
 		p.push( { type: "text", value: "[0/" + v[1] + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
-		var b = Array(7); b.fill(0);
+		var b = Array(6); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(v[0], "theft");
 		applyBool(b, 1, 4, v[2]);
-		applyShort(b, 5, amt);
+		applyShort(b, 4, amt);
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
@@ -3796,7 +3864,7 @@ const ALL_ENUMS = {
 	"depths":         BingoEnum_Depthable,
 	"expobject":      BingoEnum_expobject,
 	"craft":          BingoEnum_CraftableItems,
-	"banitem":        BingoEnum_Bannable,
+	"banitem":        BingoEnum_FoodTypes.concat(BingoEnum_Bannable),
 	"food":           BingoEnum_FoodTypes,
 	"theft":          BingoEnum_theft,
 	"friend":         BingoEnum_Befriendable,
@@ -4680,6 +4748,42 @@ function checkDescriptors(t, d, g, err) {
 	if (typeof(d) === "string") s = "\"" + s + "\"";
 	if (typeof(g) === "string") h = "\"" + h + "\"";
 	if (d != g) throw new TypeError(t + ": error, " + err + " " + s + ", expected: " + h);
+}
+
+/**
+ *	Quickly sets the meta / header data for a parsed text board.
+ *	Has no effect if the header table is not yet placed.
+ *	@param comm   String to set as comment / title
+ *	  character   Selected character; one of Object.values(BingoEnum_CharToDisplayText), or "Any" if other
+ *	    shelter   Shelter to start in, or "" if random.
+ *	      perks   List of perks to enable.  Array of integers, each indexing ALL_ENUMS.EXPFLAGS[]
+ *	              and related enums (see also BingoEnum_EXPFLAGSNames).
+ *	              For example, the list [0, 5, 13, 14, 16] would enable:
+ *	              "Perk: Scavenger Lantern", "Perk: Karma Flower", "Perk: Item Crafting",
+ *	              "Perk: High Agility", "Burden: Blinded"
+ *	              (Ordering of this array is not checked, and repeats are ignored.)
+ */
+function setMeta(comm = "Untitled", character = "Any", shelter = "", perks = []) {
+	if (board === undefined || document.getElementById(ids.meta).firstChild === null
+			|| document.getElementById(ids.charsel) === null
+			|| document.getElementById(ids.shelter) === null)
+		return;
+
+	document.getElementById(ids.meta).firstChild.lastChild.innerText = comm;
+	document.getElementById(ids.charsel).value = character;
+	if (shelter == "random") shelter = "";
+	document.getElementById(ids.shelter).innerText = shelter;
+
+	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+		el = document.getElementById(ids.perks + String(i));
+		if (el === null)
+			break;
+		if (perks.includes(i))
+			el.setAttribute("checked", "");
+		else
+			el.removeAttribute("checked");
+	}
+	parseText();
 }
 
 function itemToColor(i) {
