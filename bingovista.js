@@ -4,6 +4,7 @@ some more TODOs:
 - board server to...basically URL-shorten?
 - ???
 - no profit, this is for free GDI
+- Streamline challenge parsing? compactify functions? or reduce to structures if possible?
 
 Stretchier goals:
 - Board editing, of any sort
@@ -11,6 +12,7 @@ Stretchier goals:
 	* Make parameters editable
 	* Port generator code over??
 */
+
 
 /* * * Constants and Defaults * * */
 
@@ -28,13 +30,18 @@ const ids = {
 	square: "square",
 	desc: "desctxt",
 	meta: "header",
+	metatitle: "hdrttl",
+	metasize: "hdrsize",
+	metabutton: "hdrshow",
+	metaperks: "hdrperks",
+	metamods: "hdrmods",
+	charsel: "hdrchar",
+	shelter: "hdrshel",
 	message: "errorbox",
 	darkstyle: "darkmode",
 	radio1: "dark",
 	radio2: "light",
 	detail: "kibitzing",
-	charsel: "charselect",
-	shelter: "shelter",
 	perks: "perkscheck"
 };
 
@@ -46,12 +53,15 @@ const ids = {
  *	(anywhere) additional data.
  */
 const atlases = [
-	{ img: "bingoicons_mod.png", txt: "bingoicons_mod.txt", canv: undefined, frames: {} },	/**< from Bingo mod (with vista additions) */
+	{ img: "bingoicons_mod.png", txt: "bingoicons_mod.txt", canv: undefined, frames: {} },	/**< from Bingo mod (with Vista additions) */
 	{ img: "uispritesmsc.png",   txt: "uispritesmsc.txt",   canv: undefined, frames: {} }, 	/**< from DLC */
 	{ img: "uiSprites.png",      txt: "uiSprites.txt",      canv: undefined, frames: {} } 	/**< from base game */
 ];
 
-/* Bingo square graphics dimensions (in px) */
+/**
+ *	Bingo square graphics, dimensions (in px) and other properties.
+ *	Adjusted by parseText() to fit to canvas; see also: drawSquare calls 
+ */
 const square = {
 	width: 85,
 	height: 85,
@@ -68,12 +78,15 @@ const INT_MAX = 30000;
 const CHAR_MAX = 250;
 
 /**	Supported mod version */
-const VERSION_MAJOR = 0, VERSION_MINOR = 85;
+const VERSION_MAJOR = 0, VERSION_MINOR = 90;
 
 /** Binary header length, bytes */
 const HEADER_LENGTH = 21;
 /** Binary goal length, bytes */
 const GOAL_LENGTH = 3;
+
+/** Used by getMapLink(); set to "" to disable */
+var map_link_base = "https://noblecat57.github.io/map.html";
 
 
 /* * * Global Variables * * */
@@ -135,11 +148,17 @@ document.addEventListener("DOMContentLoaded", function() {
 	square.color = colorFloatToString(RainWorldColors.Unity_white);
 
 	//	File load stuff
-	document.getElementById(ids.clear).addEventListener("click", function(e) { document.getElementById(ids.textbox).value = ""; });
+	document.getElementById(ids.clear).addEventListener("click", function(e) {
+		document.getElementById(ids.textbox).value = "";
+		var u = new URL(document.URL);
+		u.search = "";
+		history.replaceState(null, "", u.href);
+	});
 	document.getElementById(ids.parse).addEventListener("click", parseText);
 	document.getElementById(ids.copy).addEventListener("click", copyText);
 	document.getElementById(ids.textbox).addEventListener("paste", pasteText);
 	document.getElementById(ids.boardbox).addEventListener("click", clickBoard);
+	document.getElementById(ids.metabutton).addEventListener("click", clickShowPerks);
 	document.getElementById(ids.boardbox).addEventListener("keydown", navSquares);
 	document.getElementById(ids.load).addEventListener("change", function() { doLoadFile(this.files) } );
 	document.getElementById(ids.radio1).addEventListener("input", toggleDark);
@@ -209,7 +228,9 @@ document.addEventListener("DOMContentLoaded", function() {
 	for (var i = 0; i < atlases.length; i++) {
 		loaders.push(loadClosure(atlases[i].txt, atlases[i], loadJson));
 	};
-	Promise.all(loaders).then(function() {
+	Promise.all(loaders).catch(function(e) {
+		console.log("Promise.all(): failed to complete fetches. Error: " + e.message);
+	}).finally(function() {
 
 		//	resources loaded, final init
 
@@ -218,7 +239,6 @@ document.addEventListener("DOMContentLoaded", function() {
 			//	Plain text / ASCII string
 			//	very inefficient, unlikely to be used, but provided for completeness
 			document.getElementById(ids.textbox).value = u.get("a");
-			parseText();
 		} else if (u.has("b")) {
 			//	Binary string, base64 encoded
 			var s = "";
@@ -231,15 +251,13 @@ document.addEventListener("DOMContentLoaded", function() {
 				setError("Error parsing URL: " + e.message);
 			}
 			document.getElementById(ids.textbox).value = board.text;
-			parseText();
 		} else if (u.has("q")) {
 			//	Query, fetch from remote server to get board data
 
 			//
 		}
+		parseText();
 
-	}).catch(function(e) {
-		console.log("Promise.all(): failed to complete fetches. Error: " + e.message);
 	});
 
 	//	Other housekeeping
@@ -299,8 +317,7 @@ function dragDrop(e) {
  */
 function setError(s) {
 	var mb = document.getElementById(ids.message);
-	while (mb.firstChild)
-		mb.removeChild(mb.firstChild);
+	while (mb.childNodes.length) mb.removeChild(mb.childNodes[0]);
 	mb.appendChild(document.createTextNode(s));
 }
 
@@ -353,10 +370,10 @@ function parseText(e) {
 		};
 	} else {
 		//	Board already exists, parse meta from the document
-		if (document.getElementById(ids.meta).firstChild !== null)
-			board.comments = document.getElementById(ids.meta).firstChild.lastChild.innerText || "Untitled";
+		if (document.getElementById(ids.metatitle) !== null)
+			board.comments = document.getElementById(ids.metatitle).innerText || "Untitled";
 		if (document.getElementById(ids.charsel) !== null)
-			board.character = document.getElementById(ids.charsel).value;
+			board.character = document.getElementById(ids.charsel).innerText;
 		if (document.getElementById(ids.shelter) !== null) {
 			board.shelter = document.getElementById(ids.shelter).innerText;
 			if (board.shelter == "random") board.shelter = "";
@@ -375,6 +392,28 @@ function parseText(e) {
 		board.size = size; board.width = size; board.height = size;
 	}
 
+	//	Detect board version:
+	//	assertion: no challenge names are shorter than 14 chars (true as of 0.90)
+	//	assertion: no character names are longer than 10 chars (true of base game + Downpour)
+	//	0.90: character prefix, ";" delimited --> check within first 12 chars
+	//	0.86: character prefix, "_" delimited --> check within first 12 chars
+	//	0.85: no prefix, gonzo right into the goal list --> first token (to "~") is valid goal name or error
+	if (goals[0].search(/[A-Za-z]{1,12}[_;]/) == 0) {
+		//	Seems 0.86 or 0.90, find which
+		if (goals[0].indexOf(";") > 0) {
+			board.version = "0.90";
+			board.character = goals[0].substring(0, goals[0].indexOf(";"));
+			goals[0] = goals[0].substring(goals[0].indexOf(";") + 1);
+		} else if (goals[0].indexOf("_") > 0) {
+			board.version = "0.86";
+			board.character = goals[0].substring(0, goals[0].indexOf("_"));
+			goals[0] = goals[0].substring(goals[0].indexOf("_") + 1);
+		}
+		board.character = BingoEnum_CharToDisplayText[board.character] || "Any";
+	} else {
+		board.version = "0.85";
+	}
+
 	for (var i = 0; i < goals.length; i++) {
 		var type, desc;
 		if (goals[i].search("~") > 0 && goals[i].search("><") > 0) {
@@ -391,9 +430,11 @@ function parseText(e) {
 				board.goals.push(defaultGoal(type, desc));
 			}
 		} else {
-			board.goals.push(CHALLENGES["BingoChallenge"](goals[i]));
+			board.goals.push(CHALLENGES["BingoChallenge"]( [ goals[i] ] ));
 		}
 	}
+	if (goals.length == 0)
+		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
 
 	function defaultGoal(t, d) {
 		return {
@@ -402,6 +443,7 @@ function parseText(e) {
 			items: [],
 			values: [],
 			description: "Unknown goal. Descriptor: " + d.join("><"),
+			comments: "",
 			paint: [
 				{ type: "text", value: "∅", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
 			],
@@ -440,72 +482,37 @@ function parseText(e) {
 	}
 
 	//	Fill meta table with board info
-	var el = document.getElementById(ids.meta);
-	while (el.firstChild)
-		el.removeChild(el.firstChild);
-	addRow(el, document.createTextNode("Title"), document.createTextNode(board.comments));
-	addRow(el, document.createTextNode("Size"),
-			document.createTextNode(String(board.width) + " x " + String(board.height)));
-	addRow(el, document.createTextNode("Character"), enumToSelectBox(
-			board.character, Object.values(BingoEnum_CharToDisplayText), ids.charsel)
-			);
-	addRow(el, document.createTextNode("Shelter"), document.createTextNode(board.shelter || "random"));
-	el.lastChild.lastChild.setAttribute("id", ids.shelter);
-	addRow(el, document.createTextNode("Perks"), perksToChecksList(board.perks));
-	addRow(el, document.createTextNode("Mods"), document.createTextNode(modsToString(board.mods)));
+	var el = document.getElementById(ids.metatitle);
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(board.comments));
+	el = document.getElementById(ids.metasize);
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(String(board.width) + " x " + String(board.height)));
+	el = document.getElementById(ids.charsel);
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(board.character || "Any"));
+	el = document.getElementById(ids.shelter);
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(board.shelter || "random"));
+	perksToChecksList(board.perks);
+	addModsToHeader(board.mods);
 
 	//	prepare board binary encoding
 	board.toBin = boardToBin(board);
 	//	Avoid some URL escaping with a simple substitution...
 	var s = btoa(String.fromCharCode.apply(null, board.toBin));
-	s = s.replace(/\+/g, "-").replace(/\//g, "_");
+	s = s.replace(/\+/g, "").replace(/\//g, "_");
 	var u = new URL(document.URL);
 	u.searchParams.set("b", s);
 	history.replaceState(null, "", u.href);
 
 	return;
 
-	function addRow(par, e1, e2) {
-		var tr = document.createElement("tr");
-		var td = document.createElement("td");
-		td.appendChild(e1);
-		tr.appendChild(td);
-		td = document.createElement("td");
-		td.appendChild(e2);
-		tr.appendChild(td);
-		par.appendChild(tr);
-	}
-
-	function enumToSelectBox(item, list, id) {
-		var elem = document.createElement("select");
-		elem.setAttribute("id", id);
-		var elem2 = document.createElement("option");
-		elem2.innerHTML = "Any";
-		elem.appendChild(elem2);
-		for (var i = 0; i < list.length; i++) {
-			elem2 = document.createElement("option");
-			elem2.innerHTML = list[i];
-			elem.appendChild(elem2);
-			if (item == list[i])
-				elem.value = item;
-		}
-		return elem;
-	}
-
 	function perksToChecksList(p) {
-		//var elem = document.createElement("table");
-		var elem = document.createElement("div");
-		elem.style.marginLeft = "0px";
-		elem.style.marginTop = "0px";
-		//elem.setAttribute("class", "perklist");
-		//var elem2 = document.createElement("tbody");
-		//elem.appendChild(elem2);
+		var elem = document.getElementById(ids.metaperks);
+		while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
 		var l = Object.keys(BingoEnum_EXPFLAGS);
 		for (var i = 0; i < l.length; i++) {
-			//var tr = document.createElement("tr");
-			//elem2.appendChild(tr);
-			//var td = document.createElement("td");
-			//tr.appendChild(td);
 			var label = document.createElement("label");
 			var check = document.createElement("input");
 			check.setAttribute("type", "checkbox");
@@ -514,21 +521,10 @@ function parseText(e) {
 				check.setAttribute("checked", "");
 			label.appendChild(check);
 			label.appendChild(document.createTextNode(BingoEnum_EXPFLAGSNames[l[i]]));
-			//td.appendChild(label);
 			elem.appendChild(label);
 		}
-		return elem;
 	}
 
-	function modsToString(m) {
-		let s = "none";
-		for (var i = 0; i < m.length; i++) {
-			s += "; Name: \"" + m.name + "\", Hash: " + m.hash;
-		}
-		if (s.length > "none".length)
-			s.replace(/^none\; /, "");
-		return s;
-	}
 }
 
 /**
@@ -544,6 +540,17 @@ function pasteText(e) {
  */
 function copyText(e) {
 	navigator.clipboard.writeText(document.getElementById(ids.textbox).value);
+}
+
+/**
+ *	Clicked on Show/Hide.
+ */
+function clickShowPerks(e) {
+	var elem = document.getElementById(ids.metaperks);
+	if (elem.style.display == "none")
+		elem.style.display = "initial";
+	else
+		elem.style.display = "none";
 }
 
 /**
@@ -589,8 +596,7 @@ function selectSquare(col, row) {
 		size.height = ctx.canvas.height - size.margin - size.border;
 		drawSquare(ctx, goal, (size.border + size.margin) / 2, (size.border + size.margin) / 2, size);
 
-		while (el.firstChild)
-			el.removeChild(el.firstChild);
+		while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 		var el2 = document.createElement("div"); el2.setAttribute("class", "descch");
 		el2.appendChild(document.createTextNode("Challenge: " + goal.category));
 		el.appendChild(el2);
@@ -642,8 +648,7 @@ function selectSquare(col, row) {
 		selected = undefined;
 		ctx.fillStyle = square.background;
 		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		while (el.firstChild)
-			el.removeChild(el.firstChild);
+		while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 		el.appendChild(document.createTextNode("Select a square to view details."));
 		document.getElementById(ids.cursor).style.display = "none";
 	}
@@ -874,6 +879,8 @@ function binToString(a) {
 				+ "; some goals or features may be unsupported.";
 	//	uint8_t character;
 	b.character = (a[8] == 0) ? "Any" : Object.values(BingoEnum_CharToDisplayText)[a[8] - 1];
+	b.text += (a[8] == 0) ? "Any" : Object.keys(BingoEnum_CharToDisplayText)[a[8] - 1];
+	b.text += ";";
 	//	uint16_t shelter;
 	var ptr = readShort(a, 9);
 	if (ptr > 0)
@@ -1003,6 +1010,16 @@ function binGoalToText(c) {
 
 /**
  *	Challenge classes from Bingomod decomp.
+ *	Used by parseText().
+ *	Note: `board` header properties have been set, and can be read at this point.
+ *
+ *	Adding new challenges:
+ *	Append at the bottom. Yeah, they're not going to be alphabetical order anymore.
+ *	Order is used by challengeValue, and thus translate names to binary identifier;
+ *	to minimize changes in binary format, preserve existing ordering when possible.
+ *	Modifying existing challenges:
+ *	If possible, preserve compatibility between formats, auto-detect differences
+ *	where possible, or use board.version to select method when not.
  */
 const CHALLENGES = {
 	BingoChallenge: function(desc) {
@@ -1016,10 +1033,10 @@ const CHALLENGES = {
 		return {
 			name: thisname,
 			category: "Empty challenge class",
-			items: [],
+			items: [],	/**< items and values arrays must have equal length */
 			values: [],
-			description: desc[0],
-			comments: "",
+			description: desc[0],	/**< HTML allowed (for other than base name == "BingoChallenge" objects) */
+			comments: "",	/**< HTML allowed */
 			paint: [
 				{ type: "text", value: "∅", color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
@@ -1063,9 +1080,14 @@ const CHALLENGES = {
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + desc[2] + "\" not a number or out of range");
 		var amt2 = parseInt(desc[3]);
+		if (isNaN(amt2)) {
+			//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
+			var amounts = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
+			amt2 = parseInt(amounts[1]); desc[3] = amounts[1];
+		}
 		amt2 = Math.min(amt2, amt + CHAR_MAX);
 		if (isNaN(amt2) || amt2 < 0 || amt2 > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + desc[3] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": error, amount \"" + desc[3] + "\" not a number or SettingBox, or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "regionsreal");
@@ -1074,11 +1096,11 @@ const CHALLENGES = {
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
-			category: "Entering all regions except one",
+			category: "Entering regions while never visiting one",
 			items: [items[2], "To do", "Progress", "Total"],
 			values: [items[1], desc[1], String(amt), String(amt2)],
-			description: "Enter all regions except " + r + ".",
-			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; a lower bar could thus be set, making a \"The Wanderer\"-lite, or setting a specific collection of regions to enter, to entice players towards certain regions. Downside: this is not currently supported in-game, so the region list is something of a mystery unless viewed and manually tracked.",
+			description: "Enter " + String(amt2 - amt) + " regions that are not " + r + ".",
+			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game, so the region list is something of a mystery unless viewed and manually tracked.",
 			paint: [
 				{ type: "icon", value: "TravellerA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
@@ -1099,7 +1121,7 @@ const CHALLENGES = {
 		var pass = checkSettingbox(thisname, desc[1], ["System.Boolean", , "Pass the Toll", , "NULL"], "pass toll flag");
 		if (pass[1] != "true" && pass[1] != "false")
 			throw new TypeError(thisname + ": error, pass toll flag \"" + speci[1] + "\" not 'true' or 'false'");
-		var regi = items[1].substring(0, items[1].search("_")).toUpperCase();
+		var regi = regionOfRoom(items[1]).toUpperCase();
 		var r = (regionCodeToDisplayName[regi] || "") + " / " + (regionCodeToDisplayNameSaint[regi] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
 		if (r == "")
@@ -1127,7 +1149,7 @@ const CHALLENGES = {
 			items: [items[2], pass[2]],
 			values: [items[1], pass[1]],
 			description: "Throw a grenade at the " + r + " Scavenger toll" + ((pass[1] == "true") ? ", then pass it." : "."),
-			comments: "Bomb and pass must be done in that order, in the same cycle.",
+			comments: "Bomb and pass must be done in that order, in the same cycle." + getMapLink(items[1].toUpperCase()),
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
@@ -1370,7 +1392,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [items[1]],
 			description: "Drop a " + d + " into the Depths drop room (SB_D06).",
-			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop.", /* It is perhaps possible&mdash;but extraordinarily unlikely&mdash;that a creature, of target type that normally spawns in Subterranean, migrates all the way over and down, and the player merely needs to show up to get credit.", */
+			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06"),
 			paint: [
 				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
 				{ type: "icon", value: "deathpiticon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
@@ -2290,7 +2312,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [String(amt)],
 			description: "Trade " + String(amt) + " points worth of items to Scavenger Merchants.",
-			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. When the Scavenger is also a Merchant, points will be awarded. Beware that Scavenger vision is very narrow and can easily miss one of these three actions. Try to get and hold their attention and be prompt. Any item can be traded once to award points according to its value; this includes items initially held by (then dropped or traded) by Scavengers. If an item seems to have been ignored or missed, try trading it again. Stealing and murder will not result in points awarded.",
+			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. When the Scavenger is also a Merchant, points will be awarded. Any item can be traded once to award points according to its value; this includes items initially held by (then dropped or traded) by Scavengers. If an item seems to have been ignored or missed, try trading it again. Stealing and murder will not result in points being awarded.",
 			paint: [
 				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
@@ -2317,7 +2339,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [String(amt)],
 			description: "Trade " + String(amt) + ((amt == 1) ? " item" : " items") + " from Scavenger Merchants to other Scavenger Merchants.",
-			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. Beware that Scavenger vision is very narrow and can easily miss one of these three actions. Try to get and hold their attention and be prompt. While this challenge is active, any item dropped by a Merchant, in trade, will be \"blessed\" and bear a mark indicating its eligibility for this challenge. In a Merchant room, the Merchant bears a '✓' tag to show who you should trade with; other Scavengers in the room are tagged with 'X'. Stealing from or murdering a Merchant will not result in \"blessed\" items dropping. A \"blessed\" item can then be brought to any <em>other</em> Merchant and traded, to obtain credit towards this goal.",
+			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. While this challenge is active, any item dropped by a Merchant, due to a trade, will be \"blessed\" and thereafter bear a mark indicating its eligibility for this challenge. In a Merchant room, the Merchant bears a '✓' tag to show who you should trade with; other Scavengers in the room are tagged with 'X'. Stealing from or murdering a Merchant will not result in \"blessed\" items dropping (unless they were already traded). A \"blessed\" item can then be brought to any <em>other</em> Merchant and traded, to award credit.",
 			paint: [
 				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: "Menu_Symbol_Shuffle", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
@@ -2451,7 +2473,7 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 6, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Room", , "vista"], "item selection");
 		//	desc[0] is region code
-		if (desc[0] != items[1].substring(0, items[1].search("_")))
+		if (desc[0] != regionOfRoom(items[1]))
 			throw new TypeError(thisname + ": error, region \"" + desc[0] + "\" does not match room \"" + items[1] + "\"'s region");
 		var v = (regionCodeToDisplayName[desc[0]] || "") + " / " + (regionCodeToDisplayNameSaint[desc[0]] || "");
 		v = v.replace(/^\s\/\s|\s\/\s$/g, "");
@@ -2463,24 +2485,68 @@ const CHALLENGES = {
 		var roomY = parseInt(desc[3]);
 		if (isNaN(roomY) || roomY < 0 || roomY > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + desc[3] + "\" not a number or out of range");
-		var b = Array(8); b.fill(0);
-		b[0] = challengeValue(thisname);
-		b[3] = enumToValue(desc[0], "regions");
-		applyShort(b, 4, roomX);
-		applyShort(b, 6, roomY);
-		b = b.concat([...new TextEncoder().encode(items[1])]);
-		b[2] = b.length - GOAL_LENGTH;
+		var idx = BingoEnum_VistaPoints.findIndex(o => o.room == items[1] && o.x == roomX && o.y == roomY);
+		if (idx < 0) {
+			//	Can't find in list, customize it
+			var b = Array(8); b.fill(0);
+			b[0] = challengeValue(thisname);
+			b[3] = enumToValue(desc[0], "regions");
+			applyShort(b, 4, roomX);
+			applyShort(b, 6, roomY);
+			b = b.concat([...new TextEncoder().encode(items[1])]);
+			b[2] = b.length - GOAL_LENGTH;
+		} else {
+			//	Use stock list for efficiency
+			var b = Array(4); b.fill(0);
+			b[0] = challengeValue("BingoVistaChallenge") + 1;
+			b[3] = idx + 1;
+			b[2] = b.length - GOAL_LENGTH;
+		}
 		return {
 			name: thisname,
 			category: "Visiting Vistas",
 			items: ["Region"],
 			values: [desc[0]],
 			description: "Reach the vista point in " + v + ".",
-			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY),
+			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1]),
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: desc[0], color: colorFloatToString(RainWorldColors.Unity_white) }
+			],
+			toBin: new Uint8Array(b)
+		};
+	},
+	BingoEnterRegionFromChallenge: function(desc) {
+		const thisname = "BingoEnterRegionFromChallenge";
+		//	desc of format ["System.String|GW|From|0|regionsreal", "System.String|SH|To|0|regionsreal", "0", "0"]
+		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "From", , "regionsreal"], "from region");
+		var r1 = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
+		r1 = r1.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r1 == "")
+			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
+		var itemTo = checkSettingbox(thisname, desc[1], ["System.String", , "To", , "regionsreal"], "to region");
+		var r2 = (regionCodeToDisplayName[itemTo[1]] || "") + " / " + (regionCodeToDisplayNameSaint[itemTo[1]] || "");
+		r2 = r2.replace(/^\s\/\s|\s\/\s$/g, "");
+		if (r2 == "")
+			throw new TypeError(thisname + ": error, region \"" + itemTo[1] + "\" not found in regionCodeToDisplayName[]");
+		var b = Array(5); b.fill(0);
+		b[0] = challengeValue(thisname);
+		b[3] = enumToValue(items[1], "regionsreal");
+		b[4] = enumToValue(itemTo[1], "regionsreal");
+		b[2] = b.length - GOAL_LENGTH;
+		return {
+			name: thisname,
+			category: "Entering a region from another region",
+			items: [items[2], itemTo[2]],
+			values: [items[1], itemTo[1]],
+			description: "First time entering " + r1 + " must be from " + r2 + ".",
+			comments: "",
+			paint: [
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 90 },
+				{ type: "text", value: itemTo[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
 			toBin: new Uint8Array(b)
 		};
@@ -3149,7 +3215,7 @@ const RainWorldColors = {
 
 /**
  *	Convert creature value string to display text.
- *	Game extract: ChallengeTools::CreatureName
+ *	Game extract: Expedition.ChallengeTools::CreatureName
  *	Additions patched in from creatureNameToIconAtlasMap and sorted to match
  *	Note: these are plural; see creatureNameToSingular() for the other case.
  */
@@ -3847,9 +3913,212 @@ const BingoEnum_EXPFLAGSNames = {
 	"AURA":      "Aura"
 };
 
+/**
+ *	Boolean strings, for completeness.
+ */
 const BingoEnum_Boolean = [
 	"false",
 	"true"
+];
+
+/**
+ *	Stock (built in / mod generated) Vista Point locations.
+ */
+const BingoEnum_VistaPoints = [
+	//	Base Expedition
+	{ region: "CC", room: "CC_A10",           x:  734, y:  506 },
+	{ region: "CC", room: "CC_B12",           x:  455, y: 1383 },
+	{ region: "CC", room: "CC_C05",           x:  449, y: 2330 },
+	{ region: "CL", room: "CL_C05",           x:  540, y: 1213 },
+	{ region: "CL", room: "CL_H02",           x: 2407, y: 1649 },
+	{ region: "CL", room: "CL_CORE",          x:  471, y:  373 },
+	{ region: "DM", room: "DM_LAB1",          x:  486, y:  324 },
+	{ region: "DM", room: "DM_LEG06",         x:  400, y:  388 },
+	{ region: "DM", room: "DM_O02",           x: 2180, y: 2175 },
+	{ region: "DS", room: "DS_A05",           x:  172, y:  490 },
+	{ region: "DS", room: "DS_A19",           x:  467, y:  545 },
+	{ region: "DS", room: "DS_C02",           x:  541, y: 1305 },
+	{ region: "GW", room: "GW_C09",           x:  607, y:  595 },
+	{ region: "GW", room: "GW_D01",           x: 1603, y:  595 },
+	{ region: "GW", room: "GW_E02",           x: 2608, y:  621 },
+	{ region: "HI", room: "HI_B04",           x:  214, y:  615 },
+	{ region: "HI", room: "HI_C04",           x:  800, y:  768 },
+	{ region: "HI", room: "HI_D01",           x: 1765, y:  655 },
+	{ region: "LC", room: "LC_FINAL",         x: 2700, y:  500 },
+	{ region: "LC", room: "LC_SUBWAY01",      x: 1693, y:  564 },
+	{ region: "LC", room: "LC_tallestconnection", x:  153, y:  242 },
+	{ region: "LF", room: "LF_A10",           x:  421, y:  412 },
+	{ region: "LF", room: "LF_C01",           x: 2792, y:  423 },
+	{ region: "LF", room: "LF_D02",           x: 1220, y:  631 },
+	{ region: "OE", room: "OE_RAIL01",        x: 2420, y: 1378 },
+	{ region: "OE", room: "OE_RUINCourtYard", x: 2133, y: 1397 },
+	{ region: "OE", room: "OE_TREETOP",       x:  468, y: 1782 },
+	{ region: "RM", room: "RM_ASSEMBLY",      x: 1550, y:  586 },
+	{ region: "RM", room: "RM_CONVERGENCE",   x: 1860, y:  670 },
+	{ region: "RM", room: "RM_I03",           x:  276, y: 2270 },
+	{ region: "SB", room: "SB_D04",           x:  483, y: 1045 },
+	{ region: "SB", room: "SB_E04",           x: 1668, y:  567 },
+	{ region: "SB", room: "SB_H02",           x: 1559, y:  472 },
+	{ region: "SH", room: "SH_A14",           x:  273, y:  556 },
+	{ region: "SH", room: "SH_B05",           x:  733, y:  453 },
+	{ region: "SH", room: "SH_C08",           x: 2159, y:  481 },
+	{ region: "SI", room: "SI_C07",           x:  539, y: 2354 },
+	{ region: "SI", room: "SI_D05",           x: 1045, y: 1258 },
+	{ region: "SI", room: "SI_D07",           x:  200, y:  400 },
+	{ region: "SL", room: "SL_B01",           x:  389, y: 1448 },
+	{ region: "SL", room: "SL_B04",           x:  390, y: 2258 },
+	{ region: "SL", room: "SL_C04",           x:  542, y: 1295 },
+	{ region: "SU", room: "SU_A04",           x:  265, y:  415 },
+	{ region: "SU", room: "SU_B12",           x: 1180, y:  382 },
+	{ region: "SU", room: "SU_C01",           x:  450, y: 1811 },
+	{ region: "UG", room: "UG_A16",           x:  640, y:  354 },
+	{ region: "UG", room: "UG_D03",           x:  857, y: 1826 },
+	{ region: "UG", room: "UG_GUTTER02",      x:  163, y:  241 },
+	{ region: "UW", room: "UW_A07",           x:  805, y:  616 },
+	{ region: "UW", room: "UW_C02",           x:  493, y:  490 },
+	{ region: "UW", room: "UW_J01",           x:  860, y: 1534 },
+	{ region: "VS", room: "VS_C03",           x:   82, y:  983 },
+	{ region: "VS", room: "VS_F02",           x: 1348, y:  533 },
+	{ region: "VS", room: "VS_H02",           x:  603, y: 3265 },
+	//	Bingo customs/adders
+	{ region: "CC", room: "CC_SHAFT0x",       x: 1525, y:  217 },
+	{ region: "CL", room: "CL_C03",           x:  808, y:   37 },
+	{ region: "DM", room: "DM_VISTA",         x:  956, y:  341 },
+	{ region: "DS", room: "DS_GUTTER02",      x:  163, y:  241 },
+	{ region: "GW", room: "GW_A24",           x:  590, y:  220 },
+	{ region: "HI", room: "HI_B02",           x:  540, y: 1343 },
+	{ region: "LC", room: "LC_stripmallNEW",  x: 1285, y:   50 },
+	{ region: "LF", room: "LF_E01",           x:  359, y:   63 },
+	{ region: "LM", room: "LM_B01",           x:  248, y: 1507 },
+	{ region: "LM", room: "LM_B04",           x:  503, y: 2900 },
+	{ region: "LM", room: "LM_C04",           x:  542, y:  129 },
+	{ region: "LM", room: "LM_EDGE02",        x: 1750, y: 1715 },
+	{ region: "MS", room: "MS_AIR03",         x: 1280, y:  770 },
+	{ region: "MS", room: "MS_ARTERY01",      x: 4626, y:   39 },
+	{ region: "MS", room: "MS_FARSIDE",       x: 2475, y: 1800 },
+	{ region: "MS", room: "MS_LAB4",          x:  390, y:  240 },
+	{ region: "OE", room: "OE_CAVE02",        x: 1200, y:   35 },
+	{ region: "RM", room: "RM_LAB8",          x: 1924, y:   65 },
+	{ region: "SB", room: "SB_C02",           x: 1155, y:  550 },
+	{ region: "SH", room: "SH_E02",           x:  770, y:   40 },
+	{ region: "SI", room: "SI_C04",           x: 1350, y:  130 },
+	{ region: "SL", room: "SL_AI",            x: 1530, y:   15 },
+	{ region: "SS", room: "SS_A13",           x:  347, y:  595 },
+	{ region: "SS", room: "SS_C03",           x:   60, y:  119 },
+	{ region: "SS", room: "SS_D04",           x:  980, y:  440 },
+	{ region: "SS", room: "SS_LAB12",         x:  697, y:  255 },
+	{ region: "SU", room: "SU_B11",           x:  770, y:   48 },
+	{ region: "UG", room: "UG_A19",           x:  545, y:   43 },
+	{ region: "UW", room: "UW_D05",           x:  760, y:  220 },
+	{ region: "VS", room: "VS_E06",           x:  298, y:  142 }
+];
+
+/**
+ *	Stock (built in / mod generated) Vista Point locations, to drop into goal strings.
+ *	Used by BingoVistaChallenge enum bin-to-string.  Of the form:
+ *	"{0}><System.String|{1}|Room|0|vista><{2}><{3}"
+ *	where {0} is the region code, {1} is the room name, {2} is the x-coordinate,
+ *	and {3} the y-coordinate.
+ */
+const BingoEnum_VistaPoints_Code = [
+	"CC><System.String|CC_A10|Room|0|vista><734><506",
+	"CC><System.String|CC_B12|Room|0|vista><455><1383",
+	"CC><System.String|CC_C05|Room|0|vista><449><2330",
+	"CL><System.String|CL_C05|Room|0|vista><540><1213",
+	"CL><System.String|CL_H02|Room|0|vista><2407><1649",
+	"CL><System.String|CL_CORE|Room|0|vista><471><373",
+	"DM><System.String|DM_LAB1|Room|0|vista><486><324",
+	"DM><System.String|DM_LEG06|Room|0|vista><400><388",
+	"DM><System.String|DM_O02|Room|0|vista><2180><2175",
+	"DS><System.String|DS_A05|Room|0|vista><172><490",
+	"DS><System.String|DS_A19|Room|0|vista><467><545",
+	"DS><System.String|DS_C02|Room|0|vista><541><1305",
+	"GW><System.String|GW_C09|Room|0|vista><607><595",
+	"GW><System.String|GW_D01|Room|0|vista><1603><595",
+	"GW><System.String|GW_E02|Room|0|vista><2608><621",
+	"HI><System.String|HI_B04|Room|0|vista><214><615",
+	"HI><System.String|HI_C04|Room|0|vista><800><768",
+	"HI><System.String|HI_D01|Room|0|vista><1765><655",
+	"LC><System.String|LC_FINAL|Room|0|vista><2700><500",
+	"LC><System.String|LC_SUBWAY01|Room|0|vista><1693><564",
+	"LC><System.String|LC_tallestconnection|Room|0|vista><153><242",
+	"LF><System.String|LF_A10|Room|0|vista><421><412",
+	"LF><System.String|LF_C01|Room|0|vista><2792><423",
+	"LF><System.String|LF_D02|Room|0|vista><1220><631",
+	"OE><System.String|OE_RAIL01|Room|0|vista><2420><1378",
+	"OE><System.String|OE_RUINCourtYard|Room|0|vista><2133><1397",
+	"OE><System.String|OE_TREETOP|Room|0|vista><468><1782",
+	"RM><System.String|RM_ASSEMBLY|Room|0|vista><1550><586",
+	"RM><System.String|RM_CONVERGENCE|Room|0|vista><1860><670",
+	"RM><System.String|RM_I03|Room|0|vista><276><2270",
+	"SB><System.String|SB_D04|Room|0|vista><483><1045",
+	"SB><System.String|SB_E04|Room|0|vista><1668><567",
+	"SB><System.String|SB_H02|Room|0|vista><1559><472",
+	"SH><System.String|SH_A14|Room|0|vista><273><556",
+	"SH><System.String|SH_B05|Room|0|vista><733><453",
+	"SH><System.String|SH_C08|Room|0|vista><2159><481",
+	"SI><System.String|SI_C07|Room|0|vista><539><2354",
+	"SI><System.String|SI_D05|Room|0|vista><1045><1258",
+	"SI><System.String|SI_D07|Room|0|vista><200><400",
+	"SL><System.String|SL_B01|Room|0|vista><389><1448",
+	"SL><System.String|SL_B04|Room|0|vista><390><2258",
+	"SL><System.String|SL_C04|Room|0|vista><542><1295",
+	"SU><System.String|SU_A04|Room|0|vista><265><415",
+	"SU><System.String|SU_B12|Room|0|vista><1180><382",
+	"SU><System.String|SU_C01|Room|0|vista><450><1811",
+	"UG><System.String|UG_A16|Room|0|vista><640><354",
+	"UG><System.String|UG_D03|Room|0|vista><857><1826",
+	"UG><System.String|UG_GUTTER02|Room|0|vista><163><241",
+	"UW><System.String|UW_A07|Room|0|vista><805><616",
+	"UW><System.String|UW_C02|Room|0|vista><493><490",
+	"UW><System.String|UW_J01|Room|0|vista><860><1534",
+	"VS><System.String|VS_C03|Room|0|vista><82><983",
+	"VS><System.String|VS_F02|Room|0|vista><1348><533",
+	"VS><System.String|VS_H02|Room|0|vista><603><3265",
+	"CC><System.String|CC_SHAFT0x|Room|0|vista><1525><217",
+	"CL><System.String|CL_C03|Room|0|vista><808><37",
+	"DM><System.String|DM_VISTA|Room|0|vista><956><341",
+	"DS><System.String|DS_GUTTER02|Room|0|vista><163><241",
+	"GW><System.String|GW_A24|Room|0|vista><590><220",
+	"HI><System.String|HI_B02|Room|0|vista><540><1343",
+	"LC><System.String|LC_stripmallNEW|Room|0|vista><1285><50",
+	"LF><System.String|LF_E01|Room|0|vista><359><63",
+	"LM><System.String|LM_B01|Room|0|vista><248><1507",
+	"LM><System.String|LM_B04|Room|0|vista><503><2900",
+	"LM><System.String|LM_C04|Room|0|vista><542><129",
+	"LM><System.String|LM_EDGE02|Room|0|vista><1750><1715",
+	"MS><System.String|MS_AIR03|Room|0|vista><1280><770",
+	"MS><System.String|MS_ARTERY01|Room|0|vista><4626><39",
+	"MS><System.String|MS_FARSIDE|Room|0|vista><2475><1800",
+	"MS><System.String|MS_LAB4|Room|0|vista><390><240",
+	"OE><System.String|OE_CAVE02|Room|0|vista><1200><35",
+	"RM><System.String|RM_LAB8|Room|0|vista><1924><65",
+	"SB><System.String|SB_C02|Room|0|vista><1155><550",
+	"SH><System.String|SH_E02|Room|0|vista><770><40",
+	"SI><System.String|SI_C04|Room|0|vista><1350><130",
+	"SL><System.String|SL_AI|Room|0|vista><1530><15",
+	"SS><System.String|SS_A13|Room|0|vista><347><595",
+	"SS><System.String|SS_C03|Room|0|vista><60><119",
+	"SS><System.String|SS_D04|Room|0|vista><980><440",
+	"SS><System.String|SS_LAB12|Room|0|vista><697><255",
+	"SU><System.String|SU_B11|Room|0|vista><770><48",
+	"UG><System.String|UG_A19|Room|0|vista><545><43",
+	"UW><System.String|UW_D05|Room|0|vista><760><220",
+	"VS><System.String|VS_E06|Room|0|vista><298><142"
+];
+
+const BingoEnum_EnterableGates = [
+	"SU_HI", "SU_LF", "SU_DS", "HI_SU",
+	"HI_CC", "HI_SH", "HI_GW", "HI_VS",
+	"VS_HI", "VS_SI", "VS_SL", "VS_SB",
+	"GW_HI", "GW_SL", "GW_DS", "SL_GW",
+	"SL_SB", "SL_SH", "SL_VS", "SH_GW",
+	"SH_HI", "SH_UW", "SH_SL", "UW_SH",
+	"UW_SL", "UW_CC", "CC_UW", "CC_HI",
+	"CC_DS", "CC_SI", "LF_SU", "LF_SI",
+	"LF_SB", "SI_LF", "SI_CC", "SI_VS",
+	"DS_SU", "DS_SB", "DS_GW", "DS_CC",
+	"SB_DS", "SB_SL", "SB_VS"
 ];
 
 /**
@@ -3883,10 +4152,11 @@ const ALL_ENUMS = {
 	"EXPFLAGS":       Object.keys(BingoEnum_EXPFLAGS),
 	"challenges":     BingoEnum_CHALLENGES,
 	"boolean":        BingoEnum_Boolean,
+	"vista_code":     BingoEnum_VistaPoints_Code
 };
 
 /**
- *	Instruction data for producing text goals.  Index with BingoEnum_CHALLENGES.
+ *	Instructions for producing text goals.  Index with BingoEnum_CHALLENGES.
  *
  *	An entry shall have this structure:
  *	{
@@ -3963,7 +4233,7 @@ const ALL_ENUMS = {
  *	committing read-beyond-bounds or uninitialized memory access.  A recommended approach
  *	is copying the goal into a temporary buffer, that has been zeroed at least some bytes
  *	beyond the length of the goal being read.  Or use a language which returns zero or null
- *	OoB reads, or throws error.
+ *	or throws error for OoB reads.
  */
 const BINARY_TO_STRING_DEFINITIONS = [
 	{	//	Base class: no parameters, any desc allowed
@@ -4639,7 +4909,37 @@ const BINARY_TO_STRING_DEFINITIONS = [
 			}
 		],
 		desc: "{0}><System.String|{1}|Room|0|vista><{2}><{3}><0><0"
-	}
+	},
+	{	/*  Alternate enum version for as-generated locations; to index, use indexOf(name == "BingoVistaChallenge") + 1  */
+		name: "BingoVistaChallenge",
+		params: [
+			{	//	0: Vista Point choice
+				type: "number",
+				offset: 0,
+				size: 1,
+				formatter: "vista_code"
+			}
+		],
+		desc: "{0}><0><0"
+	},
+	{
+		name: "BingoEnterRegionFromChallenge",
+		params: [
+			{	//	0: From regions choice
+				type: "number",
+				offset: 0,
+				size: 1,
+				formatter: "regionsreal"
+			},
+			{	//	1: To regions choice
+				type: "string",
+				offset: 1,
+				size: 1,
+				formatter: "regionsreal",
+			}
+		],
+		desc: "System.String|{0}|From|0|regionsreal><System.String|{1}|To|0|regionsreal><0><0"
+	},
 ];
 
 
@@ -4654,10 +4954,12 @@ function enumToValue(s, en) {
 }
 
 /**
- *	Converts a string in the BingoEnum_CHALLENGES enum to its binary stored value.
+ *	Finds a string in the BingoEnum_CHALLENGES enum and converts to its binary
+ *	value/index (the first selection from BINARY_TO_STRING_DEFINITIONS).
+ *	Returns -1 if not found.
  */
 function challengeValue(s) {
-	return ALL_ENUMS["challenges"].indexOf(s);
+	return BINARY_TO_STRING_DEFINITIONS.findIndex(a => a.name == s);
 }
 
 /**
@@ -4751,39 +5053,135 @@ function checkDescriptors(t, d, g, err) {
 }
 
 /**
+ *	Generate a valid? link to the RW map viewer, of the specified room,
+ *	and current global state (board.character, map_link_base).
+ */
+function getMapLink(room) {
+	if (map_link_base == "")
+		return "";
+	var reg = regionOfRoom(room);
+	var ch = Object.keys(BingoEnum_CharToDisplayText)[
+			Object.values(BingoEnum_CharToDisplayText).indexOf(board.character)] || "White";
+	ch = ch.toLowerCase();
+	return "<br><a href=\"" + map_link_base + "?slugcat=" + ch + "&region=" + reg + "&room=" + room
+			+ "\" target=\"_blank\">" + room + " on Rain World Downpour Map" + "</a>";
+}
+
+/**
+ *	Extract region code from given room code string.
+ *	All extant regions follow this pattern, so, probably safe enough?
+ */
+function regionOfRoom(r) {
+	return r.substring(0, r.search("_"));
+}
+
+/**
+ *	Sets header mod information from the provided array:
+ *	m = [
+ *		{ name: "mod name", hash: "caf3bab3" },
+ *		...
+ *	]
+ */
+function addModsToHeader(m) {
+	var elem = document.getElementById(ids.metamods);
+	while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
+	if (!m.length) {
+		elem.appendChild(document.createTextNode("none"));
+		return;
+	}
+	var td = document.createElement("td");
+	var tr = document.createElement("tr");
+	var tbl = document.createElement("table");
+	td.appendChild(document.createTextNode("Number"));
+	tr.appendChild(td);
+	td = document.createElement("td");
+	td.appendChild(document.createTextNode("Hash"));
+	tr.appendChild(td);
+	td = document.createElement("td");
+	td.appendChild(document.createTextNode("Name"));
+	tr.appendChild(td);
+	tbl.appendChild(tr); elem.appendChild(tbl);
+	for (var i = 0; i < m.length; i++) {
+		tr = document.createElement("tr");
+		tbl.appendChild(tr);
+		td = document.createElement("td");
+		td.appendChild(document.createTextNode(String(i)));
+		td.style.textAlign = "center";
+		tr.appendChild(td);
+		td = document.createElement("td");
+		td.appendChild(document.createTextNode(m[i].hash));
+		tr.appendChild(td);
+		td = document.createElement("td");
+		td.appendChild(document.createTextNode(m[i].name));
+		tr.appendChild(td);
+	}
+}
+
+/**
  *	Quickly sets the meta / header data for a parsed text board.
  *	Has no effect if the header table is not yet placed.
  *	@param comm   String to set as comment / title
  *	  character   Selected character; one of Object.values(BingoEnum_CharToDisplayText), or "Any" if other
  *	    shelter   Shelter to start in, or "" if random.
  *	      perks   List of perks to enable.  Array of integers, each indexing ALL_ENUMS.EXPFLAGS[]
- *	              and related enums (see also BingoEnum_EXPFLAGSNames).
+ *	              and respective enums (see also BingoEnum_EXPFLAGSNames).
  *	              For example, the list [0, 5, 13, 14, 16] would enable:
  *	              "Perk: Scavenger Lantern", "Perk: Karma Flower", "Perk: Item Crafting",
  *	              "Perk: High Agility", "Burden: Blinded"
  *	              (Ordering of this array is not checked, and repeats are ignored.)
+ *	Parameters are optional; an absent parameter leaves the existing value alone.
+ *	Call with no parameters to get usage.
  */
-function setMeta(comm = "Untitled", character = "Any", shelter = "", perks = []) {
-	if (board === undefined || document.getElementById(ids.meta).firstChild === null
+function setMeta() {
+	var comm = arguments[0], character = arguments[1];
+	var shelter = arguments[2], perks = arguments[3];
+
+	if (board === undefined || document.getElementById(ids.metatitle) === null
 			|| document.getElementById(ids.charsel) === null
-			|| document.getElementById(ids.shelter) === null)
+			|| document.getElementById(ids.shelter) === null) {
+		console.log("Need a board to set.");
 		return;
-
-	document.getElementById(ids.meta).firstChild.lastChild.innerText = comm;
-	document.getElementById(ids.charsel).value = character;
-	if (shelter == "random") shelter = "";
-	document.getElementById(ids.shelter).innerText = shelter;
-
-	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-		el = document.getElementById(ids.perks + String(i));
-		if (el === null)
-			break;
-		if (perks.includes(i))
-			el.setAttribute("checked", "");
-		else
-			el.removeAttribute("checked");
 	}
-	parseText();
+
+	if (comm !== undefined)
+		document.getElementById(ids.metatitle).innerText = comm;
+	if (character !== undefined)
+		document.getElementById(ids.charsel).value = character;
+	if (shelter !== undefined) {
+		if (shelter == "random") shelter = "";
+		document.getElementById(ids.shelter).innerText = shelter;
+	}
+	if (perks !== undefined) {
+		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+			el = document.getElementById(ids.perks + String(i));
+			if (el === null)
+				break;
+			if (perks.includes(i))
+				el.setAttribute("checked", "");
+			else
+				el.removeAttribute("checked");
+		}
+	}
+	if (comm !== undefined || character !== undefined
+			|| shelter !== undefined || perks !== undefined) {
+		console.log("Updated.");
+		parseText();
+		return;
+	}
+	console.log("setMeta(comm, character, shelter, perks)\n"
+	          + "Quickly sets the meta / header data for a parsed text board.\n"
+	          + "     comm   String to set as comment / title\n"
+	          + "character   Selected character; one of Object.values(BingoEnum_CharToDisplayText), or \"Any\" if other.\n"
+	          + "  shelter   Shelter to start in, or \"\" if random.\n"
+	          + "    perks   List of perks to enable.  Array of integers, each indexing ALL_ENUMS.EXPFLAGS[] and\n"
+	          + "respective enums (e.g. BingoEnum_EXPFLAGSNames). For example, the list [0, 5, 13, 14, 16] would\n"
+	          + "enable: \"Perk: Scavenger Lantern\", \"Perk: Karma Flower\", \"Perk: Item Crafting\", \"Perk: High Agility\",\n"
+	          + "\"Burden: Blinded\". (Ordering of this array is not checked, and repeats are ignored.)\n"
+	          + "Parameters are optional; an absent parameter leaves the existing value alone. Call with no parameters\n"
+	          + "to get usage.\n"
+	          + "Example:  setMeta(\"New Title\", \"White\", \"SU_S05\", [])\n"
+	          + "> sets the title, character and shelter, and clears perks.\n"
+	);
 }
 
 function enumeratePerks() {

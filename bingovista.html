@@ -90,6 +90,12 @@
 	text-align: left;
 	padding-right: 0.7em;
 }
+a:link {
+	color: #90a0ff;
+}
+a:visited {
+	color: #ff90e8;
+}
 body {
 	font-family: Verdana, Arial, sans-serif;
 	line-height: 130%;
@@ -99,6 +105,8 @@ body {
 }
 body div {
 	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
 }
 canvas {
 	border: 1px solid #404040;
@@ -114,7 +122,11 @@ h1 {
 	padding-bottom: 8px;
 	line-height: 90%;
 	text-align: center;
-	
+}
+h2 {
+	font-size: x-large;
+	margin-bottom: 0.25em;
+	margin-left: 3em;
 }
 input[type=button] {
 	padding: 4px 6px;
@@ -126,9 +138,18 @@ input[type=file] {
 label input {
 	vertical-align: 1px;
 }
+p {
+	padding-bottom: 0.5em;
+	margin-left: 1em;
+	margin-right: 2em;
+	max-width: 50em;
+}
 table {
 	margin: 6px auto 0 auto;
 }
+td div {
+	text-align: left;
+	}
 td label {
 	display: inline-block;
 	padding: 0 3px;
@@ -143,17 +164,15 @@ textarea {
 	background-color: #f2f2f2;
 	line-break: anywhere;
 }
-p {
-	padding-bottom: 0.5em;
-	margin-left: 1em;
-	margin-right: 2em;
+ul li {
+	margin: 0 2em 4px 1.5em;
 	max-width: 50em;
-	font-size: inherit;
 }
 @media only screen and (min-width: 830px) {
 	body div {
 		text-align: left;
 		margin-left: 1em;
+		margin-right: initial;
 	}
 	h1 {
 		margin-left: 0.7em;
@@ -187,29 +206,55 @@ textarea {
   </head>
   <body>
 	<h1>Rain World: Bingo Mod<br> Board Viewer</h1>
-	<table class="hdrtbl"><tbody id="header"></tbody></table>
+	<table class="hdrtbl"><tbody id="header">
+	  <tr><td>Title</td><td id="hdrttl">Untitled</td></tr>
+	  <tr><td>Size</td><td id="hdrsize"></td></tr>
+	  <tr><td>Character</td><td id="hdrchar"></td></tr>
+	  <tr><td>Shelter</td><td id="hdrshel"></td></tr>
+	  <tr><td>Perks</td><td>
+		<div style="margin-left: 6px; margin-bottom: 4px;"><input type="button" value="Show / Hide" id="hdrshow"></div>
+		<div style="margin-left: 0px; display: none;" id="hdrperks"></div>
+	  </td></tr>
+	  <tr><td>Mods</td><td id="hdrmods">none</td></tr>
+	</tbody></table>
 	<div id="boardcontainer" tabindex="1" style="position: relative; width: 456px; height: 456px;">
 	  <canvas width="454" height="454" id="board" style="position: absolute; top: 0px; left: 0px; z-index: 1;">Canvas support and scripting are required.</canvas>
-	  <div id="cursor" style="display: none; width: 39px; height: 39px; margin: 0; border: 3px solid #ff0000; border-radius: 5px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
+	  <div id="cursor" style="display: none; width: 39px; height: 39px; margin: 0; border: 3px solid #ff8090; border-radius: 5px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
 	</div>
 	<table><tr><td style="vertical-align: top; padding-top: 6px;"><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
 	<p>&nbsp;</p>
+	<div style="display: none;"><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label> (flashbang warning)</div>
+	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
 	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
 	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text">&nbsp;&nbsp;&nbsp;<input type="button" id="copy" value="Copy Text"></div>
 	<p>Paste/edit above, or select file or drag-and-drop below:</p>
 	<table class="droptbl"><tr><td class="drop" id="droptarget"><input type="file" id="fileload" accept=".txt,text/plain"></td></tr></table>
 	<p class="errorbox" id="errorbox"></p>
 	<p>&nbsp;</p>
-	<div><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label> (flashbang warning)</div>
-	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
-	<p>&nbsp;</p>
-	<p>Bingo Board Viewer, by <a href="mailto:tmoranwms@gmail.com?subject=Bingovista Comments">T3sl4co1l</a>, 2025/02/19.</p>
-	<p>For use with Rain World Bingo Mod v0.85 (by Nacu).</p>
+	<p>Bingo Board Viewer, by <a href="https://github.com/T3sl4co1l/bingovista/">T3sl4co1l</a>.</p>
+	<p>For use with Rain World Bingo Mod v0.90 (by Nacu).</p>
 	<p>Usage: in-game, while configuring the board and selecting challenges, press "Copy".  Clipboard contents can be pasted into the cleared textbox above.  It can also pasted and copied between chat windows, etc., for easy sharing, or pasted into and saved as a text file (*.TXT) for storage.  These files can be loaded by clicking Choose File (or Browse... or etc., whatever your browser shows).  Or click-and-drag a text file from a file folder into the drop zone, on or around the file input area.  In any case, the text content is loaded into the text box to allow visual confirmation (and possible manual editing).</p>
-	<p>For convenience, pasting into the text box also triggers parsing.  The text content will be parsed and any valid goals rendered as they would in an in-game bingo board.  Goals in error show a null symbol, with error information in the square's description.  If corrections are needed, or manual edits made, do them in the text box, then press Parse Text.  Parsing automatically detects and corrects for white space before and after the board, and between goals (delimited by "bChG" markers).</p>
+	<p>For convenience, pasting into the text box also triggers parsing.  Parsing takes in any valid goals and renders them in the square as in-game.  Goals in error show a null symbol, with error information in the square's description.  If corrections are needed, or manual edits made, do them in the text box, then press Parse Text.  Parsing automatically detects and corrects for white space before and after the board, and between goals (delimited by "bChG" markers).  Parse also updates the URL to use the shorthand / encoded board string.</p>
 	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, and all parameters and values used in it.</p>
 	<p>Kibitzing enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
-	<p>Shoutouts to: Videocult and friends for Rain World, Nacu for Bingo, ICED37 for making Bingo happen, and alphappy and diedirl for tips and help.</p>
+	<p>Metadata is... not terribly convenient to update right now, but see the setMeta() function in debug view.</p>
+	<p>Stock Vista Point locations can be found on these maps (courtesy Bronsej):</p>
+	<ul>
+	  <li><a href="worldmaps/Base_World_Map_Downpour_NewVistas.png">Full Downpour World Map</a> (all regions, non-timeline-specific versions)</li>
+	  <li><a href="worldmaps/Looks_to_the_Moon_Map_NewVistas.png">Looks To The Moon (DM)</a></li>
+	  <li><a href="worldmaps/Metropolis_Map_NewVistas.png">Metropolis (LC)</a></li>
+	  <li><a href="worldmaps/Silent_Construct_Map_NewVistas.png">Silent Construct (CL)</a></li>
+	  <li><a href="worldmaps/The_Rot_Map_NewVistas.png">The Rot (RM)</a></li>
+	  <li><a href="worldmaps/Undergrowth_Map_NewVistas.png">Undergrowth (UG)</a></li>
+	  <li><a href="worldmaps/Waterfront_Facility_Map_NewVistas.png">Waterfront Facility (LM)</a></li>
+	</ul>
+	<p><a href="https://noblecat57.github.io/">Rain World Downpour Map | noblecat57</a> interactive map viewer is recommended, generally, and is also linked by room-specific goal commentary where possible.</p>
+	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, and alphappy and diedirl for tips and help.</p>
+	<h2>Changelog</h2>
+	<ul>
+	  <li>2025/03/02: 0.90 mod support.</li>
+	  <li>2025/02/19: First release, 0.85 mod support.</li>
+	</ul>
 	<script src="bingovista.js"></script>
   </body>
 </html>
