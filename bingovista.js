@@ -119,12 +119,14 @@ var map_link_base = "https://noblecat57.github.io/map.html";
  *					{ type: "break" },
  *					{ type: "text", value: <string>, color: <HTMLColorString> },
  *				],
- *				toBin: <Uint8Array>
+ *				toBin: <Uint8Array>	//	binary format of goal
  *			},
  *
  *			( . . . )
  *
- *		]
+ *		],
+ *		text: <string>,    	//	text format of whole board, including meta supported by current version
+ *		toBin: <Uint8Array>	//	binary format of whole board, including meta and concatenated goals
  *	};
  */
 var board;
@@ -248,6 +250,21 @@ document.addEventListener("DOMContentLoaded", function() {
 				s = u.get("b").replace(/-/g, "+").replace(/_/g, "/");
 				var ar = new Uint8Array(atob(s).split("").map( c => c.charCodeAt(0) ));
 				board = binToString(ar);
+				var el = document.getElementById(ids.metatitle);
+				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+				el.appendChild(document.createTextNode(board.comments));
+				el = document.getElementById(ids.metasize);
+				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+				el.appendChild(document.createTextNode(String(board.width) + " x " + String(board.height)));
+				el = document.getElementById(ids.charsel);
+				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+				el.appendChild(document.createTextNode(board.character || "Any"));
+				el = document.getElementById(ids.shelter);
+				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+				el.appendChild(document.createTextNode(board.shelter || "random"));
+				perksToChecksList(board.perks);
+				addModsToHeader(board.mods);
+	
 			} catch (e) {
 				setError("Error parsing URL: " + e.message);
 			}
@@ -508,24 +525,6 @@ function parseText(e) {
 	history.replaceState(null, "", u.href);
 
 	return;
-
-	function perksToChecksList(p) {
-		var elem = document.getElementById(ids.metaperks);
-		while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
-		var l = Object.keys(BingoEnum_EXPFLAGS);
-		for (var i = 0; i < l.length; i++) {
-			var label = document.createElement("label");
-			var check = document.createElement("input");
-			check.setAttribute("type", "checkbox");
-			check.setAttribute("id", ids.perks + String(i));
-			if (p & BingoEnum_EXPFLAGS[l[i]])
-				check.setAttribute("checked", "");
-			label.appendChild(check);
-			label.appendChild(document.createTextNode(BingoEnum_EXPFLAGSNames[l[i]]));
-			elem.appendChild(label);
-		}
-	}
-
 }
 
 /**
@@ -875,9 +874,9 @@ function binToString(a) {
 	var d = new TextDecoder;
 	//	uint8_t version_major; uint8_t version_minor;
 	if (((a[4] << 8) + a[5]) > (VERSION_MAJOR << 8) + VERSION_MINOR)
-		b.comments += " || Warning: board version " + String(a[4]) + "." + String(a[5])
+		setError("Warning: board version " + String(a[4]) + "." + String(a[5])
 				+ " is newer than viewer v" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR)
-				+ "; some goals or features may be unsupported.";
+				+ "; some goals or features may be unsupported.");
 	//	uint8_t character;
 	b.character = (a[8] == 0) ? "Any" : Object.values(BingoEnum_CharToDisplayText)[a[8] - 1];
 	b.text += (a[8] == 0) ? "Any" : Object.keys(BingoEnum_CharToDisplayText)[a[8] - 1];
@@ -5077,6 +5076,26 @@ function regionOfRoom(r) {
 }
 
 /**
+ *	Populates the document with checkboxes tagged according to a `perks` bitmask.
+ */
+function perksToChecksList(p) {
+	var elem = document.getElementById(ids.metaperks);
+	while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
+	var l = Object.keys(BingoEnum_EXPFLAGS);
+	for (var i = 0; i < l.length; i++) {
+		var label = document.createElement("label");
+		var check = document.createElement("input");
+		check.setAttribute("type", "checkbox");
+		check.setAttribute("id", ids.perks + String(i));
+		if (p & BingoEnum_EXPFLAGS[l[i]])
+			check.setAttribute("checked", "");
+		label.appendChild(check);
+		label.appendChild(document.createTextNode(BingoEnum_EXPFLAGSNames[l[i]]));
+		elem.appendChild(label);
+	}
+}
+
+/**
  *	Sets header mod information from the provided array:
  *	m = [
  *		{ name: "mod name", hash: "caf3bab3" },
@@ -5177,11 +5196,11 @@ function setMeta() {
 	          + "    perks   List of perks to enable.  Array of integers, each indexing ALL_ENUMS.EXPFLAGS[] and\n"
 	          + "respective enums (e.g. BingoEnum_EXPFLAGSNames). For example, the list [0, 5, 13, 14, 16] would\n"
 	          + "enable: \"Perk: Scavenger Lantern\", \"Perk: Karma Flower\", \"Perk: Item Crafting\", \"Perk: High Agility\",\n"
-	          + "\"Burden: Blinded\". (Ordering of this array is not checked, and repeats are ignored.)\n"
+	          + "\"Burden: Blinded\". (Ordering of this array doesn't matter; repeats are ignored.)\n"
 	          + "Parameters are optional; an absent parameter leaves the existing value alone. Call with no parameters\n"
 	          + "to get usage.\n"
 	          + "Example:  setMeta(\"New Title\", \"White\", \"SU_S05\", [])\n"
-	          + "> sets the title, character and shelter, and clears perks.\n"
+	          + "-> sets the title, character and shelter, and clears perks.\n"
 	);
 }
 
