@@ -3886,7 +3886,9 @@ const BingoEnum_EXPFLAGS = {
 	"DOOMED":    0x00020000,
 	"HUNTED":    0x00040000,
 	"PURSUED":   0x00080000,
-	"AURA":      0x00100000
+	"AURA":      0x00100000,
+	"LOCKOUT":   0x00200000,
+	"BLACKOUT":  0x00400000
 };
 
 const BingoEnum_EXPFLAGSNames = {
@@ -3910,7 +3912,9 @@ const BingoEnum_EXPFLAGSNames = {
 	"DOOMED":    "Burden: Doomed",
 	"HUNTED":    "Burden: Hunted",
 	"PURSUED":   "Burden: Pursued",
-	"AURA":      "Aura"
+	"AURA":      "Aura Enabled",
+	"LOCKOUT":   "Gameplay: Lockout",
+	"BLACKOUT":  "Gameplay: Blackout"
 };
 
 /**
@@ -5166,7 +5170,7 @@ function setMeta() {
 	if (comm !== undefined)
 		document.getElementById(ids.metatitle).innerText = comm;
 	if (character !== undefined)
-		document.getElementById(ids.charsel).value = character;
+		document.getElementById(ids.charsel).innerText = character;
 	if (shelter !== undefined) {
 		if (shelter == "random") shelter = "";
 		document.getElementById(ids.shelter).innerText = shelter;
