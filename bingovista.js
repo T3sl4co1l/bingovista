@@ -443,6 +443,10 @@ function parseText(e) {
 				} catch (er) {
 					board.goals.push(defaultGoal(type, desc));
 					board.goals[board.goals.length - 1].description = "Error, " + er.message + "; Descriptor: " + goals[i].split("~")[1];
+					var b = [challengeValue("BingoChallenge"), 0, 0];
+					b = b.concat(new TextEncoder().encode(board.goals[board.goals.length - 1].description));
+					b[2] = b.length - GOAL_LENGTH;
+					board.goals[board.goals.length - 1].toBin = new Uint8Array(b);
 				}
 			} else {
 				board.goals.push(defaultGoal(type, desc));
@@ -465,7 +469,7 @@ function parseText(e) {
 			paint: [
 				{ type: "text", value: "∅", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
 			],
-			toBin: new Uint8Array([BingoEnum_CHALLENGES.indexOf("BingoChallenge"), 0])
+			toBin: new Uint8Array([challengeValue("BingoChallenge"), 0, 0])
 		};
 	}
 
@@ -2021,6 +2025,7 @@ const CHALLENGES = {
 		var v = [], i = [];
 		var items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Common Pearls", , "NULL"], "common pearls flag"); v.push(items[1]); i.push(items[2]);
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pearl count"); v.push(items[1]); i.push(items[2]);
+		desc[2] = desc[2].replace(/regionsreal/, "regions");	//	both acceptable (v0.85/0.90)
 		var items = checkSettingbox(thisname, desc[2], ["System.String", , "In Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
 		if (v[0] != "true" && v[0] != "false")
 			throw new TypeError(thisname + ": error, common pearls flag \"" + v[0] + "\" not 'true' or 'false'");
@@ -2517,6 +2522,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
+	//	added 0.86 (in 0.90 update cycle)
 	BingoEnterRegionFromChallenge: function(desc) {
 		const thisname = "BingoEnterRegionFromChallenge";
 		//	desc of format ["System.String|GW|From|0|regionsreal", "System.String|SH|To|0|regionsreal", "0", "0"]
@@ -2545,7 +2551,9 @@ const CHALLENGES = {
 			comments: "",
 			paint: [
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
-				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 90 },
+				{ type: "break" },
+				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.EnterFrom), rotation: 90 },
+				{ type: "break" },
 				{ type: "text", value: itemTo[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
 			toBin: new Uint8Array(b)
@@ -3210,14 +3218,15 @@ const RainWorldColors = {
 	"GuidanceNeuron":      [0,        1,        0.3      ],
 	"GuidanceMoon":        [1,        0.8,      0.3      ],
 	"nomscpebble":         [0.447059, 0.901961, 0.768627 ],
-	"popcorn_plant":       [0.41,     0.16,     0.23     ]
+	"popcorn_plant":       [0.41,     0.16,     0.23     ],
+	"EnterFrom":           [0.258823, 0.529412, 1        ]
 };
 
 /**
  *	Convert creature value string to display text.
  *	Game extract: Expedition.ChallengeTools::CreatureName
  *	Additions patched in from creatureNameToIconAtlasMap and sorted to match
- *	Note: these are plural; see creatureNameToSingular() for the other case.
+ *	Note: these are plural; see creatureNameQuantify() for special handling.
  */
 const creatureNameToDisplayTextMap = {
 	"Slugcat":         "Slugcats",
