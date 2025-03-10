@@ -2552,7 +2552,7 @@ const CHALLENGES = {
 			paint: [
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
 				{ type: "break" },
-				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.EnterFrom), rotation: 90 },
+				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.EnterFrom), rotation: 180 },
 				{ type: "break" },
 				{ type: "text", value: itemTo[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
