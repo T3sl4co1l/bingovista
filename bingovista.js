@@ -2666,7 +2666,9 @@ const BingoEnum_Befriendable = [
 	"BlueLizard",
 	"EelLizard",
 	"SpitLizard",
-	"ZoopLizard"
+	"ZoopLizard",
+	"Salamander",	//	added 0.9
+	"RedLizard" 	//	added 0.99
 ];
 
 /**
