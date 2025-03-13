@@ -2597,7 +2597,9 @@ const BingoEnum_theft = [
 	"Lantern",
 	"GooieDuck",
 	"GlowWeed",
-	"DataPearl"	//	added by GetCorrectListForChallenge()
+	"DataPearl",	//	added by GetCorrectListForChallenge()
+	"DangleFruit",	//	foods added 1.04
+	"SlimeMold"
 ];
 
 /**
