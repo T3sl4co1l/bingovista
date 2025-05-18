@@ -73,9 +73,14 @@ const square = {
 	font: "600 10pt \"Segoe UI\", sans-serif"
 };
 
-/** Maximum accepted value for Int32 challenge parameters. In-game default seems to be 500; binary format has a hard limit of 32767 (signed) or 65535 (unsigned). Somewhere around 30k seems reasonable enough?  */
+/**
+ *	Maximum accepted value for Int32 challenge parameters. In-game default
+ *	seems to be 500; binary format has a hard limit of 32767 (signed) or
+ *	65535 (unsigned). Somewhere around 30k seems reasonable enough for a
+ *	rounded value?
+ */
 const INT_MAX = 30000;
-/** Similar to INT_MAX, but for challenges *very* unlikely to need even a full byte */
+/** As INT_MAX, but for challenges *very* unlikely to need >1 byte */
 const CHAR_MAX = 250;
 
 /**	Supported mod version */
@@ -264,7 +269,7 @@ document.addEventListener("DOMContentLoaded", function() {
 				el.appendChild(document.createTextNode(board.shelter || "random"));
 				perksToChecksList(board.perks);
 				addModsToHeader(board.mods);
-	
+
 			} catch (e) {
 				setError("Error parsing URL: " + e.message);
 			}
@@ -942,7 +947,7 @@ function binGoalToText(c) {
 
 	if (c[0] >= BINARY_TO_STRING_DEFINITIONS.length)
 		throw new TypeError("binGoalToText: unknown challenge type " + String(c[0]));
-	//	ignore flags, not supported in 0.85 text
+	//	ignore flags, not supported in 0.90 text
 	//c[1]
 	s = BINARY_TO_STRING_DEFINITIONS[c[0]].desc;
 	p = BINARY_TO_STRING_DEFINITIONS[c[0]].params;
@@ -955,7 +960,7 @@ function binGoalToText(c) {
 			outputs = [0];
 			for (k = 0; k < p[j].size; k++) {
 				//	little-endian, variable byte length, unsigned integer
-				outputs[0] += c[GOAL_LENGTH + p[j].offset + k] << (8 * k);
+				outputs[0] += c[GOAL_LENGTH + p[j].offset + k] * (1 << (8 * k));
 			}
 
 		} else if (p[j].type == "bool") {
@@ -966,7 +971,7 @@ function binGoalToText(c) {
 				outputs[0]++;	//	hack for formatter offset below
 
 		} else if (p[j].type == "string") {
-			//	Plain string: copies a fixed-length or ASCIIZ string into its replacement template site(s)
+			//	Plain string: copies a fixed-length or zero-terminated string into its replacement template site(s)
 			stringtype = true;
 			if (p[j].size == 0) {
 				maxIdx = c.indexOf(0, GOAL_LENGTH + p[j].offset);
@@ -1073,7 +1078,7 @@ const CHALLENGES = {
 	},
 	BingoAllRegionsExcept: function(desc) {
 		const thisname = "BingoAllRegionsExcept";
-		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "13", "0", "0"]
+		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "System.Int32|13|Amount|1|NULL", "0", "0"]
 		checkDescriptors(thisname, desc.length, 6, "parameter item count");
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
 		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
@@ -4204,7 +4209,10 @@ const ALL_ENUMS = {
  *		formatter: ""   	//	Name of an enum to transform each character with, or empty for identity
  *	}
  *
- *	//	Plain string: copies a fixed-length or ASCIIZ string into its replacement template site(s)
+ *	//	Plain string: copies a fixed-length or zero-terminated string (optionally
+ *	//	transformed by formatter and joiner) into the matching position in the template
+ *	//	string. Note: when formatter == "", UTF-8 decoding is applied, returning a
+ *	//	normal JS string in the object.
  *	{
  *		type: "string",
  *		offset: 3,      	//	byte offset to read from
@@ -4213,9 +4221,10 @@ const ALL_ENUMS = {
  *		joiner: ""      	//	String to join characters with
  *	}
  *
- *	//	Pointer to string: reads a (byte) offset from target location, then copies, from
- *	//	that offset (relative to goal data start), a fixed-length or ASCIIZ string into
- *	//	its replacement template site(s)
+ *	//	Pointer to string: reads a (byte) offset from target location, then uses it as
+ *	//	an offset (relative to goal data start) pointing to a fixed-length or zero-
+ *	//	terminated string; the string is optionally transformed by formatter and joiner;
+ *	//	then the result is deposited into the matching position in the template string
  *	{
  *		type: "pstr",
  *		offset: 2,    	//	byte offset to read pointer from
@@ -4242,8 +4251,8 @@ const ALL_ENUMS = {
  *
  *	Special note: because zero may be used for string terminator, and because enums may be
  *	used for both string (array) and scalar (number) data, the actual enum index written is
- *	someEnumArray.indexOf("someString") + 1 for either type of data.  Enums with a default
- *	or "any" value shall have that value at index 0 (thus, stored as 1 in the binary format).
+ *	someEnumArray.indexOf("someString") + 1 for both data types.  Enums with a default or
+ *	"any" value shall use a default index of 0 (thus stored as 1 in the binary format).
  *
  *	Note that the last string in a goal can be terminated by the goal object itself, saving
  *	a zero terminator.  Ensure that an implementation captures this behavior safely, without
@@ -4300,7 +4309,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				joiner: "|"
 			}
 		],
-		desc: "System.String|{0}|Region|0|regionsreal><{2}><0><{1}><0><0"
+		desc: "System.String|{0}|Region|0|regionsreal><{2}><0><System.Int32|{1}|Amount|1|NULL><0><0"
 	},
 	{
 		name: "BingoBombTollChallenge",
@@ -4333,13 +4342,13 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "pearls",
+				formatter: "pearls"
 			},
 			{	//	2: Item amount
 				type: "number",
 				offset: 1,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "System.Boolean|{0}|Specific Pearl|0|NULL><System.String|{1}|Pearl|1|pearls><0><System.Int32|{2}|Amount|3|NULL><0><0><"
@@ -4351,13 +4360,13 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "craft",
+				formatter: "craft"
 			},
 			{	//	1: Item amount
 				type: "number",
 				offset: 1,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "System.String|{0}|Item to Craft|0|craft><System.Int32|{1}|Amount|1|NULL><0><0><0"
@@ -4369,13 +4378,13 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "transport",
+				formatter: "transport"
 			},
 			{	//	1: Gate amount
 				type: "number",
 				offset: 1,
 				size: 1,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "System.String|{0}|Creature Type|1|transport><0><System.Int32|{1}|Amount|0|NULL><empty><0><0"
@@ -4387,7 +4396,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "System.Int32|{0}|Target Score|0|NULL><0><0"
@@ -4399,19 +4408,19 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "weapons",
+				formatter: "weapons"
 			},
 			{	//	1: Creature choice
 				type: "number",
 				offset: 1,
 				size: 1,
-				formatter: "creatures",
+				formatter: "creatures"
 			},
 			{	//	2: Score amount
 				type: "number",
 				offset: 2,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "System.String|{0}|Weapon|0|weapons><System.String|{1}|Creature Type|1|creatures><0><System.Int32|{2}|Amount|2|NULL><0><0"
@@ -4423,7 +4432,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "depths",
+				formatter: "depths"
 			}
 		],
 		desc: "System.String|{0}|Creature Type|0|depths><0><0"
@@ -4441,7 +4450,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "banitem",
+				formatter: "banitem"
 			},
 			{	//	1: Pass Toll flag
 				type: "bool",
@@ -4465,19 +4474,19 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			},
 			{	//	1: Creature flag
 				type: "bool",
 				offset: 0,
 				bit: 4,
-				formatter: "",
+				formatter: ""
 			},
 			{	//	2: Item choice
 				type: "number",
 				offset: 2,
 				size: 1,
-				formatter: "food",
+				formatter: "food"
 			}
 		],
 		desc: "System.Int32|{0}|Amount|1|NULL><0><{1}><System.String|{2}|Food type|0|food><0><0"
@@ -4489,13 +4498,13 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "echoes",
+				formatter: "echoes"
 			},
 			{	//	1: Starving flag
 				type: "bool",
 				offset: 0,
 				bit: 4,
-				formatter: "boolean",
+				formatter: "boolean"
 			}
 		],
 		desc: "System.String|{0}|Region|0|echoes><System.Boolean|{1}|While Starving|1|NULL><0><0"
@@ -4507,7 +4516,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "regionsreal",
+				formatter: "regionsreal"
 			}
 		],
 		desc: "System.String|{0}|Region|0|regionsreal><0><0"
@@ -4519,7 +4528,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "0><System.Int32|{0}|Target Score|0|NULL><0><0"
@@ -4531,7 +4540,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "bool",
 				offset: 0,
 				bit: 4,
-				formatter: "boolean",
+				formatter: "boolean"
 			}
 		],
 		desc: "System.Boolean|{0}|Looks to the Moon|0|NULL><0><0"
@@ -4543,13 +4552,13 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "",
+				formatter: ""
 			},
 			{	//	1: At Once flag
 				type: "bool",
 				offset: 0,
 				bit: 4,
-				formatter: "boolean",
+				formatter: "boolean"
 			}
 		],
 		desc: "0><System.Int32|{0}|Amount|1|NULL><System.Boolean|{1}|At Once|0|NULL><0><0"
@@ -4561,7 +4570,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "0><System.Int32|{0}|Amount|0|NULL><0><0"
@@ -4573,13 +4582,13 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 1,
-				formatter: "",
+				formatter: ""
 			},
 			{	//	1: Item choice
 				type: "number",
 				offset: 1,
 				size: 1,
-				formatter: "expobject",
+				formatter: "expobject"
 			}
 		],
 		desc: "System.Int32|{0}|Amount|1|NULL><System.String|{1}|Item|0|expobject><0><0"
@@ -4591,7 +4600,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				type: "number",
 				offset: 0,
 				size: 2,
-				formatter: "",
+				formatter: ""
 			}
 		],
 		desc: "0><System.Int32|{0}|Amount|0|NULL><0><0"
@@ -4646,7 +4655,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				offset: 0,
 				bit: 6,
 				formatter: "boolean"
-			},
+			}
 		],
 		desc: "System.String|{0}|Creature Type|0|creatures><System.String|{1}|Weapon Used|6|weaponsnojelly><System.Int32|{2}|Amount|1|NULL><0><System.String|{3}|Region|5|regions><System.String|{4}|Subregion|4|subregions><System.Boolean|{5}|In one Cycle|3|NULL><System.Boolean|{6}|Via a Death Pit|7|NULL><System.Boolean|{7}|While Starving|2|NULL><0><0"
 	},
@@ -4658,7 +4667,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				offset: 0,
 				size: 1,	//	Skimping on number size, but it's basically limited to ALL_ENUMS["creatures"]
 				formatter: ""
-			},
+			}
 		],
 		desc: "0><System.Int32|{0}|Amount|0|NULL><0><0><"
 	},
@@ -4670,7 +4679,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				offset: 0,
 				size: 2,
 				formatter: ""
-			},
+			}
 		],
 		desc: "0><System.Int32|{0}|Amount|0|NULL><0><0"
 	},
@@ -4682,7 +4691,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				offset: 0,
 				size: 2,
 				formatter: ""
-			},
+			}
 		],
 		desc: "System.Int32|{0}|Amount of Neurons|0|NULL><0><0><0"
 	},
@@ -4700,7 +4709,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				offset: 0,
 				size: 1,
 				formatter: "regionsreal"
-			},
+			}
 		],
 		desc: "System.String|{0}|Region|0|regionsreal><0><0"
 	},
@@ -4712,7 +4721,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				offset: 0,
 				size: 1,
 				formatter: "regions"
-			},
+			}
 		],
 		desc: "System.String|{0}|Pearl from Region|0|regions><0><0"
 	},
@@ -4949,10 +4958,10 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				formatter: "regionsreal"
 			},
 			{	//	1: To regions choice
-				type: "string",
+				type: "number",
 				offset: 1,
 				size: 1,
-				formatter: "regionsreal",
+				formatter: "regionsreal"
 			}
 		],
 		desc: "System.String|{0}|From|0|regionsreal><System.String|{1}|To|0|regionsreal><0><0"
@@ -5030,7 +5039,7 @@ function readShort(a, offs) {
  *	returns: unsigned, little-endian
  */
 function readLong(a, offs) {
-	return (a[offs] << 0) + (a[offs + 1] << 8) + (a[offs + 2] << 16) + (a[offs + 3] << 24);
+	return (a[offs] << 0) + (a[offs + 1] << 8) + (a[offs + 2] << 16) + (a[offs + 3] * (1 << 24));
 }
 
 /**
@@ -5213,7 +5222,7 @@ function setMeta() {
 	          + "    perks   List of perks to enable.  Array of integers, each indexing ALL_ENUMS.EXPFLAGS[] and\n"
 	          + "respective enums (e.g. BingoEnum_EXPFLAGSNames). For example, the list [0, 5, 13, 14, 16] would\n"
 	          + "enable: \"Perk: Scavenger Lantern\", \"Perk: Karma Flower\", \"Perk: Item Crafting\", \"Perk: High Agility\",\n"
-	          + "\"Burden: Blinded\". (Ordering of this array doesn't matter; repeats are ignored.)\n"
+	          + "\"Burden: Blinded\". (Ordering of this array doesn't matter, and repeats are ignored.)\n"
 	          + "Parameters are optional; an absent parameter leaves the existing value alone. Call with no parameters\n"
 	          + "to get usage.\n"
 	          + "Example:  setMeta(\"New Title\", \"White\", \"SU_S05\", [])\n"
@@ -5236,6 +5245,73 @@ function enumeratePerks() {
 
 function compressionRatio() {
 	return Math.round(1000 - 1000 * board.toBin.length / document.getElementById(ids.textbox).value.length) / 10;
+}
+
+/**
+ *	Counts the total number of possible values/options for a given goal
+ *	type (g indexing in BINARY_TO_STRING_DEFINITIONS).
+ */
+function countGoalOptions(g) {
+	g = parseInt(g);
+	var count = 1;
+	if (g < 0 || g >= BINARY_TO_STRING_DEFINITIONS.length) return;
+	var desc = BINARY_TO_STRING_DEFINITIONS[g];
+	for (var i = 0; i < desc.params.length; i++) {
+		if (desc.params[i].type == "bool") {
+			count *= 2;
+		} else if (desc.params[i].type == "number") {
+			if (desc.params[i].formatter == "") {
+				if (desc.params[i].size == 1) {
+					//	Known uses: desc.name in ["BingoAllRegionsExcept", "BingoHatchNoodleChallenge", "BingoHellChallenge", "BingoItemHoardChallenge"]
+					count *= CHAR_MAX;
+				} else if (desc.params[i].size == 2) {
+					count *= INT_MAX;
+				} else {
+					console.log("Unexpected value: BINARY_TO_STRING_DEFINITIONS["
+							+ g + "].params[" + i + "].size: " + desc.params[i].size);
+				}
+			} else {
+				if (ALL_ENUMS[desc.params[i].formatter] === undefined) {
+					console.log("Unexpected formatter: BINARY_TO_STRING_DEFINITIONS["
+							+ g + "].params[" + i + "].formatter: " + desc.params[i].formatter);
+				} else {
+					count *= ALL_ENUMS[desc.params[i].formatter].length;
+				}
+			}
+		} else if (desc.params[i].type == "string" || desc.params[i].type == "pstr") {
+			//	Known uses: desc.name in ["BingoChallenge", "BingoAllRegionsExcept", "BingoVistaChallenge"]
+			var exponent = desc.params[i].size;
+			if (exponent == 0) {
+				//	Variable length; customize based on goal
+				if (desc.name == "BingoChallenge" && i == 0) {
+					//	Plain (UTF-8) string
+					exponent = 0;
+				} else if (desc.name == "BingoAllRegionsExcept" && i == 2) {
+					//	Can assign arbitrary sets of regions here; usually, set to everything but the target region so 0 degrees of freedom
+					exponent = 0;
+				} else if (desc.name == "BingoVistaChallenge" && i == 1) {
+					//	String selects room name
+					exponent = 0;
+					count *= 1578;	//	approx. room count in Downpour, adding up Wiki region room counts
+				}
+			}
+			if (ALL_ENUMS[desc.params[i].formatter] == "") {
+				for (var j = 0; j < exponent; j++)
+					count *= 256;
+			} else if (ALL_ENUMS[desc.params[i].formatter] === undefined) {
+				console.log("Unexpected formatter: BINARY_TO_STRING_DEFINITIONS["
+						+ g + "].params[" + i + "].formatter: " + desc.params[i].formatter);
+			} else {
+				for (var j = 0; j < exponent; j++)
+					count *= ALL_ENUMS[desc.params[i].formatter].length;
+			}
+		} else {
+			console.log("Unsupported type: BINARY_TO_STRING_DEFINITIONS["
+					+ g + "].params[" + i + "].type: " + desc.params[i].type);
+		}
+	}
+
+	return count;
 }
 
 function itemToColor(i) {
