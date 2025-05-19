@@ -446,18 +446,21 @@ function parseText(e) {
 				try {
 					board.goals.push(CHALLENGES[type](desc));
 				} catch (er) {
-					board.goals.push(defaultGoal(type, desc));
-					board.goals[board.goals.length - 1].description = "Error, " + er.message + "; Descriptor: " + goals[i].split("~")[1];
-					var b = [challengeValue("BingoChallenge"), 0, 0];
-					b = b.concat(new TextEncoder().encode(board.goals[board.goals.length - 1].description));
-					b[2] = b.length - GOAL_LENGTH;
-					board.goals[board.goals.length - 1].toBin = new Uint8Array(b);
+					board.goals.push(CHALLENGES["BingoChallenge"]( [
+						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
+//					board.goals.push(defaultGoal(type, desc));
+//					board.goals[board.goals.length - 1].description = "Error: " + er.message + "; Descriptor: " + goals[i].split("~")[1];
+//					var b = [challengeValue("BingoChallenge"), 0, 0];
+//					b = b.concat(new TextEncoder().encode(board.goals[board.goals.length - 1].description));
+//					b[2] = b.length - GOAL_LENGTH;
+//					board.goals[board.goals.length - 1].toBin = new Uint8Array(b);
 				}
 			} else {
-				board.goals.push(defaultGoal(type, desc));
+				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
+				//board.goals.push(defaultGoal(type, desc));
 			}
 		} else {
-			board.goals.push(CHALLENGES["BingoChallenge"]( [ goals[i] ] ));
+			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
 		}
 	}
 	if (goals.length == 0)
@@ -528,12 +531,11 @@ function parseText(e) {
 	board.toBin = boardToBin(board);
 	//	Avoid some URL escaping with a simple substitution...
 	var s = btoa(String.fromCharCode.apply(null, board.toBin));
-	s = s.replace(/\+/g, "").replace(/\//g, "_");
+	s = s.replace(/\+/g, "-").replace(/\//g, "_");
 	var u = new URL(document.URL);
 	u.searchParams.set("b", s);
 	history.replaceState(null, "", u.href);
 
-	return;
 }
 
 /**
@@ -590,68 +592,70 @@ function clickBoard(e) {
 function selectSquare(col, row) {
 	var el = document.getElementById(ids.desc);
 	var ctx = document.getElementById(ids.square).getContext("2d");
-	if (row >= 0 && col >= 0 && row < board.height && col < board.width) {
-		var goal = board.goals[row + col * board.height];
-		if (goal === undefined) {
-			clearDescription();
-			return;
-		}
-		selected = { row: row, col: col };
-		ctx.fillStyle = square.background;
-		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		var size = {}; Object.assign(size, square);
-		size.margin = 4;
-		size.width = ctx.canvas.width - size.margin - size.border;
-		size.height = ctx.canvas.height - size.margin - size.border;
-		drawSquare(ctx, goal, (size.border + size.margin) / 2, (size.border + size.margin) / 2, size);
-
-		while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-		var el2 = document.createElement("div"); el2.setAttribute("class", "descch");
-		el2.appendChild(document.createTextNode("Challenge: " + goal.category));
-		el.appendChild(el2);
-		el2 = document.createElement("div"); el2.setAttribute("class", "descdesc");
-		//	If content is "trusted", let it use HTML; else, escape it because it contains board text that's illegal HTML
-		if (goal.name == "BingoChallenge")
-			el2.appendChild(document.createTextNode(goal.description));
-		else
-			el2.innerHTML = goal.description;
-		el.appendChild(el2);
-		el2 = document.createElement("table"); el2.setAttribute("class", "desclist");
-		var el3 = document.createElement("thead");
-		var tr = document.createElement("tr");
-		var td = document.createElement("td"); td.appendChild(document.createTextNode("Parameter")); tr.appendChild(td);
-		td = document.createElement("td"); td.appendChild(document.createTextNode("Value")); tr.appendChild(td);
-		el3.appendChild(tr);
-		el3 = document.createElement("tbody");
-		for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
-			if (goal.items[i].length > 0) {
-				tr = document.createElement("tr");
-				td = document.createElement("td"); td.appendChild(document.createTextNode(goal.items[i]));
-				tr.appendChild(td);
-				td = document.createElement("td"); td.appendChild(document.createTextNode(goal.values[i]));
-				tr.appendChild(td);
-				el3.appendChild(tr);
-			}
-		}
-		el2.appendChild(el3);
-		el.appendChild(el2);
-
-		if (kibitzing && goal.comments.length > 0) {
-			el2 = document.createElement("div"); el2.setAttribute("class", "desccomm");
-			el2.innerHTML = goal.comments;
-			el.appendChild(el2);
-		}
-
-		//	position cursor
-		var curSty = document.getElementById(ids.cursor).style;
-		curSty.width  = String(square.width  + square.border - 4) + "px";
-		curSty.height = String(square.height + square.border - 4) + "px";
-		curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
-		curSty.top  = String(square.margin / 2 - 0 + row * (square.height + square.margin + square.border)) + "px";
-		curSty.display = "initial";
+	if (row < 0 || col < 0 || row >= board.height || col >= board.width) {
+		clearDescription();
 		return;
 	}
-	clearDescription();
+	var goal = board.goals[row + col * board.height];
+	if (goal === undefined) {
+		clearDescription();
+		return;
+	}
+	selected = { row: row, col: col };
+	ctx.fillStyle = square.background;
+	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+	var size = {}; Object.assign(size, square);
+	size.margin = 4;
+	size.width = ctx.canvas.width - size.margin - size.border;
+	size.height = ctx.canvas.height - size.margin - size.border;
+	drawSquare(ctx, goal, (size.border + size.margin) / 2, (size.border + size.margin) / 2, size);
+
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	var el2 = document.createElement("div"); el2.setAttribute("class", "descch");
+	el2.appendChild(document.createTextNode("Challenge: " + goal.category));
+	el.appendChild(el2);
+	el2 = document.createElement("div"); el2.setAttribute("class", "descdesc");
+	//	If content is "trusted", let it use HTML; else, escape it because it contains board text that's illegal HTML
+	if (goal.name == "BingoChallenge")
+		el2.appendChild(document.createTextNode(goal.description));
+	else
+		el2.innerHTML = goal.description;
+	el.appendChild(el2);
+	el2 = document.createElement("table"); el2.setAttribute("class", "desclist");
+	var el3 = document.createElement("thead");
+	var tr = document.createElement("tr");
+	var td = document.createElement("td"); td.appendChild(document.createTextNode("Parameter")); tr.appendChild(td);
+	td = document.createElement("td"); td.appendChild(document.createTextNode("Value")); tr.appendChild(td);
+	el3.appendChild(tr);
+	el3 = document.createElement("tbody");
+	for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
+		if (goal.items[i].length > 0) {
+			tr = document.createElement("tr");
+			td = document.createElement("td"); td.appendChild(document.createTextNode(goal.items[i]));
+			tr.appendChild(td);
+			td = document.createElement("td"); td.appendChild(document.createTextNode(goal.values[i]));
+			td.style.wordWrap = "anywhere";
+			tr.appendChild(td);
+			el3.appendChild(tr);
+		}
+	}
+	el2.appendChild(el3);
+	el.appendChild(el2);
+
+	if (kibitzing && goal.comments.length > 0) {
+		el2 = document.createElement("div"); el2.setAttribute("class", "desccomm");
+		el2.innerHTML = goal.comments;
+		el.appendChild(el2);
+	}
+
+	//	position cursor
+	var curSty = document.getElementById(ids.cursor).style;
+	curSty.width  = String(square.width  + square.border - 4) + "px";
+	curSty.height = String(square.height + square.border - 4) + "px";
+	curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
+	curSty.top  = String(square.margin / 2 - 0 + row * (square.height + square.margin + square.border)) + "px";
+	curSty.display = "initial";
+	return;
 
 	function clearDescription() {
 		selected = undefined;
@@ -1035,10 +1039,12 @@ const CHALLENGES = {
 		const thisname = "BingoChallenge";
 		//	Keep as template and default; behavior is as a zero-terminated string container
 		desc[0] = desc[0].substring(0, 255);
-		var b = Array(3); b.fill(0);
+		var b = new Uint8Array(258);
 		b[0] = challengeValue(thisname);
-		b = b.concat(new TextEncoder().encode(desc[0]));
-		b[2] = b.length - GOAL_LENGTH;
+		var enc = new TextEncoder().encode(desc[0]);
+		enc = enc.subarray(0, 255);
+		b.set(enc, 3);
+		b[2] = enc.length;
 		return {
 			name: thisname,
 			category: "Empty challenge class",
@@ -1049,7 +1055,7 @@ const CHALLENGES = {
 			paint: [
 				{ type: "text", value: "∅", color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
-			toBin: new Uint8Array(b)
+			toBin: b.subarray(0, enc.length + GOAL_LENGTH)
 		};
 	},
 	BingoAchievementChallenge: function(desc) {
@@ -1190,6 +1196,8 @@ const CHALLENGES = {
 				if (regi === undefined)
 					throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in dataPearlToRegionMap[]");
 				r = regionCodeToDisplayName[regi];
+				//	CL pearl is a possible option from DataPearlList, but Saint doesn't get colored pearl challenges so this doesn't matter
+				if (regi == "CL") r = regionCodeToDisplayNameSaint[regi];
 				if (r === undefined)
 					throw new TypeError(thisname + ": error, region \"" + regi + "\" not found in regionCodeToDisplayName[]");
 				if (items[1] == "DM")
@@ -1391,6 +1399,7 @@ const CHALLENGES = {
 		var d = creatureNameToDisplayTextMap[items[1]];
 		if (d === undefined || iconName === undefined || iconColor === undefined)
 			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in creatureNameToDisplayTextMap[]");
+		d = creatureNameQuantify(1, d);
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "depths");
@@ -1400,7 +1409,7 @@ const CHALLENGES = {
 			category: "Dropping a creature in the depth pit",
 			items: [items[2]],
 			values: [items[1]],
-			description: "Drop a " + d + " into the Depths drop room (SB_D06).",
+			description: "Drop " + d + " into the Depths drop room (SB_D06).",
 			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06"),
 			paint: [
 				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
@@ -1786,8 +1795,9 @@ const CHALLENGES = {
 			r = " in " + r;
 		}
 		if (v[4] != "Any Subregion") {
+			if (v[4] == "Journey\\'s End") v[4] = "Journey\'s End";
 			r = " in " + v[4];
-			if (BingoEnum_AllSubregions[v[4]] === undefined)
+			if (BingoEnum_AllSubregions.indexOf(v[4]) == -1)
 				throw new TypeError(thisname + ": error, subregion selection \"" + v[4] + "\" not found in BingoEnum_AllSubregions[]");
 		}
 		var w = ", with a death pit";
@@ -2747,7 +2757,8 @@ const regionCodeToDisplayName = {
 	"SS": "Five Pebbles",
 	"SU": "Outskirts",
 	"UW": "The Exterior",
-	"VS": "Pipeyard"
+	"VS": "Pipeyard",
+	"UNKNOWN": "UNKNOWN"
 };
 
 /**
@@ -3639,7 +3650,12 @@ const dataPearlToDisplayTextMap = {
 	"Rivulet_stomach":  "Celadon",
 	"RM":               "Music",
 	"Spearmasterpearl": "Dark Red",
-	"SU_filt":          "Light Pink"
+	"SU_filt":          "Light Pink",
+	//	Unused, to match parity with DataPearlList
+	"BroadcastMisc":    "Broadcast",
+	"Misc":             "Misc",
+	"Misc2":            "Misc 2",
+	"PebblesPearl":     "Active Processes"
 };
 
 /**
@@ -3676,7 +3692,15 @@ const dataPearlToRegionMap = {
 	"MS":               "GW",
 	"OE":               "OE",
 	"RM":               "RM",
-	"SU_filt":          "SU"
+	"SU_filt":          "SU",
+	//	Should never happen
+	"BroadcastMisc":    "UNKNOWN",
+	"Misc":             "UNKNOWN",
+	"Misc2":            "UNKNOWN",
+	"PebblesPearl":     "UNKNOWN",
+	"Red_stomach":      "UNKNOWN",
+	"Rivulet_stomach":  "UNKNOWN",
+	"Spearmasterpearl": "UNKNOWN"
 };
 
 /**
@@ -5247,6 +5271,8 @@ function compressionRatio() {
 	return Math.round(1000 - 1000 * board.toBin.length / document.getElementById(ids.textbox).value.length) / 10;
 }
 
+const TOTAL_ROOM_COUNT = 1578;	//	approx. room count in Downpour, adding up Wiki region room counts
+
 /**
  *	Counts the total number of possible values/options for a given goal
  *	type (g indexing in BINARY_TO_STRING_DEFINITIONS).
@@ -5263,9 +5289,9 @@ function countGoalOptions(g) {
 			if (desc.params[i].formatter == "") {
 				if (desc.params[i].size == 1) {
 					//	Known uses: desc.name in ["BingoAllRegionsExcept", "BingoHatchNoodleChallenge", "BingoHellChallenge", "BingoItemHoardChallenge"]
-					count *= CHAR_MAX;
+					count *= CHAR_MAX + 1;
 				} else if (desc.params[i].size == 2) {
-					count *= INT_MAX;
+					count *= INT_MAX + 1;
 				} else {
 					console.log("Unexpected value: BINARY_TO_STRING_DEFINITIONS["
 							+ g + "].params[" + i + "].size: " + desc.params[i].size);
@@ -5279,9 +5305,9 @@ function countGoalOptions(g) {
 				}
 			}
 		} else if (desc.params[i].type == "string" || desc.params[i].type == "pstr") {
-			//	Known uses: desc.name in ["BingoChallenge", "BingoAllRegionsExcept", "BingoVistaChallenge"]
 			var exponent = desc.params[i].size;
 			if (exponent == 0) {
+				//	Known uses: desc.name in ["BingoChallenge", "BingoAllRegionsExcept", "BingoVistaChallenge"]
 				//	Variable length; customize based on goal
 				if (desc.name == "BingoChallenge" && i == 0) {
 					//	Plain (UTF-8) string
@@ -5292,10 +5318,10 @@ function countGoalOptions(g) {
 				} else if (desc.name == "BingoVistaChallenge" && i == 1) {
 					//	String selects room name
 					exponent = 0;
-					count *= 1578;	//	approx. room count in Downpour, adding up Wiki region room counts
+					count *= TOTAL_ROOM_COUNT;	//	approx. room count in Downpour, adding up Wiki region room counts
 				}
 			}
-			if (ALL_ENUMS[desc.params[i].formatter] == "") {
+			if (desc.params[i].formatter == "") {
 				for (var j = 0; j < exponent; j++)
 					count *= 256;
 			} else if (ALL_ENUMS[desc.params[i].formatter] === undefined) {
@@ -5303,7 +5329,7 @@ function countGoalOptions(g) {
 						+ g + "].params[" + i + "].formatter: " + desc.params[i].formatter);
 			} else {
 				for (var j = 0; j < exponent; j++)
-					count *= ALL_ENUMS[desc.params[i].formatter].length;
+					count *= ALL_ENUMS[desc.params[i].formatter].length - 1;
 			}
 		} else {
 			console.log("Unsupported type: BINARY_TO_STRING_DEFINITIONS["
@@ -5312,6 +5338,137 @@ function countGoalOptions(g) {
 	}
 
 	return count;
+}
+
+/**
+ *	Use binGoalToText(goalFromNumber(g, Math.random())) to generate truly
+ *	random goals.
+ *	Warning, may be self-inconsistent (let alone with others on a board!).
+ *	@param g goal index (in BINARY_TO_STRING_DEFINITIONS[]) to generate.
+ *	@param n floating point value between 0...1; arithmetic encoded sequence
+ *	of parameters.
+ */ 
+function goalFromNumber(g, n) {
+	g = parseInt(g);
+	if (g < 0 || g >= BINARY_TO_STRING_DEFINITIONS.length) return;
+	n = parseFloat(n);
+	if (isNaN(n) || n < 0 || n >= 1) return;
+	var r = new Uint8Array(256);
+	var bytes = 0;
+	var val;
+	var desc = BINARY_TO_STRING_DEFINITIONS[g];
+	r[0] = g;
+	for (var i = 0; i < desc.params.length; i++) {
+		if (desc.params[i].type == "bool") {
+			n *= 2;
+			val = Math.floor(n);
+			n -= val;
+			r[1 + desc.params[i].offset] |= (val << desc.params[i].bit);
+			bytes = Math.max(bytes, desc.params[i].offset - 1);
+		} else if (desc.params[i].type == "number") {
+			val = 0;
+			if (desc.params[i].formatter == "") {
+				if (desc.params[i].size == 1) {
+					n *= CHAR_MAX + 1;
+				} else if (desc.params[i].size == 2) {
+					n *= INT_MAX + 1;
+				} else {
+					console.log("Unexpected value: BINARY_TO_STRING_DEFINITIONS["
+							+ g + "].params[" + i + "].size: " + desc.params[i].size);
+				}
+			} else if (ALL_ENUMS[desc.params[i].formatter] === undefined) {
+				console.log("Unexpected formatter: BINARY_TO_STRING_DEFINITIONS["
+						+ g + "].params[" + i + "].formatter: " + desc.params[i].formatter);
+			} else {
+				n *= ALL_ENUMS[desc.params[i].formatter].length;
+				val = 1;
+			}
+			val += Math.floor(n);
+			n -= Math.floor(n);
+			if (desc.params[i].size == 1) {
+				r[GOAL_LENGTH + desc.params[i].offset] = val;
+			} else if (desc.params[i].size == 2) {
+				applyShort(r, GOAL_LENGTH + desc.params[i].offset, val);
+			} else {
+				//	add more apply-ers here
+			}
+			bytes = Math.max(bytes, desc.params[i].offset + desc.params[i].size);
+		} else if (desc.params[i].type == "string") {
+			if (desc.params[i].size == 0) {
+				//	Known uses: desc.name in ["BingoChallenge", "BingoAllRegionsExcept", "BingoVistaChallenge"]
+				//	Variable length; customize based on goal
+				if (desc.name == "BingoChallenge" && i == 0) {
+					//	Plain (UTF-8) string, any length
+					val = "Title Text!";
+					val = new TextEncoder().encode(val);
+				} else if (desc.name == "BingoAllRegionsExcept" && i == 2) {
+					//	Can assign an arbitrary set of regions here
+					//	usually is set to all regions (0 degrees of freedom)
+					val = Array(ALL_ENUMS[desc.params[i].formatter].length);
+					for (var j = 0; j < val.length - 1; j++) val[j] = j + 2;
+				} else if (desc.name == "BingoVistaChallenge" && i == 1) {
+					//	String selects room name; don't have a list of these, use a descriptive identifier instead
+					n *= TOTAL_ROOM_COUNT;
+					val = Math.floor(n);
+					n -= val;
+					val = "room_" + String(val);
+					val = new TextEncoder().encode(val);
+				} else {
+					console.log("Unknown use of type \"string\", size = 0, in " +
+							"BINARY_TO_STRING_DEFINITIONS[" + g + "].params[" + i + "]");
+				}
+				for (var j = 0; j < val.length; j++)
+					r[GOAL_LENGTH + desc.params[i].offset + j] = val[j];
+				bytes = Math.max(bytes, desc.params[i].offset + val.length);
+			} else {
+				val = Array(desc.params[i].size);
+				bytes = Math.max(bytes, desc.params[i].offset + desc.params[i].size);
+				if (ALL_ENUMS[desc.params[i].formatter] != "" &&
+						ALL_ENUMS[desc.params[i].formatter] === undefined) {
+					console.log("Unexpected formatter: BINARY_TO_STRING_DEFINITIONS["
+							+ g + "].params[" + i + "].formatter: " + desc.params[i].formatter);
+				} else {
+					for (var j = 0; j < desc.params[i].size; j++) {
+						if (ALL_ENUMS[desc.params[i].formatter] == "") {
+							n *= 256;
+						} else {
+							n *= ALL_ENUMS[desc.params[i].formatter].length;
+						}
+						val = Math.floor(n);
+						n -= val;
+						r[GOAL_LENGTH + desc.params[i].offset + j] = val;
+						if (ALL_ENUMS[desc.params[i].formatter] > "")
+							r[GOAL_LENGTH + desc.params[i].offset + j]++;
+					}
+				}
+			}
+		} else if (desc.params[i].type == "pstr") {
+			console.log("Unimplemented type: \"pstr\" in " |
+					"BINARY_TO_STRING_DEFINITIONS[" + g + "].params[" + i + "]");
+		} else {
+			console.log("Unsupported type: BINARY_TO_STRING_DEFINITIONS["
+					+ g + "].params[" + i + "].type: " + desc.params[i].type);
+		}
+	}
+	r[2] = bytes;
+
+	return r.subarray(0, bytes + GOAL_LENGTH);
+}
+
+function generateRandomGoals(g, n) {
+	g = parseInt(g);
+	if (g < 0 || g >= BINARY_TO_STRING_DEFINITIONS.length) return;
+	n = parseInt(n);
+	if (n < 0) return;
+	var s = "White;";
+	for (var i = 0;;) {
+		s += binGoalToText(goalFromNumber(g, Math.random()));
+		if (++i >= n) break;
+		s += "bChG";
+	}
+	document.getElementById(ids.textbox).value = s;
+
+	return s;
 }
 
 function itemToColor(i) {
