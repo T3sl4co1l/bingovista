@@ -5271,7 +5271,8 @@ function compressionRatio() {
 	return Math.round(1000 - 1000 * board.toBin.length / document.getElementById(ids.textbox).value.length) / 10;
 }
 
-const TOTAL_ROOM_COUNT = 1578;	//	approx. room count in Downpour, adding up Wiki region room counts
+/**	approx. room count in Downpour, adding up Wiki region room counts */
+const TOTAL_ROOM_COUNT = 1578;
 
 /**
  *	Counts the total number of possible values/options for a given goal
@@ -5455,6 +5456,10 @@ function goalFromNumber(g, n) {
 	return r.subarray(0, bytes + GOAL_LENGTH);
 }
 
+/**
+ *	Generates n goals, of type g (index in BINARY_TO_STRING_DEFINITIONS),
+ *	with very random settings.
+ */
 function generateRandomGoals(g, n) {
 	g = parseInt(g);
 	if (g < 0 || g >= BINARY_TO_STRING_DEFINITIONS.length) return;
@@ -5465,6 +5470,45 @@ function generateRandomGoals(g, n) {
 		s += binGoalToText(goalFromNumber(g, Math.random()));
 		if (++i >= n) break;
 		s += "bChG";
+	}
+	document.getElementById(ids.textbox).value = s;
+
+	return s;
+}
+
+/**
+ *	Generates n goals, of random types, with *very* random settings.
+ */
+function generateRandomRandomGoals(n) {
+	n = parseInt(n);
+	if (n < 0) return;
+	//	Exclude these challenges from generation:
+	var blacklist = [
+		Object.keys(CHALLENGES).indexOf("BingoChallenge"),    	//	Base class, useless in game
+		Object.keys(CHALLENGES).indexOf("BingoVistaChallenge")	//	full-general vista goal can't generate real room names
+	];
+	var s = BingoEnum_CHARACTERS[Math.floor(Math.random() * BingoEnum_CHARACTERS.length)]
+			+ ";";
+	for (var i = 0; i < n; i++) {
+		if (i > 0) s += "bChG";
+		//	Try generating goals until one passes; the raw encoding
+		//	supports some disallowed values, filter them out
+		var goalNum, goalTxt = "", goal, retries;
+		goalNum = Math.floor(Math.random() * (BINARY_TO_STRING_DEFINITIONS.length - blacklist.length));
+		for (var j = 0; j < blacklist.length; j++) {
+			if (goalNum >= blacklist[j]) goalNum++;
+		}
+		for (retries = 0; retries < 100; retries++) {
+			goalTxt = binGoalToText(goalFromNumber(goalNum, Math.random()));
+			try {
+				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></));
+			} catch (e) {
+				goalTxt = "";
+			}
+			if (goalTxt > "") break;
+		}
+		if (retries >= 100) console.log("Really bad luck trying to generate a goal");
+		s += goalTxt;
 	}
 	document.getElementById(ids.textbox).value = s;
 
