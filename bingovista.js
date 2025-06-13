@@ -1,5 +1,6 @@
 /*
 some more TODOs:
+- categorize vista points by source (stock = base game; bingo extended = from mod; or other strings from modpacks)
 - nudge around board view by a couple pixels to spread out rounding errors
 - board server to...basically URL-shorten?
 - ???
@@ -2290,7 +2291,7 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 3, "parameter item count");
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Creature Type", , "friend"], "creature type");
 		if (!BingoEnum_Befriendable.includes(items[1]))
-			throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not Befriendable");
+			throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not found in BingoEnum_Befriendable[]");
 		var d = creatureNameToDisplayTextMap[items[1]];
 		if (d === undefined)
 			throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not found in creatureNameToDisplayTextMap[]");
@@ -2546,12 +2547,12 @@ const CHALLENGES = {
 		var r1 = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 		r1 = r1.replace(/^\s\/\s|\s\/\s$/g, "");
 		if (r1 == "")
-			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
+			throw new TypeError(thisname + ": error, from-region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
 		var itemTo = checkSettingbox(thisname, desc[1], ["System.String", , "To", , "regionsreal"], "to region");
 		var r2 = (regionCodeToDisplayName[itemTo[1]] || "") + " / " + (regionCodeToDisplayNameSaint[itemTo[1]] || "");
 		r2 = r2.replace(/^\s\/\s|\s\/\s$/g, "");
 		if (r2 == "")
-			throw new TypeError(thisname + ": error, region \"" + itemTo[1] + "\" not found in regionCodeToDisplayName[]");
+			throw new TypeError(thisname + ": error, to-region \"" + itemTo[1] + "\" not found in regionCodeToDisplayName[]");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "regionsreal");
@@ -2562,7 +2563,7 @@ const CHALLENGES = {
 			category: "Entering a region from another region",
 			items: [items[2], itemTo[2]],
 			values: [items[1], itemTo[1]],
-			description: "First time entering " + r1 + " must be from " + r2 + ".",
+			description: "First time entering " + r2 + " must be from " + r1 + ".",
 			comments: "",
 			paint: [
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
@@ -3972,91 +3973,91 @@ const BingoEnum_Boolean = [
  */
 const BingoEnum_VistaPoints = [
 	//	Base Expedition
-	{ region: "CC", room: "CC_A10",           x:  734, y:  506 },
-	{ region: "CC", room: "CC_B12",           x:  455, y: 1383 },
-	{ region: "CC", room: "CC_C05",           x:  449, y: 2330 },
-	{ region: "CL", room: "CL_C05",           x:  540, y: 1213 },
-	{ region: "CL", room: "CL_H02",           x: 2407, y: 1649 },
-	{ region: "CL", room: "CL_CORE",          x:  471, y:  373 },
-	{ region: "DM", room: "DM_LAB1",          x:  486, y:  324 },
-	{ region: "DM", room: "DM_LEG06",         x:  400, y:  388 },
-	{ region: "DM", room: "DM_O02",           x: 2180, y: 2175 },
-	{ region: "DS", room: "DS_A05",           x:  172, y:  490 },
-	{ region: "DS", room: "DS_A19",           x:  467, y:  545 },
-	{ region: "DS", room: "DS_C02",           x:  541, y: 1305 },
-	{ region: "GW", room: "GW_C09",           x:  607, y:  595 },
-	{ region: "GW", room: "GW_D01",           x: 1603, y:  595 },
-	{ region: "GW", room: "GW_E02",           x: 2608, y:  621 },
-	{ region: "HI", room: "HI_B04",           x:  214, y:  615 },
-	{ region: "HI", room: "HI_C04",           x:  800, y:  768 },
-	{ region: "HI", room: "HI_D01",           x: 1765, y:  655 },
-	{ region: "LC", room: "LC_FINAL",         x: 2700, y:  500 },
-	{ region: "LC", room: "LC_SUBWAY01",      x: 1693, y:  564 },
+	{ region: "CC", room: "CC_A10",         x:  734, y:  506  },
+	{ region: "CC", room: "CC_B12",         x:  455, y: 1383  },
+	{ region: "CC", room: "CC_C05",         x:  449, y: 2330  },
+	{ region: "CL", room: "CL_C05",         x:  540, y: 1213  },
+	{ region: "CL", room: "CL_H02",         x: 2407, y: 1649  },
+	{ region: "CL", room: "CL_CORE",        x:  471, y:  373  },
+	{ region: "DM", room: "DM_LAB1",        x:  486, y:  324  },
+	{ region: "DM", room: "DM_LEG06",       x:  400, y:  388  },
+	{ region: "DM", room: "DM_O02",         x: 2180, y: 2175  },
+	{ region: "DS", room: "DS_A05",         x:  172, y:  490  },
+	{ region: "DS", room: "DS_A19",         x:  467, y:  545  },
+	{ region: "DS", room: "DS_C02",         x:  541, y: 1305  },
+	{ region: "GW", room: "GW_C09",         x:  607, y:  595  },
+	{ region: "GW", room: "GW_D01",         x: 1603, y:  595  },
+	{ region: "GW", room: "GW_E02",         x: 2608, y:  621  },
+	{ region: "HI", room: "HI_B04",         x:  214, y:  615  },
+	{ region: "HI", room: "HI_C04",         x:  800, y:  768  },
+	{ region: "HI", room: "HI_D01",         x: 1765, y:  655  },
+	{ region: "LC", room: "LC_FINAL",       x: 2700, y:  500  },
+	{ region: "LC", room: "LC_SUBWAY01",    x: 1693, y:  564  },
 	{ region: "LC", room: "LC_tallestconnection", x:  153, y:  242 },
-	{ region: "LF", room: "LF_A10",           x:  421, y:  412 },
-	{ region: "LF", room: "LF_C01",           x: 2792, y:  423 },
-	{ region: "LF", room: "LF_D02",           x: 1220, y:  631 },
-	{ region: "OE", room: "OE_RAIL01",        x: 2420, y: 1378 },
-	{ region: "OE", room: "OE_RUINCourtYard", x: 2133, y: 1397 },
-	{ region: "OE", room: "OE_TREETOP",       x:  468, y: 1782 },
-	{ region: "RM", room: "RM_ASSEMBLY",      x: 1550, y:  586 },
-	{ region: "RM", room: "RM_CONVERGENCE",   x: 1860, y:  670 },
-	{ region: "RM", room: "RM_I03",           x:  276, y: 2270 },
-	{ region: "SB", room: "SB_D04",           x:  483, y: 1045 },
-	{ region: "SB", room: "SB_E04",           x: 1668, y:  567 },
-	{ region: "SB", room: "SB_H02",           x: 1559, y:  472 },
-	{ region: "SH", room: "SH_A14",           x:  273, y:  556 },
-	{ region: "SH", room: "SH_B05",           x:  733, y:  453 },
-	{ region: "SH", room: "SH_C08",           x: 2159, y:  481 },
-	{ region: "SI", room: "SI_C07",           x:  539, y: 2354 },
-	{ region: "SI", room: "SI_D05",           x: 1045, y: 1258 },
-	{ region: "SI", room: "SI_D07",           x:  200, y:  400 },
-	{ region: "SL", room: "SL_B01",           x:  389, y: 1448 },
-	{ region: "SL", room: "SL_B04",           x:  390, y: 2258 },
-	{ region: "SL", room: "SL_C04",           x:  542, y: 1295 },
-	{ region: "SU", room: "SU_A04",           x:  265, y:  415 },
-	{ region: "SU", room: "SU_B12",           x: 1180, y:  382 },
-	{ region: "SU", room: "SU_C01",           x:  450, y: 1811 },
-	{ region: "UG", room: "UG_A16",           x:  640, y:  354 },
-	{ region: "UG", room: "UG_D03",           x:  857, y: 1826 },
-	{ region: "UG", room: "UG_GUTTER02",      x:  163, y:  241 },
-	{ region: "UW", room: "UW_A07",           x:  805, y:  616 },
-	{ region: "UW", room: "UW_C02",           x:  493, y:  490 },
-	{ region: "UW", room: "UW_J01",           x:  860, y: 1534 },
-	{ region: "VS", room: "VS_C03",           x:   82, y:  983 },
-	{ region: "VS", room: "VS_F02",           x: 1348, y:  533 },
-	{ region: "VS", room: "VS_H02",           x:  603, y: 3265 },
-	//	Bingo customs/adders
-	{ region: "CC", room: "CC_SHAFT0x",       x: 1525, y:  217 },
-	{ region: "CL", room: "CL_C03",           x:  808, y:   37 },
-	{ region: "DM", room: "DM_VISTA",         x:  956, y:  341 },
-	{ region: "DS", room: "DS_GUTTER02",      x:  163, y:  241 },
-	{ region: "GW", room: "GW_A24",           x:  590, y:  220 },
-	{ region: "HI", room: "HI_B02",           x:  540, y: 1343 },
-	{ region: "LC", room: "LC_stripmallNEW",  x: 1285, y:   50 },
-	{ region: "LF", room: "LF_E01",           x:  359, y:   63 },
-	{ region: "LM", room: "LM_B01",           x:  248, y: 1507 },
-	{ region: "LM", room: "LM_B04",           x:  503, y: 2900 },
-	{ region: "LM", room: "LM_C04",           x:  542, y:  129 },
-	{ region: "LM", room: "LM_EDGE02",        x: 1750, y: 1715 },
-	{ region: "MS", room: "MS_AIR03",         x: 1280, y:  770 },
-	{ region: "MS", room: "MS_ARTERY01",      x: 4626, y:   39 },
-	{ region: "MS", room: "MS_FARSIDE",       x: 2475, y: 1800 },
-	{ region: "MS", room: "MS_LAB4",          x:  390, y:  240 },
-	{ region: "OE", room: "OE_CAVE02",        x: 1200, y:   35 },
-	{ region: "RM", room: "RM_LAB8",          x: 1924, y:   65 },
-	{ region: "SB", room: "SB_C02",           x: 1155, y:  550 },
-	{ region: "SH", room: "SH_E02",           x:  770, y:   40 },
-	{ region: "SI", room: "SI_C04",           x: 1350, y:  130 },
-	{ region: "SL", room: "SL_AI",            x: 1530, y:   15 },
-	{ region: "SS", room: "SS_A13",           x:  347, y:  595 },
-	{ region: "SS", room: "SS_C03",           x:   60, y:  119 },
-	{ region: "SS", room: "SS_D04",           x:  980, y:  440 },
-	{ region: "SS", room: "SS_LAB12",         x:  697, y:  255 },
-	{ region: "SU", room: "SU_B11",           x:  770, y:   48 },
-	{ region: "UG", room: "UG_A19",           x:  545, y:   43 },
-	{ region: "UW", room: "UW_D05",           x:  760, y:  220 },
-	{ region: "VS", room: "VS_E06",           x:  298, y:  142 }
+	{ region: "LF", room: "LF_A10",         x:  421, y:  412  },
+	{ region: "LF", room: "LF_C01",         x: 2792, y:  423  },
+	{ region: "LF", room: "LF_D02",         x: 1220, y:  631  },
+	{ region: "OE", room: "OE_RAIL01",      x: 2420, y: 1378  },
+	{ region: "OE", room: "OE_RUINCourtYard", x: 2133, y: 1397  },
+	{ region: "OE", room: "OE_TREETOP",     x:  468, y: 1782  },
+	{ region: "RM", room: "RM_ASSEMBLY",    x: 1550, y:  586  },
+	{ region: "RM", room: "RM_CONVERGENCE", x: 1860, y:  670  },
+	{ region: "RM", room: "RM_I03",         x:  276, y: 2270  },
+	{ region: "SB", room: "SB_D04",         x:  483, y: 1045  },
+	{ region: "SB", room: "SB_E04",         x: 1668, y:  567  },
+	{ region: "SB", room: "SB_H02",         x: 1559, y:  472  },
+	{ region: "SH", room: "SH_A14",         x:  273, y:  556  },
+	{ region: "SH", room: "SH_B05",         x:  733, y:  453  },
+	{ region: "SH", room: "SH_C08",         x: 2159, y:  481  },
+	{ region: "SI", room: "SI_C07",         x:  539, y: 2354  },
+	{ region: "SI", room: "SI_D05",         x: 1045, y: 1258  },
+	{ region: "SI", room: "SI_D07",         x:  200, y:  400  },
+	{ region: "SL", room: "SL_B01",         x:  389, y: 1448  },
+	{ region: "SL", room: "SL_B04",         x:  390, y: 2258  },
+	{ region: "SL", room: "SL_C04",         x:  542, y: 1295  },
+	{ region: "SU", room: "SU_A04",         x:  265, y:  415  },
+	{ region: "SU", room: "SU_B12",         x: 1180, y:  382  },
+	{ region: "SU", room: "SU_C01",         x:  450, y: 1811  },
+	{ region: "UG", room: "UG_A16",         x:  640, y:  354  },
+	{ region: "UG", room: "UG_D03",         x:  857, y: 1826  },
+	{ region: "UG", room: "UG_GUTTER02",    x:  163, y:  241  },
+	{ region: "UW", room: "UW_A07",         x:  805, y:  616  },
+	{ region: "UW", room: "UW_C02",         x:  493, y:  490  },
+	{ region: "UW", room: "UW_J01",         x:  860, y: 1534  },
+	{ region: "VS", room: "VS_C03",         x:   82, y:  983  },
+	{ region: "VS", room: "VS_F02",         x: 1348, y:  533  },
+	{ region: "VS", room: "VS_H02",         x:  603, y: 3265  },
+	//	Bingo customs/adders                
+	{ region: "CC", room: "CC_SHAFT0x",     x: 1525, y:  217  },
+	{ region: "CL", room: "CL_C03",         x:  808, y:   37  },
+	{ region: "DM", room: "DM_VISTA",       x:  956, y:  341  },
+	{ region: "DS", room: "DS_GUTTER02",    x:  163, y:  241  },
+	{ region: "GW", room: "GW_A24",         x:  590, y:  220  },
+	{ region: "HI", room: "HI_B02",         x:  540, y: 1343  },
+	{ region: "LC", room: "LC_stripmallNEW", x: 1285, y:   50  },
+	{ region: "LF", room: "LF_E01",         x:  359, y:   63  },
+	{ region: "LM", room: "LM_B01",         x:  248, y: 1507  },
+	{ region: "LM", room: "LM_B04",         x:  503, y: 2900  },
+	{ region: "LM", room: "LM_C04",         x:  542, y:  129  },
+	{ region: "LM", room: "LM_EDGE02",      x: 1750, y: 1715  },
+	{ region: "MS", room: "MS_AIR03",       x: 1280, y:  770  },
+	{ region: "MS", room: "MS_ARTERY01",    x: 4626, y:   39  },
+	{ region: "MS", room: "MS_FARSIDE",     x: 2475, y: 1800  },
+	{ region: "MS", room: "MS_LAB4",        x:  390, y:  240  },
+	{ region: "OE", room: "OE_CAVE02",      x: 1200, y:   35  },
+	{ region: "RM", room: "RM_LAB8",        x: 1924, y:   65  },
+	{ region: "SB", room: "SB_C02",         x: 1155, y:  550  },
+	{ region: "SH", room: "SH_E02",         x:  770, y:   40  },
+	{ region: "SI", room: "SI_C04",         x: 1350, y:  130  },
+	{ region: "SL", room: "SL_AI",          x: 1530, y:   15  },
+	{ region: "SS", room: "SS_A13",         x:  347, y:  595  },
+	{ region: "SS", room: "SS_C03",         x:   60, y:  119  },
+	{ region: "SS", room: "SS_D04",         x:  980, y:  440  },
+	{ region: "SS", room: "SS_LAB12",       x:  697, y:  255  },
+	{ region: "SU", room: "SU_B11",         x:  770, y:   48  },
+	{ region: "UG", room: "UG_A19",         x:  545, y:   43  },
+	{ region: "UW", room: "UW_D05",         x:  760, y:  220  },
+	{ region: "VS", room: "VS_E06",         x:  298, y:  1421 }
 ];
 
 /**
