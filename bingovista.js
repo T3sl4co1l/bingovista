@@ -5038,7 +5038,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 				formatter: "boolean"
 			}
 		],
-		desc: "BingoMoonCloak~System.Boolean|{0}|Deliver|0|NULL><0><0"
+		desc: "System.Boolean|{0}|Deliver|0|NULL><0><0"
 	},
 ];
 
