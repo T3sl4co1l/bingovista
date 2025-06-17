@@ -219,7 +219,7 @@ document.addEventListener("DOMContentLoaded", function() {
 				return reject(new NetworkError("URL " + response.url + " error " + response.status + " " + response.statusText + "."));
 			//console.log("resolved: " + src + " fetch");
 			return response.text();
-		}).catch( (e) => {
+		}).catch((e) => {
 			return Promise.reject(e);
 		}).then((s) => {
 			dest.frames = JSON.parse(s).frames;
@@ -2572,6 +2572,43 @@ const CHALLENGES = {
 				{ type: "break" },
 				{ type: "text", value: itemTo[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
+			toBin: new Uint8Array(b)
+		};
+	},
+	//	added 1.08 (uncomment 1.09?)
+	BingoMoonCloak: function(desc) {
+		const thisname = "BingoMoonCloak";
+//	BingoMoonCloakChallenge: function(desc) {
+//		const thisname = "BingoMoonCloakChallenge";
+		//	desc of format ["System.Boolean|false|Deliver|0|NULL", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Deliver", , "NULL"], "delivery flag");
+		if (items[1] !== "true" && items[1] !== "false")
+			throw new TypeError(thisname + ": error, delivery flag \"" + items[1] + "\" not 'true' or 'false'");
+		var p = [ { type: "icon", value: "Symbol_MoonCloak", scale: 1, color: colorFloatToString([0.8, 0.8, 0.8]), rotation: 0 } ];
+		if (items[1] === "true") {
+			p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_green), rotation: 0 } );
+//			p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
+			p.push( { type: "icon", value: "GuidanceMoon", scale: 1, color: colorFloatToString(RainWorldColors["GuidanceMoon"]), rotation: 0 } );
+		}
+//		return new Phrase([new Icon("Symbol_MoonCloak", 1f, new Color(0.8f, 0.8f, 0.8f))], []);
+//		return new Phrase([
+//			new Icon("Symbol_MoonCloak", 1f, new Color(0.8f, 0.8f, 0.8f)),
+//			new Icon("singlearrow", 1f, Color.green),
+//			new Icon("GuidanceMoon" , 1f, new Color(1f, 0.8f, 0.3f))
+//		], []);
+		var b = Array(3); b.fill(0);
+		b[0] = challengeValue(thisname);
+		applyBool(b, 1, 4, items[1]);
+		b[2] = b.length - GOAL_LENGTH;
+		return {
+			name: thisname,
+			category: "Moon's Cloak",
+			items: [items[2]],
+			values: [items[1]],
+			description: ((items[1] === "false") ? "Obtain Moon's Cloak" : "Deliver the Cloak to Moon"),
+			comments: "With only a 'Deliver' goal on the board, players will spawn with the Cloak in the starting shelter, and must deliver it to Looks To The Moon. If both Obtain and Deliver are present, players must obtain the Cloak from Submerged Superstructure first, and then deliver it.",
+			paint: p,
 			toBin: new Uint8Array(b)
 		};
 	}
@@ -4990,6 +5027,18 @@ const BINARY_TO_STRING_DEFINITIONS = [
 			}
 		],
 		desc: "System.String|{0}|From|0|regionsreal><System.String|{1}|To|0|regionsreal><0><0"
+	},
+	{
+		name: "BingoMoonCloak",
+		params: [
+			{	//	0: Delivery choice
+				type: "bool",
+				offset: 0,
+				bit: 4,
+				formatter: "boolean"
+			}
+		],
+		desc: "BingoMoonCloak~System.Boolean|{0}|Deliver|0|NULL><0><0"
 	},
 ];
 
