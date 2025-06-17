@@ -85,7 +85,7 @@ const INT_MAX = 30000;
 const CHAR_MAX = 250;
 
 /**	Supported mod version */
-const VERSION_MAJOR = 0, VERSION_MINOR = 90;
+const VERSION_MAJOR = 1, VERSION_MINOR = 8;
 
 /** Binary header length, bytes */
 const HEADER_LENGTH = 21;
