@@ -400,7 +400,7 @@ function parseText(e) {
 			board.character = document.getElementById(ids.charsel).innerText;
 		if (document.getElementById(ids.shelter) !== null) {
 			board.shelter = document.getElementById(ids.shelter).innerText;
-			if (board.shelter == "random") board.shelter = "";
+			if (board.shelter === "random") board.shelter = "";
 		}
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
 			el = document.getElementById(ids.perks + String(i));
@@ -559,7 +559,7 @@ function copyText(e) {
  */
 function clickShowPerks(e) {
 	var elem = document.getElementById(ids.metaperks);
-	if (elem.style.display == "none")
+	if (elem.style.display === "none")
 		elem.style.display = "initial";
 	else
 		elem.style.display = "none";
@@ -617,7 +617,7 @@ function selectSquare(col, row) {
 	el.appendChild(el2);
 	el2 = document.createElement("div"); el2.setAttribute("class", "descdesc");
 	//	If content is "trusted", let it use HTML; else, escape it because it contains board text that's illegal HTML
-	if (goal.name == "BingoChallenge")
+	if (goal.name === "BingoChallenge")
 		el2.appendChild(document.createTextNode(goal.description));
 	else
 		el2.innerHTML = goal.description;
@@ -681,10 +681,10 @@ function selectSquare(col, row) {
 function navSquares(e) {
 	if (board !== undefined && [ids.board, ids.boardbox, ids.cursor].includes(e.target.id)) {
 		var dRow = 0, dCol = 0;
-		if (e.key == "Up"    || e.key == "ArrowUp"   ) dRow = -1;
-		if (e.key == "Down"  || e.key == "ArrowDown" ) dRow = 1;
-		if (e.key == "Left"  || e.key == "ArrowLeft" ) dCol = -1;
-		if (e.key == "Right" || e.key == "ArrowRight") dCol = 1;
+		if (e.key === "Up"    || e.key === "ArrowUp"   ) dRow = -1;
+		if (e.key === "Down"  || e.key === "ArrowDown" ) dRow = 1;
+		if (e.key === "Left"  || e.key === "ArrowLeft" ) dCol = -1;
+		if (e.key === "Right" || e.key === "ArrowRight") dCol = 1;
 		if (dRow || dCol) {
 			e.preventDefault();
 			var col = 0, row = 0;
@@ -722,7 +722,7 @@ function drawSquare(ctx, goal, x, y, size) {
 	ctx.imageSmoothingEnabled = "false";
 	var lines = [], thisLine = [];
 	for (var i = 0; i < goal.paint.length; i++) {
-		if (goal.paint[i].type == "break") {
+		if (goal.paint[i].type === "break") {
 			lines.push(thisLine);
 			thisLine = [];
 		} else {
@@ -745,14 +745,17 @@ function drawSquare(ctx, goal, x, y, size) {
 			else
 				xBase = x + size.border / 2 + (size.width - size.border) * (j + 0.5) / lines[i].length;
 			xBase = Math.round(xBase);
-			if (lines[i][j].type == "icon") {
-				drawIcon(ctx, lines[i][j].value, xBase, yBase, lines[i][j].color, lines[i][j].scale, lines[i][j].rotation); 
-			} else if (lines[i][j].type == "text") {
+			if (lines[i][j].type === "icon") {
+				if (lines[i][j].background !== undefined && lines[i][j].background.type === "icon") {
+					drawIcon(ctx, lines[i][j].background.value, xBase, yBase, lines[i][j].background.color, lines[i][j].background.scale, lines[i][j].background.rotation);
+				}
+				drawIcon(ctx, lines[i][j].value, xBase, yBase, lines[i][j].color, lines[i][j].scale, lines[i][j].rotation);
+			} else if (lines[i][j].type === "text") {
 				ctx.fillStyle = lines[i][j].color;
 				ctx.fillText(lines[i][j].value, xBase, yBase);
 			} else {
 				//	unimplemented
-				drawIcon(ctx, "Futile_White", xBase, yBase, colorFloatToString(RainWorldColors.Unity_white), lines[i][j].scale || 1, lines[i][j].rotation || 0); 
+				drawIcon(ctx, "Futile_White", xBase, yBase, colorFloatToString(RainWorldColors.Unity_white), lines[i][j].scale || 1, lines[i][j].rotation || 0);
 			}
 		}
 	}
@@ -960,7 +963,7 @@ function binGoalToText(c) {
 	for (j = 0; j < p.length; j++) {
 		stringtype = false;
 
-		if (p[j].type == "number") {
+		if (p[j].type === "number") {
 			//	Plain number: writes a decimal integer into its replacement template site(s)
 			outputs = [0];
 			for (k = 0; k < p[j].size; k++) {
@@ -968,14 +971,14 @@ function binGoalToText(c) {
 				outputs[0] += c[GOAL_LENGTH + p[j].offset + k] * (1 << (8 * k));
 			}
 
-		} else if (p[j].type == "bool") {
+		} else if (p[j].type === "bool") {
 			//	Boolean: reads one bit at the specified offset and position
 			//	Note: offset includes goal's hidden flag for better packing when few flags are needed
 			outputs = [(c[1 + p[j].offset] >> p[j].bit) & 0x01];
-			if (p[j].formatter != "")
+			if (p[j].formatter !== "")
 				outputs[0]++;	//	hack for formatter offset below
 
-		} else if (p[j].type == "string") {
+		} else if (p[j].type === "string") {
 			//	Plain string: copies a fixed-length or zero-terminated string into its replacement template site(s)
 			stringtype = true;
 			if (p[j].size == 0) {
@@ -986,7 +989,7 @@ function binGoalToText(c) {
 				maxIdx = p[j].size + GOAL_LENGTH + p[j].offset;
 			outputs = c.subarray(GOAL_LENGTH + p[j].offset, maxIdx);
 
-		} else if (p[j].type == "pstr") {
+		} else if (p[j].type === "pstr") {
 			//	Pointer to string: reads a (byte) offset from target location, then copies from that offset
 			stringtype = true;
 			if (p[j].size == 0) {
@@ -998,10 +1001,10 @@ function binGoalToText(c) {
 			outputs = c.subarray(GOAL_LENGTH + c[p[j].offset + GOAL_LENGTH], maxIdx);
 		}
 
-		if (stringtype && p[j].formatter == "") {
+		if (stringtype && p[j].formatter === "") {
 			//	Unformatted string, decode bytes into utf-8
 			replacer = d.decode(outputs);
-		} else if (!stringtype && p[j].formatter == "") {
+		} else if (!stringtype && p[j].formatter === "") {
 			//	single number, toString it
 			replacer = String(outputs[0]);
 		} else {
@@ -1051,7 +1054,7 @@ const CHALLENGES = {
 			category: "Empty challenge class",
 			items: [],	/**< items and values arrays must have equal length */
 			values: [],
-			description: desc[0],	/**< HTML allowed (for other than base name == "BingoChallenge" objects) */
+			description: desc[0],	/**< HTML allowed (for other than base name === "BingoChallenge" objects) */
 			comments: "",	/**< HTML allowed */
 			paint: [
 				{ type: "text", value: "∅", color: colorFloatToString(RainWorldColors.Unity_white) }
@@ -1090,7 +1093,7 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
 		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r == "")
+		if (r === "")
 			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
 		var amt = parseInt(desc[2]);
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
@@ -1135,16 +1138,16 @@ const CHALLENGES = {
 		if (!BingoEnum_BombableOutposts.includes(items[1]))
 			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in BingoEnum_BombableOutposts[]");
 		var pass = checkSettingbox(thisname, desc[1], ["System.Boolean", , "Pass the Toll", , "NULL"], "pass toll flag");
-		if (pass[1] != "true" && pass[1] != "false")
+		if (pass[1] !== "true" && pass[1] !== "false")
 			throw new TypeError(thisname + ": error, pass toll flag \"" + speci[1] + "\" not 'true' or 'false'");
 		var regi = regionOfRoom(items[1]).toUpperCase();
 		var r = (regionCodeToDisplayName[regi] || "") + " / " + (regionCodeToDisplayNameSaint[regi] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r == "")
+		if (r === "")
 			throw new TypeError(thisname + ": error, region \"" + regi + "\" not found in regionCodeToDisplayName[]");
-		if (items[1] == "gw_c11")
+		if (items[1] === "gw_c11")
 			r += " underground";
-		if (items[1] == "gw_c05")
+		if (items[1] === "gw_c05")
 			r += " surface";
 		var p = [
 			{ type: "icon", value: "Symbol_StunBomb", scale: 1, color: colorFloatToString(itemNameToIconColorMap["ScavengerBomb"]), rotation: 0 },
@@ -1152,7 +1155,7 @@ const CHALLENGES = {
 			{ type: "break" },
 			{ type: "text", value: items[1].toUpperCase(), color: colorFloatToString(RainWorldColors.Unity_white) }
 		];
-		if (pass[1] == "true")
+		if (pass[1] === "true")
 			p.splice(2, 0, { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1164,7 +1167,7 @@ const CHALLENGES = {
 			category: "Throwing grenades at Scavenger tolls",
 			items: [items[2], pass[2]],
 			values: [items[1], pass[1]],
-			description: "Throw a grenade at the " + r + " Scavenger toll" + ((pass[1] == "true") ? ", then pass it." : "."),
+			description: "Throw a grenade at the " + r + " Scavenger toll" + ((pass[1] === "true") ? ", then pass it." : "."),
 			comments: "Bomb and pass must be done in that order, in the same cycle." + getMapLink(items[1].toUpperCase()),
 			paint: p,
 			toBin: new Uint8Array(b)
@@ -1175,7 +1178,7 @@ const CHALLENGES = {
 		//	desc of format ["System.Boolean|true|Specific Pearl|0|NULL", "System.String|LF_bottom|Pearl|1|pearls", "0", "System.Int32|1|Amount|3|NULL", "0", "0", ""]
 		checkDescriptors(thisname, desc.length, 7, "parameter item count");
 		var speci = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Specific Pearl", , "NULL"], "specific pearl flag");
-		if (speci[1] != "true" && speci[1] != "false")
+		if (speci[1] !== "true" && speci[1] !== "false")
 			throw new TypeError(thisname + ": error, starving flag \"" + speci[1] + "\" not 'true' or 'false'");
 		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Pearl", , "pearls"], "pearl selection");
 		if (!DataPearlList.includes(items[1])) {
@@ -1188,9 +1191,9 @@ const CHALLENGES = {
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
 		var p;
-		if (speci[1] == "true") {
+		if (speci[1] === "true") {
 			var r;
-			if (items[1] == "MS")
+			if (items[1] === "MS")
 				r = "Old " + regionCodeToDisplayName["GW"];
 			else {
 				var regi = dataPearlToRegionMap[items[1]];
@@ -1198,15 +1201,15 @@ const CHALLENGES = {
 					throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in dataPearlToRegionMap[]");
 				r = regionCodeToDisplayName[regi];
 				//	CL pearl is a possible option from DataPearlList, but Saint doesn't get colored pearl challenges so this doesn't matter
-				if (regi == "CL") r = regionCodeToDisplayNameSaint[regi];
+				if (regi === "CL") r = regionCodeToDisplayNameSaint[regi];
 				if (r === undefined)
 					throw new TypeError(thisname + ": error, region \"" + regi + "\" not found in regionCodeToDisplayName[]");
-				if (items[1] == "DM")
+				if (items[1] === "DM")
 					r = regionCodeToDisplayName["DM"] + " / " + r;
 			}
 			d = "Collect the " + dataPearlToDisplayTextMap[items[1]] + " pearl from " + r + ".";
 			p = [
-				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: colorFloatToString(dataPearlToColorMap[items[1]]), rotation: 0 },
+				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: colorFloatToString(dataPearlToColorMap[items[1]]), rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } },
 				{ type: "break" },
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
 				{ type: "break" },
@@ -1358,13 +1361,13 @@ const CHALLENGES = {
 			{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
 		];
 		var d = "Hit ";
-		if (v[1] != "Any Creature") {
+		if (v[1] !== "Any Creature") {
 			if (creatureNameToDisplayTextMap[v[1]] === undefined)
 				throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
 			p.splice(1, 0, { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: creatureToColor(v[1]), rotation: 0 } );
 		}
 		d += (creatureNameToDisplayTextMap[v[1]] || v[1]) + " with ";
-		if (v[0] != "Any Weapon") {
+		if (v[0] !== "Any Weapon") {
 			if (itemNameToDisplayTextMap[v[0]] === undefined)
 				throw new TypeError(thisname + ": error, item type \"" + v[0] + "\" not found in itemNameToDisplayTextMap[]");
 			p.unshift( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1, color: itemToColor(v[0]), rotation: 0 } );
@@ -1456,16 +1459,16 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in creature- or itemNameToDisplayTextMap[]");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
-		applyBool(b, 1, 4, String(desc[1] == "1"));
-		applyBool(b, 1, 5, String(desc[4] == "1"));
+		applyBool(b, 1, 4, String(desc[1] === "1"));
+		applyBool(b, 1, 5, String(desc[4] === "1"));
 		b[3] = enumToValue(items[1], "banitem");
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
 			category: "Avoiding items",
 			items: [items[2], "isFood", "isCreature"],
-			values: [items[2], desc[1] == "1", desc[4] == "1"],
-			description: "Never " + ((desc[1] == "1") ? "eat" : "use") + " " + d + ".",
+			values: [items[2], desc[1] === "1", desc[4] === "1"],
+			description: "Never " + ((desc[1] === "1") ? "eat" : "use") + " " + d + ".",
 			comments: "\"Using\" an item involves throwing a throwable item, eating a food item, or holding any other type of item for 5 seconds.",
 			paint: [
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
@@ -1491,7 +1494,7 @@ const CHALLENGES = {
 		var b = Array(6); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
-		applyBool(b, 1, 4, String(desc[2] == "1"));
+		applyBool(b, 1, 4, String(desc[2] === "1"));
 		b[5] = enumToValue(items[1], "food");
 		b[2] = b.length - GOAL_LENGTH;
 		return {
@@ -1517,16 +1520,16 @@ const CHALLENGES = {
 		var echor = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "echoes"], "echo region");
 		var r = (regionCodeToDisplayName[echor[1]] || "") + " / " + (regionCodeToDisplayNameSaint[echor[1]] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r == "")
+		if (r === "")
 			throw new TypeError(thisname + ": error, region \"" + echor[1] + "\" not found in regionCodeToDisplayName[]");
 		items = checkSettingbox(thisname, desc[1], ["System.Boolean", , "While Starving", , "NULL"], "starving flag");
-		if (items[1] != "true" && items[1] != "false")
+		if (items[1] !== "true" && items[1] !== "false")
 			throw new TypeError(thisname + ": error, starving flag \"" + items[1] + "\" not 'true' or 'false'");
 		var p = [
 			{ type: "icon", value: "echo_icon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 			{ type: "text", value: echor[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 		];
-		if (items[1] == "true") {
+		if (items[1] === "true") {
 			p.push( { type: "break" } );
 			p.push( { type: "icon", value: "Multiplayer_Death", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		}
@@ -1540,7 +1543,7 @@ const CHALLENGES = {
 			category: "Visiting echoes",
 			items: [echor[2], items[2]],
 			values: [echor[1], items[1]],
-			description: "Visit the " + r + " Echo" + ((items[1] == "true") ? ", while starving." : "."),
+			description: "Visit the " + r + " Echo" + ((items[1] === "true") ? ", while starving." : "."),
 			comments: "",
 			paint: p,
 			toBin: new Uint8Array(b)
@@ -1553,7 +1556,7 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "enter region");
 		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r == "")
+		if (r === "")
 			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1605,14 +1608,14 @@ const CHALLENGES = {
 		//	desc of format ["System.Boolean|true|Looks to the Moon|0|NULL", "0", "0"]
 		checkDescriptors(thisname, desc.length, 3, "parameter item count");
 		items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Looks to the Moon", , "NULL"], "iterator choice flag");
-		if (items[1] != "true" && items[1] != "false")
+		if (items[1] !== "true" && items[1] !== "false")
 			throw new TypeError(thisname + ": error, iterator choice flag \"" + items[1] + "\" not 'true' or 'false'");
 		var d;
 		var p = [
 			{ type: "icon", value: "GuidanceNeuron", scale: 1, color: colorFloatToString(RainWorldColors["GuidanceNeuron"]), rotation: 0 },
 			{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 		]
-		if (items[1] == "true") {
+		if (items[1] === "true") {
 			d = "Reactivate Looks to the Moon.";
 			p.push( { type: "icon", value: "GuidanceMoon", scale: 1, color: colorFloatToString(RainWorldColors["GuidanceMoon"]), rotation: 0 } );
 		} else {
@@ -1644,7 +1647,7 @@ const CHALLENGES = {
 		if (isNaN(amt) || amt < 0)
 			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
 		items = checkSettingbox(thisname, desc[2], ["System.Boolean", , "At Once", , "NULL"], "one-cycle flag");
-		if (items[1] != "true" && items[1] != "false")
+		if (items[1] !== "true" && items[1] !== "false")
 			throw new TypeError(thisname + ": error, one-cycle flag \"" + items[1] + "\" not 'true' or 'false'");
 		var p = [
 			{ type: "icon", value: itemNameToIconAtlasMap["NeedleEgg"], scale: 1, color: colorFloatToString(itemNameToIconColorMap["NeedleEgg"]), rotation: 0 },
@@ -1652,7 +1655,7 @@ const CHALLENGES = {
 			{ type: "break" },
 			{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) },
 		];
-		if (items[1] == "true")
+		if (items[1] === "true")
 			p.splice(2, 0, { type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1664,7 +1667,7 @@ const CHALLENGES = {
 			category: "Hatching noodlefly eggs",
 			items: [amounts[2], items[2]],
 			values: [amounts[1], items[1]],
-			description: "Hatch " + creatureNameQuantify(amt, itemNameToDisplayTextMap["NeedleEgg"]) + ((items[1] == "true") ? " in one cycle." : "."),
+			description: "Hatch " + creatureNameQuantify(amt, itemNameToDisplayTextMap["NeedleEgg"]) + ((items[1] === "true") ? " in one cycle." : "."),
 			comments: "Eggs must be hatched where the player is sheltering. Eggs stored in other shelters disappear and do not give credit towards this goal.",
 			paint: p,
 			toBin: new Uint8Array(b)
@@ -1783,20 +1786,20 @@ const CHALLENGES = {
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + v[2] + "\" not a number or out of range");
 		var c = String(amt) + " creatures";
-		if (v[0] != "Any Creature") {
+		if (v[0] !== "Any Creature") {
 			if (creatureNameToDisplayTextMap[v[0]] === undefined)
 				throw new TypeError(thisname + ": error, creature type \"" + v[0] + "\" not found in creatureNameToDisplayTextMap[]");
 			c = creatureNameQuantify(amt, creatureNameToDisplayTextMap[v[0]]);
 		}
-		if (v[3] != "Any Region") {
+		if (v[3] !== "Any Region") {
 			r = (regionCodeToDisplayName[v[3]] || "") + " / " + (regionCodeToDisplayNameSaint[v[3]] || "");
 			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r == "")
+			if (r === "")
 				throw new TypeError(thisname + ": error, region selection \"" + v[3] + "\" not found in regionCodeToDisplayName[]");
 			r = " in " + r;
 		}
-		if (v[4] != "Any Subregion") {
-			if (v[4] == "Journey\\'s End") v[4] = "Journey\'s End";
+		if (v[4] !== "Any Subregion") {
+			if (v[4] === "Journey\\'s End") v[4] = "Journey\'s End";
 			r = " in " + v[4];
 			if (BingoEnum_AllSubregions.indexOf(v[4]) == -1)
 				throw new TypeError(thisname + ": error, subregion selection \"" + v[4] + "\" not found in BingoEnum_AllSubregions[]");
@@ -1804,34 +1807,34 @@ const CHALLENGES = {
 		var w = ", with a death pit";
 		if (!BingoEnum_Weapons.includes(v[1]))
 			throw new TypeError(thisname + ": error, weapon selection \"" + v[1] + "\" not found in BingoEnum_Weapons[]");
-		if (v[6] == "false") {
-			if (v[1] != "Any Weapon") {
+		if (v[6] === "false") {
+			if (v[1] !== "Any Weapon") {
 				w = " with " + itemNameToDisplayTextMap[v[1]];
 			} else {
 				w = "";
 			}
 		}
 		var p = [];
-		if (v[1] != "Any Weapon" || v[6] == "true") {
-			if (v[6] == "true")
+		if (v[1] !== "Any Weapon" || v[6] === "true") {
+			if (v[6] === "true")
 				p.push( { type: "icon", value: "deathpiticon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 			else
 				p.push( { type: "icon", value: itemNameToIconAtlasMap[v[1]], scale: 1, color: itemToColor(v[1]), rotation: 0 } );
 		}
-		if (v[5] != "true" && v[5] != "false")
+		if (v[5] !== "true" && v[5] !== "false")
 			throw new TypeError(thisname + ": error, one-cycle flag \"" + v[5] + "\" not 'true' or 'false'");
-		if (v[6] != "true" && v[6] != "false")
+		if (v[6] !== "true" && v[6] !== "false")
 			throw new TypeError(thisname + ": error, death pit flag \"" + v[6] + "\" not 'true' or 'false'");
-		if (v[7] != "true" && v[7] != "false")
+		if (v[7] !== "true" && v[7] !== "false")
 			throw new TypeError(thisname + ": error, starving flag \"" + v[7] + "\" not 'true' or 'false'");
 		p.push( { type: "icon", value: "Multiplayer_Bones", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
-		if (v[0] != "Any Creature") {
+		if (v[0] !== "Any Creature") {
 			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[0]], scale: 1,
 					color: creatureToColor(v[0]), rotation: 0 } );
 		}
 		p.push( { type: "break" } );
-		if (v[4] == "Any Subregion") {
-			if (v[3] != "Any Region") {
+		if (v[4] === "Any Subregion") {
+			if (v[3] !== "Any Region") {
 				p.push( { type: "text", value: v[3], color: colorFloatToString(RainWorldColors.Unity_white) } );
 				p.push( { type: "break" } );
 			}
@@ -1840,9 +1843,9 @@ const CHALLENGES = {
 			p.push( { type: "break" } );
 		}
 		p.push( { type: "text", value: "[0/" + v[2] + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
-		if (v[7] == "true")
+		if (v[7] === "true")
 			p.push( { type: "icon", value: "Multiplayer_Death", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
-		if (v[5] == "true")
+		if (v[5] === "true")
 			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		var b = Array(9); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1861,8 +1864,8 @@ const CHALLENGES = {
 			items: i,
 			values: v,
 			description: "Kill " + c + r + w
-					+ ((v[7] == "true") ? ", while starving" : "")
-					+ ((v[5] == "true") ? ", in one cycle"   : "") + ".",
+					+ ((v[7] === "true") ? ", while starving" : "")
+					+ ((v[5] === "true") ? ", in one cycle"   : "") + ".",
 			comments: "(If defined, subregion takes precedence over region. If set, Death Pit takes precedence over weapon selection.)<br>Credit is determined by the last source of 'blame' at time of death. For creatures that take multiple hits, try to \"soften them up\" with more common items, before using limited ammunition to deliver the killing blow.  Creatures that \"bleed out\", can be mortally wounded (brought to or below 0 HP), before being tagged with a specific weapon to obtain credit. Starving: must be in the \"malnourished\" state; this state is cleared after eating to full.",
 			paint: p,
 			toBin: new Uint8Array(b)
@@ -1982,7 +1985,7 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "avoid region");
 		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r == "")
+		if (r === "")
 			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2009,7 +2012,7 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Pearl from Region", , "regions"], "pearl region");
 		var r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 		r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r == "")
+		if (r === "")
 			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2043,20 +2046,20 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pearl count"); v.push(items[1]); i.push(items[2]);
 		desc[2] = desc[2].replace(/regionsreal/, "regions");	//	both acceptable (v0.85/0.90)
 		var items = checkSettingbox(thisname, desc[2], ["System.String", , "In Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
-		if (v[0] != "true" && v[0] != "false")
+		if (v[0] !== "true" && v[0] !== "false")
 			throw new TypeError(thisname + ": error, common pearls flag \"" + v[0] + "\" not 'true' or 'false'");
 		var amt = parseInt(v[1]);
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + v[1] + "\" not a number or out of range");
-		if (v[2] != "Any Region") {
+		if (v[2] !== "Any Region") {
 			var r = (regionCodeToDisplayName[v[2]] || "") + " / " + (regionCodeToDisplayNameSaint[v[2]] || "");
 			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r == "")
+			if (r === "")
 				throw new TypeError(thisname + ": error, region \"" + v[2] + "\" not found in regionCodeToDisplayName[]");
 		} else
 			r = "any region";
 		var pearl = " common pearls";
-		if (v[0] == "false") pearl = " colored pearls";
+		if (v[0] === "false") pearl = " colored pearls";
 		if (amt == 1) pearl = pearl.substring(0, pearl.length - 1);
 		var b = Array(6); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2073,7 +2076,7 @@ const CHALLENGES = {
 			comments: "Faded pearls (colored pearl spawns in Saint campaign) do not count towards a \"common pearls\" goal.",
 			paint: [
 				{ type: "icon", value: "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
-				{ type: "icon", value: ((v[0] == "true") ? "pearlhoard_normal" : "pearlhoard_color"), scale: 1, color: colorFloatToString(itemNameToIconColorMap["Pearl"]), rotation: 0 },
+				{ type: "icon", value: ((v[0] === "true") ? "pearlhoard_normal" : "pearlhoard_color"), scale: 1, color: colorFloatToString(itemNameToIconColorMap["Pearl"]), rotation: 0 },
 				{ type: "text", value: v[2], color: colorFloatToString(RainWorldColors.Unity_white) },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
@@ -2093,26 +2096,26 @@ const CHALLENGES = {
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + v[0] + "\" not a number or out of range");
 		var c = "creatures";
-		if (v[1] != "Any Creature") {
+		if (v[1] !== "Any Creature") {
 			if (creatureNameToDisplayTextMap[v[1]] === undefined)
 				throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
 			c = creatureNameToDisplayTextMap[v[1]];
 		}
 		c = creatureNameQuantify(amt, c);
 		var r = v[2];
-		if (r != "Any Region") {
+		if (r !== "Any Region") {
 			r = (regionCodeToDisplayName[v[2]] || "") + " / " + (regionCodeToDisplayNameSaint[v[2]] || "");
 			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r == "")
+			if (r === "")
 				throw new TypeError(thisname + ": error, region \"" + v[2] + "\" not found in regionCodeToDisplayName[]");
 		} else {
 			r = "different regions";
 		}
 		var p = [ { type: "icon", value: "pin_creature", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } ];
-		if (v[1] != "Any Creature") {
+		if (v[1] !== "Any Creature") {
 			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: colorFloatToString(creatureNameToIconColorMap[v[1]] || creatureNameToIconColorMap["Default"]), rotation: 0 } );
 		}
-		if (v[2] == "Any Region") {
+		if (v[2] === "Any Region") {
 			p.push( { type: "icon", value: "TravellerA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		} else {
 			p.push( { type: "text", value: v[2], color: colorFloatToString(RainWorldColors.Unity_white) } );
@@ -2256,10 +2259,10 @@ const CHALLENGES = {
 		var d = "Steal " + String(amt) + " " + itemNameToDisplayTextMap[v[0]] + " from ";
 		p.push( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1,
 				color: itemToColor(v[0]), rotation: 0 } );
-		if (v[2] == "true") {
+		if (v[2] === "true") {
 			p.push( { type: "icon", value: "scavtoll", scale: 0.8, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 			d += "a Scavenger Toll.";
-		} else if (v[2] == "false") {
+		} else if (v[2] === "false") {
 			p.push( { type: "icon", value: creatureNameToIconAtlasMap["Scavenger"], scale: 1,
 					color: creatureToColor("Scavenger"), rotation: 0 } );
 			d += "Scavengers.";
@@ -2380,16 +2383,16 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[1], ["System.String", , "To Region", , "regions"], "to region"); v.push(items[1]); i.push(items[2]);
 		var items = checkSettingbox(thisname, desc[2], ["System.String", , "Creature Type", , "transport"], "transportable creature type"); v.push(items[1]); i.push(items[2]);
 		var r1 = v[0], r2 = v[1];
-		if (r1 != "Any Region") {
+		if (r1 !== "Any Region") {
 			r1 = (regionCodeToDisplayName[v[0]] || "") + " / " + (regionCodeToDisplayNameSaint[v[0]] || "");
 			r1 = r1.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r1 == "")
+			if (r1 === "")
 				throw new TypeError(thisname + ": error, region \"" + v[0] + "\" not found in regionCodeToDisplayName[]");
 		}
-		if (r2 != "Any Region") {
+		if (r2 !== "Any Region") {
 			r2 = (regionCodeToDisplayName[v[1]] || "") + " / " + (regionCodeToDisplayNameSaint[v[1]] || "");
 			r2 = r2.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r2 == "")
+			if (r2 === "")
 				throw new TypeError(thisname + ": error, region \"" + v[1] + "\" not found in regionCodeToDisplayName[]");
 		}
 		if (creatureNameToDisplayTextMap[v[2]] === undefined)
@@ -2402,9 +2405,9 @@ const CHALLENGES = {
 		];
 		if (p[0].value === undefined || p[0].color === undefined)
 			throw new TypeError(thisname + ": error, token \"" + v[2] + "\" not found in itemNameToIconAtlasMap[] or Color");
-		if (v[0] != "Any Region") p.push( { type: "text", value: v[0], color: colorFloatToString(RainWorldColors.Unity_white) } );
+		if (v[0] !== "Any Region") p.push( { type: "text", value: v[0], color: colorFloatToString(RainWorldColors.Unity_white) } );
 		p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
-		if (v[1] != "Any Region") p.push( { type: "text", value: v[1], color: colorFloatToString(RainWorldColors.Unity_white) } );
+		if (v[1] !== "Any Region") p.push( { type: "text", value: v[1], color: colorFloatToString(RainWorldColors.Unity_white) } );
 		var b = Array(6); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(v[0], "regions");
@@ -2445,7 +2448,7 @@ const CHALLENGES = {
 			p[0].color = colorFloatToString(RainWorldColors.TokenDefault);
 			r = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r == "") {
+			if (r === "") {
 				r = arenaUnlocksGoldToDisplayName[items[1]];
 				if (r === undefined)
 					throw new TypeError(thisname + ": error, arena \"" + items[1] + "\" not found in arenaUnlocksGoldToDisplayName[]");
@@ -2463,13 +2466,13 @@ const CHALLENGES = {
 			r = items[1].substring(0, items[1].search("-"));
 			r = (regionCodeToDisplayName[r] || "") + " / " + (regionCodeToDisplayNameSaint[r] || "");
 			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
-			if (r == "")
+			if (r === "")
 				throw new TypeError(thisname + ": error, region \"" + items[1].substring(0, items[1].search("-")) + "\" not found in regionCodeToDisplayName[]");
 			d += r + " Safari";
 		} else {
 			throw new TypeError(thisname + ": error, token \"" + items[1] + "\" not found in BingoEnum_ArenaUnlocks[]");
 		}
-		if (iconName == "")
+		if (iconName === "")
 			p.push( { type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) } );
 		else
 			p.push( { type: "icon", value: iconName, scale: 1, color: colorFloatToString(iconColor), rotation: 0 } );
@@ -2498,7 +2501,7 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, region \"" + desc[0] + "\" does not match room \"" + items[1] + "\"'s region");
 		var v = (regionCodeToDisplayName[desc[0]] || "") + " / " + (regionCodeToDisplayNameSaint[desc[0]] || "");
 		v = v.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (v == "")
+		if (v === "")
 			throw new TypeError(thisname + ": error, region \"" + desc[0] + "\" not found in regionCodeToDisplayName[]");
 		var roomX = parseInt(desc[2]);
 		if (isNaN(roomX) || roomX < 0 || roomX > INT_MAX)
@@ -2546,12 +2549,12 @@ const CHALLENGES = {
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "From", , "regionsreal"], "from region");
 		var r1 = (regionCodeToDisplayName[items[1]] || "") + " / " + (regionCodeToDisplayNameSaint[items[1]] || "");
 		r1 = r1.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r1 == "")
+		if (r1 === "")
 			throw new TypeError(thisname + ": error, from-region \"" + items[1] + "\" not found in regionCodeToDisplayName[]");
 		var itemTo = checkSettingbox(thisname, desc[1], ["System.String", , "To", , "regionsreal"], "to region");
 		var r2 = (regionCodeToDisplayName[itemTo[1]] || "") + " / " + (regionCodeToDisplayNameSaint[itemTo[1]] || "");
 		r2 = r2.replace(/^\s\/\s|\s\/\s$/g, "");
-		if (r2 == "")
+		if (r2 === "")
 			throw new TypeError(thisname + ": error, to-region \"" + itemTo[1] + "\" not found in regionCodeToDisplayName[]");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -4273,7 +4276,7 @@ const ALL_ENUMS = {
  *
  *	//	Plain string: copies a fixed-length or zero-terminated string (optionally
  *	//	transformed by formatter and joiner) into the matching position in the template
- *	//	string. Note: when formatter == "", UTF-8 decoding is applied, returning a
+ *	//	string. Note: when formatter === "", UTF-8 decoding is applied, returning a
  *	//	normal JS string in the object.
  *	{
  *		type: "string",
@@ -4998,7 +5001,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 		],
 		desc: "{0}><System.String|{1}|Room|0|vista><{2}><{3}><0><0"
 	},
-	{	/*  Alternate enum version for as-generated locations; to index, use indexOf(name == "BingoVistaChallenge") + 1  */
+	{	/*  Alternate enum version for as-generated locations; to index, use indexOf(name === "BingoVistaChallenge") + 1  */
 		name: "BingoVistaChallenge",
 		params: [
 			{	//	0: Vista Point choice
@@ -5157,7 +5160,7 @@ function checkDescriptors(t, d, g, err) {
  *	and current global state (board.character, map_link_base).
  */
 function getMapLink(room) {
-	if (map_link_base == "")
+	if (map_link_base === "")
 		return "";
 	var reg = regionOfRoom(room);
 	var ch = Object.keys(BingoEnum_CharToDisplayText)[
@@ -5268,7 +5271,7 @@ function setMeta() {
 	if (character !== undefined)
 		document.getElementById(ids.charsel).innerText = character;
 	if (shelter !== undefined) {
-		if (shelter == "random") shelter = "";
+		if (shelter === "random") shelter = "";
 		document.getElementById(ids.shelter).innerText = shelter;
 	}
 	if (perks !== undefined) {
@@ -5334,10 +5337,10 @@ function countGoalOptions(g) {
 	if (g < 0 || g >= BINARY_TO_STRING_DEFINITIONS.length) return;
 	var desc = BINARY_TO_STRING_DEFINITIONS[g];
 	for (var i = 0; i < desc.params.length; i++) {
-		if (desc.params[i].type == "bool") {
+		if (desc.params[i].type === "bool") {
 			count *= 2;
-		} else if (desc.params[i].type == "number") {
-			if (desc.params[i].formatter == "") {
+		} else if (desc.params[i].type === "number") {
+			if (desc.params[i].formatter === "") {
 				if (desc.params[i].size == 1) {
 					//	Known uses: desc.name in ["BingoAllRegionsExcept", "BingoHatchNoodleChallenge", "BingoHellChallenge", "BingoItemHoardChallenge"]
 					count *= CHAR_MAX + 1;
@@ -5355,24 +5358,24 @@ function countGoalOptions(g) {
 					count *= ALL_ENUMS[desc.params[i].formatter].length;
 				}
 			}
-		} else if (desc.params[i].type == "string" || desc.params[i].type == "pstr") {
+		} else if (desc.params[i].type === "string" || desc.params[i].type === "pstr") {
 			var exponent = desc.params[i].size;
 			if (exponent == 0) {
 				//	Known uses: desc.name in ["BingoChallenge", "BingoAllRegionsExcept", "BingoVistaChallenge"]
 				//	Variable length; customize based on goal
-				if (desc.name == "BingoChallenge" && i == 0) {
+				if (desc.name === "BingoChallenge" && i == 0) {
 					//	Plain (UTF-8) string
 					exponent = 0;
-				} else if (desc.name == "BingoAllRegionsExcept" && i == 2) {
+				} else if (desc.name === "BingoAllRegionsExcept" && i == 2) {
 					//	Can assign arbitrary sets of regions here; usually, set to everything but the target region so 0 degrees of freedom
 					exponent = 0;
-				} else if (desc.name == "BingoVistaChallenge" && i == 1) {
+				} else if (desc.name === "BingoVistaChallenge" && i == 1) {
 					//	String selects room name
 					exponent = 0;
 					count *= TOTAL_ROOM_COUNT;	//	approx. room count in Downpour, adding up Wiki region room counts
 				}
 			}
-			if (desc.params[i].formatter == "") {
+			if (desc.params[i].formatter === "") {
 				for (var j = 0; j < exponent; j++)
 					count *= 256;
 			} else if (ALL_ENUMS[desc.params[i].formatter] === undefined) {
@@ -5410,15 +5413,15 @@ function goalFromNumber(g, n) {
 	var desc = BINARY_TO_STRING_DEFINITIONS[g];
 	r[0] = g;
 	for (var i = 0; i < desc.params.length; i++) {
-		if (desc.params[i].type == "bool") {
+		if (desc.params[i].type === "bool") {
 			n *= 2;
 			val = Math.floor(n);
 			n -= val;
 			r[1 + desc.params[i].offset] |= (val << desc.params[i].bit);
 			bytes = Math.max(bytes, desc.params[i].offset - 1);
-		} else if (desc.params[i].type == "number") {
+		} else if (desc.params[i].type === "number") {
 			val = 0;
-			if (desc.params[i].formatter == "") {
+			if (desc.params[i].formatter === "") {
 				if (desc.params[i].size == 1) {
 					n *= CHAR_MAX + 1;
 				} else if (desc.params[i].size == 2) {
@@ -5444,20 +5447,20 @@ function goalFromNumber(g, n) {
 				//	add more apply-ers here
 			}
 			bytes = Math.max(bytes, desc.params[i].offset + desc.params[i].size);
-		} else if (desc.params[i].type == "string") {
+		} else if (desc.params[i].type === "string") {
 			if (desc.params[i].size == 0) {
 				//	Known uses: desc.name in ["BingoChallenge", "BingoAllRegionsExcept", "BingoVistaChallenge"]
 				//	Variable length; customize based on goal
-				if (desc.name == "BingoChallenge" && i == 0) {
+				if (desc.name === "BingoChallenge" && i == 0) {
 					//	Plain (UTF-8) string, any length
 					val = "Title Text!";
 					val = new TextEncoder().encode(val);
-				} else if (desc.name == "BingoAllRegionsExcept" && i == 2) {
+				} else if (desc.name === "BingoAllRegionsExcept" && i == 2) {
 					//	Can assign an arbitrary set of regions here
 					//	usually is set to all regions (0 degrees of freedom)
 					val = Array(ALL_ENUMS[desc.params[i].formatter].length);
 					for (var j = 0; j < val.length - 1; j++) val[j] = j + 2;
-				} else if (desc.name == "BingoVistaChallenge" && i == 1) {
+				} else if (desc.name === "BingoVistaChallenge" && i == 1) {
 					//	String selects room name; don't have a list of these, use a descriptive identifier instead
 					n *= TOTAL_ROOM_COUNT;
 					val = Math.floor(n);
@@ -5474,13 +5477,13 @@ function goalFromNumber(g, n) {
 			} else {
 				val = Array(desc.params[i].size);
 				bytes = Math.max(bytes, desc.params[i].offset + desc.params[i].size);
-				if (ALL_ENUMS[desc.params[i].formatter] != "" &&
+				if (ALL_ENUMS[desc.params[i].formatter] !== "" &&
 						ALL_ENUMS[desc.params[i].formatter] === undefined) {
 					console.log("Unexpected formatter: BINARY_TO_STRING_DEFINITIONS["
 							+ g + "].params[" + i + "].formatter: " + desc.params[i].formatter);
 				} else {
 					for (var j = 0; j < desc.params[i].size; j++) {
-						if (ALL_ENUMS[desc.params[i].formatter] == "") {
+						if (ALL_ENUMS[desc.params[i].formatter] === "") {
 							n *= 256;
 						} else {
 							n *= ALL_ENUMS[desc.params[i].formatter].length;
@@ -5493,7 +5496,7 @@ function goalFromNumber(g, n) {
 					}
 				}
 			}
-		} else if (desc.params[i].type == "pstr") {
+		} else if (desc.params[i].type === "pstr") {
 			console.log("Unimplemented type: \"pstr\" in " |
 					"BINARY_TO_STRING_DEFINITIONS[" + g + "].params[" + i + "]");
 		} else {
@@ -5686,117 +5689,117 @@ function creatureNameToIconAtlas(type) {
 	 *	- Assumes CreatureTemplate enums use symbols equal to string contents; this appears to
 	 *		always be the case, but may vary with future updates, or modded content.  Beware!
 	 */
-	if (type == "Slugcat")
+	if (type === "Slugcat")
 		return "Kill_Slugcat";
-	if (type == "GreenLizard")
+	if (type === "GreenLizard")
 		return "Kill_Green_Lizard";
-	if (type == "PinkLizard" || type == "BlueLizard" || type == "CyanLizard" || type == "RedLizard")
+	if (type === "PinkLizard" || type === "BlueLizard" || type === "CyanLizard" || type === "RedLizard")
 		return "Kill_Standard_Lizard";
-	if (type == "WhiteLizard")
+	if (type === "WhiteLizard")
 		return "Kill_White_Lizard";
-	if (type == "BlackLizard")
+	if (type === "BlackLizard")
 		return "Kill_Black_Lizard";
-	if (type == "YellowLizard")
+	if (type === "YellowLizard")
 		return "Kill_Yellow_Lizard";
-	if (type == "Salamander")
+	if (type === "Salamander")
 		return "Kill_Salamander";
-	if (type == "Scavenger")
+	if (type === "Scavenger")
 		return "Kill_Scavenger";
-	if (type == "Vulture")
+	if (type === "Vulture")
 		return "Kill_Vulture";
-	if (type == "KingVulture")
+	if (type === "KingVulture")
 		return "Kill_KingVulture";
-	if (type == "CicadaA" || type == "CicadaB")
+	if (type === "CicadaA" || type === "CicadaB")
 		return "Kill_Cicada";
-	if (type == "Snail")
+	if (type === "Snail")
 		return "Kill_Snail";
-	if (type == "Centiwing")
+	if (type === "Centiwing")
 		return "Kill_Centiwing";
-	if (type == "SmallCentipede")
+	if (type === "SmallCentipede")
 		return "Kill_Centipede1";
-	if (type == "Centipede")
+	if (type === "Centipede")
 		return "Kill_Centipede2";
-	if (type == "RedCentipede")
+	if (type === "RedCentipede")
 		return "Kill_Centipede3";
-	if (type == "BrotherLongLegs" || type == "DaddyLongLegs")
+	if (type === "BrotherLongLegs" || type === "DaddyLongLegs")
 		return "Kill_Daddy";
-	if (type == "LanternMouse")
+	if (type === "LanternMouse")
 		return "Kill_Mouse";
-	if (type == "GarbageWorm")
+	if (type === "GarbageWorm")
 		return "Kill_Garbageworm";
-	if (type == "Fly")
+	if (type === "Fly")
 		return "Kill_Bat";
-	if (type == "Leech" || type == "SeaLeech")
+	if (type === "Leech" || type === "SeaLeech")
 		return "Kill_Leech";
-	if (type == "Spider")
+	if (type === "Spider")
 		return "Kill_SmallSpider";
-	if (type == "JetFish")
+	if (type === "JetFish")
 		return "Kill_Jetfish";
-	if (type == "BigEel")
+	if (type === "BigEel")
 		return "Kill_BigEel";
-	if (type == "Deer")
+	if (type === "Deer")
 		return "Kill_RainDeer";
-	if (type == "TubeWorm")
+	if (type === "TubeWorm")
 		return "Kill_Tubeworm";
-	if (type == "TentaclePlant")
+	if (type === "TentaclePlant")
 		return "Kill_TentaclePlant";
-	if (type == "PoleMimic")
+	if (type === "PoleMimic")
 		return "Kill_PoleMimic";
-	if (type == "MirosBird")
+	if (type === "MirosBird")
 		return "Kill_MirosBird";
-	if (type == "Overseer")
+	if (type === "Overseer")
 		return "Kill_Overseer";
-	if (type == "VultureGrub")
+	if (type === "VultureGrub")
 		return "Kill_VultureGrub";
-	if (type == "EggBug")
+	if (type === "EggBug")
 		return "Kill_EggBug";
-	if (type == "BigSpider" || type == "SpitterSpider")
+	if (type === "BigSpider" || type === "SpitterSpider")
 		return "Kill_BigSpider";
-	if (type == "BigNeedleWorm")
+	if (type === "BigNeedleWorm")
 		return "Kill_NeedleWorm";
-	if (type == "SmallNeedleWorm")
+	if (type === "SmallNeedleWorm")
 		return "Kill_SmallNeedleWorm";
-	if (type == "DropBug")
+	if (type === "DropBug")
 		return "Kill_DropBug";
-	if (type == "Hazer")
+	if (type === "Hazer")
 		return "Kill_Hazer";
-	if (type == "TrainLizard")
+	if (type === "TrainLizard")
 		return "Kill_Standard_Lizard";
-	if (type == "ZoopLizard")
+	if (type === "ZoopLizard")
 		return "Kill_White_Lizard";
-	if (type == "EelLizard")
+	if (type === "EelLizard")
 		return "Kill_Salamander";
-	if (type == "JungleLeech")
+	if (type === "JungleLeech")
 		return "Kill_Leech";
-	if (type == "TerrorLongLegs")
+	if (type === "TerrorLongLegs")
 		return "Kill_Daddy";
-	if (type == "MotherSpider")
+	if (type === "MotherSpider")
 		return "Kill_BigSpider";
-	if (type == "StowawayBug")
+	if (type === "StowawayBug")
 		return "Kill_Stowaway";
-	if (type == "HunterDaddy")
+	if (type === "HunterDaddy")
 		return "Kill_Slugcat";
-	if (type == "FireBug")
+	if (type === "FireBug")
 		return "Kill_FireBug";
-	if (type == "AquaCenti")
+	if (type === "AquaCenti")
 		return "Kill_Centiwing";
-	if (type == "MirosVulture")
+	if (type === "MirosVulture")
 		return "Kill_MirosBird";
-	if (type == "FireBug")	//	bug in original code, extraneous clause left in, and not optimized out
+	if (type === "FireBug")	//	bug in original code, extraneous clause left in, and not optimized out
 		return "Kill_EggBug";
-	if (type == "ScavengerElite")
+	if (type === "ScavengerElite")
 		return "Kill_ScavengerElite";
-	if (type == "ScavengerKing")
+	if (type === "ScavengerKing")
 		return "Kill_ScavengerKing";
-	if (type == "SpitLizard")
+	if (type === "SpitLizard")
 		return "Kill_Spit_Lizard";
-	if (type == "Inspector")
+	if (type === "Inspector")
 		return "Kill_Inspector";
-	if (type == "Yeek")
+	if (type === "Yeek")
 		return "Kill_Yeek";
-	if (type == "BigJelly")
+	if (type === "BigJelly")
 		return "Kill_BigJellyFish";
-	if (type == "SlugNPC")
+	if (type === "SlugNPC")
 		return "Kill_Slugcat";
 	return "Futile_White";
 }
@@ -5844,82 +5847,82 @@ function creatureNameToIconColor(type) {
 	 *		always be the case, but may vary with future updates, or modded content.  Beware!
 	 */
 	var c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu.Menu::MenuColor (default value hoisted from end)
-	if (type == "Slugcat")
+	if (type === "Slugcat")
 		c = [1, 1, 1];	//	PlayerGraphics::DefaultSlugcatColor (White)
-	if (type == "GreenLizard")
+	if (type === "GreenLizard")
 		c = standardColor[type];
-	if (type == "PinkLizard")
+	if (type === "PinkLizard")
 		c = standardColor[type];
-	if (type == "BlueLizard")
+	if (type === "BlueLizard")
 		c = standardColor[type];
-	if (type == "WhiteLizard")
+	if (type === "WhiteLizard")
 		c = standardColor[type];
-	if (type == "RedLizard")
+	if (type === "RedLizard")
 		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type == "BlackLizard")
+	if (type === "BlackLizard")
 		c = [0.36862746, 0.36862746, 0.43529412];
-	if (type == "YellowLizard" || type == "SmallCentipede" || type == "Centipede")
+	if (type === "YellowLizard" || type === "SmallCentipede" || type === "Centipede")
 		c = [1, 0.6, 0];
-	if (type == "RedCentipede")
+	if (type === "RedCentipede")
 		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type == "CyanLizard" || type == "Overseer")
+	if (type === "CyanLizard" || type === "Overseer")
 		c = [0, 0.9098039, 0.9019608];
-	if (type == "Salamander")
+	if (type === "Salamander")
 		c = [0.93333334, 0.78039217, 0.89411765];
-	if (type == "CicadaB")
+	if (type === "CicadaB")
 		c = [0.36862746, 0.36862746, 0.43529412];
-	if (type == "CicadaA")
+	if (type === "CicadaA")
 		c = [1, 1, 1];
-	if (type == "SpitterSpider" || type == "Leech")
+	if (type === "SpitterSpider" || type === "Leech")
 		c = [0.68235296, 0.15686275, 0.11764706];
-	if (type == "SeaLeech" || type == "TubeWorm")
+	if (type === "SeaLeech" || type === "TubeWorm")
 		c = [0.05, 0.3, 0.7];
-	if (type == "Centiwing")
+	if (type === "Centiwing")
 		c = [0.05490196, 0.69803923, 0.23529412];
-	if (type == "BrotherLongLegs")
+	if (type === "BrotherLongLegs")
 		c = [0.45490196, 0.5254902, 0.30588236];
-	if (type == "DaddyLongLegs")
+	if (type === "DaddyLongLegs")
 		c = [0, 0, 1];
-	if (type == "VultureGrub")
+	if (type === "VultureGrub")
 		c = [0.83137256, 0.7921569, 0.43529412];
-	if (type == "EggBug")
+	if (type === "EggBug")
 		c = [0, 1, 0.47058824];
-	if (type == "BigNeedleWorm" || type == "SmallNeedleWorm")
+	if (type === "BigNeedleWorm" || type === "SmallNeedleWorm")
 		c = [1, 0.59607846, 0.59607846];
-	if (type == "Hazer")
+	if (type === "Hazer")
 		c = [0.21176471, 0.7921569, 0.3882353];
-	if (type == "Vulture" || type == "KingVulture")
+	if (type === "Vulture" || type === "KingVulture")
 		c = [0.83137256, 0.7921569, 0.43529412];
-	if (type == "ZoopLizard")
+	if (type === "ZoopLizard")
 		c = [0.95, 0.73, 0.73];
-	if (type == "StowawayBug")
+	if (type === "StowawayBug")
 		c = [0.36862746, 0.36862746, 0.43529412];
-	if (type == "AquaCenti")
+	if (type === "AquaCenti")
 		c = [0, 0, 1];
-	if (type == "TerrorLongLegs" || type == "TrainLizard")
+	if (type === "TerrorLongLegs" || type === "TrainLizard")
 		c = [0.3, 0, 1];
-	if (type == "MotherSpider" || type == "JungleLeech")
+	if (type === "MotherSpider" || type === "JungleLeech")
 		c = [0.1, 0.7, 0.1];
-	if (type == "HunterDaddy")
+	if (type === "HunterDaddy")
 		//	var a = {r: 1, g: 0.4509804, b: 0.4509804};	//	PlayerGraphics::DefaultSlugcatColor (Red)
 		//	var b = {r: 0.5, g: 0.5, b: 0.5}, t = 0.4;	//	UnityEngine.Color::gray
 		//	//	Lerp 0.4:
 		//	var c = {r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t};	//	UnityEngine.Color::Lerp(a, b)
 		//	-> c = {r: 0.8, g: 0.47058824, b: 0.47058824}
 		c = [0.8, 0.47058824, 0.47058824];
-	if (type == "MirosVulture")
+	if (type === "MirosVulture")
 		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type == "FireBug")
+	if (type === "FireBug")
 		c = [1, 0.47058824, 0.47058824];
-	if (type == "SpitLizard")
+	if (type === "SpitLizard")
 		c = standardColor[type];
-	if (type == "EelLizard")
+	if (type === "EelLizard")
 		c = [0.02, 0.78039217, 0.2];
-	if (type == "Inspector")
+	if (type === "Inspector")
 		c = [0.44705883, 0.9019608, 0.76862746];
-	if (type == "Yeek")
+	if (type === "Yeek")
 		c = [0.9, 0.9, 0.9];
-	if (type == "BigJelly")
+	if (type === "BigJelly")
 		c = [1, 0.85, 0.7];
 	/* end copy */
 
@@ -5950,51 +5953,51 @@ function itemNameToIconColor(type) {
 	 *	- except for PebblesPearl3 (includes any intData >= 3), PebblesPearl (intData < 0)
 	 */
 	var c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu::MenuColors.MediumGrey
-	if (type == "SporePlant")
+	if (type === "SporePlant")
 		c = [0.68235296, 0.15686275, 0.11764706];
-	if (type == "FirecrackerPlant")
+	if (type === "FirecrackerPlant")
 		c = [0.68235296, 0.15686275, 0.11764706];
-	if (type == "ScavengerBomb")
+	if (type === "ScavengerBomb")
 		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type == "Spear1")
+	if (type === "Spear1")
 		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type == "Spear2")
+	if (type === "Spear2")
 		c = [0, 0, 1];
-	if (type == "Spear3")
+	if (type === "Spear3")
 		c = [1, 0.47058824, 0.47058824];
-	if (type == "Lantern")
+	if (type === "Lantern")
 		c = [1, 0.57254905, 0.31764707];
-	if (type == "FlareBomb")
+	if (type === "FlareBomb")
 		c = [0.73333335, 0.68235296, 1];
-	if (type == "SlimeMold")
+	if (type === "SlimeMold")
 		c = [1, 0.6, 0];
-	if (type == "BubbleGrass")
+	if (type === "BubbleGrass")
 		c = [0.05490196, 0.69803923, 0.23529412];
-	if (type == "DangleFruit")
+	if (type === "DangleFruit")
 		c = [0, 0, 1];
-	if (type == "Mushroom")
+	if (type === "Mushroom")
 		c = [1, 1, 1];
-	if (type == "WaterNut")
+	if (type === "WaterNut")
 		c = [0.05, 0.3, 0.7];
-	if (type == "EggBugEgg")
+	if (type === "EggBugEgg")
 		c = [0, 1, 0.47058824];
-	if (type == "FlyLure")
+	if (type === "FlyLure")
 		c = [0.6784314, 0.26666668, 0.21176471];
-	if (type == "SSOracleSwarmer")
+	if (type === "SSOracleSwarmer")
 		c = [1, 1, 1];
-	if (type == "NSHSwarmer")
+	if (type === "NSHSwarmer")
 		c = [0, 1, 0.3];
-	if (type == "NeedleEgg")
+	if (type === "NeedleEgg")
 		c = [0.5764706, 0.16078432, 0.2509804];
-	if (type == "PebblesPearl1")
+	if (type === "PebblesPearl1")
 		c = [0.7, 0.7, 0.7];
-	if (type == "PebblesPearl2")
+	if (type === "PebblesPearl2")
 		c = HSL2RGB(0.73055553, 0.08, 0.3);
-	if (type == "PebblesPearl3")	//	intData >= 3
+	if (type === "PebblesPearl3")	//	intData >= 3
 		c = [1, 0.47843137, 0.007843138];
-	if (type == "PebblesPearl") 	//	intData < 0
+	if (type === "PebblesPearl") 	//	intData < 0
 		c = [0, 0.45490196, 0.6392157];
-	if (type == "DataPearl" || itemType == "HalcyonPearl") {
+	if (type === "DataPearl" || itemType === "HalcyonPearl") {
 		if (intData > 1 && intData < DataPearlList.length) {
 				var mc = UniquePearlMainColor(intData);
 				var hc = UniquePearlHighLightColor(intData);
@@ -6010,23 +6013,23 @@ function itemNameToIconColor(type) {
 		else
 			c = [0.7, 0.7, 0.7];
 	} else {
-		if (type == "Spearmasterpearl")
+		if (type === "Spearmasterpearl")
 			c = ColorLerp([0.45, 0.01, 0.04], [1, 1, 1], 0.15);
-		if (type == "EnergyCell")
+		if (type === "EnergyCell")
 			c = [0.01961, 0.6451, 0.85];
-		if (type == "SingularityBomb")
+		if (type === "SingularityBomb")
 			c = [0.01961, 0.6451, 0.85];
-		if (type == "GooieDuck")
+		if (type === "GooieDuck")
 			c = [0.44705883, 0.9019608, 0.76862746];
-		if (type == "LillyPuck")
+		if (type === "LillyPuck")
 			c = [0.17058827, 0.9619608, 0.9986275];
-		if (type == "GlowWeed")
+		if (type === "GlowWeed")
 			c = [0.94705886, 1, 0.26862746];
-		if (type == "DandelionPeach")
+		if (type === "DandelionPeach")
 			c = [0.59, 0.78, 0.96];
-		if (type == "MoonCloak")
+		if (type === "MoonCloak")
 			c = [0.95, 1, 0.96];
-		if (type == "FireEgg")
+		if (type === "FireEgg")
 			c = [1, 0.47058824, 0.47058824];
 	}
 	return c;
@@ -6065,73 +6068,73 @@ function makePearlColors() {
 	function UniquePearlMainColor(intData) {
 		var pearlType = DataPearlList[intData];
 		var c = [0.7, 0.7, 0.7];
-		if (pearlType == "SI_west")
+		if (pearlType === "SI_west")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SI_top")
+		if (pearlType === "SI_top")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SI_chat3")
+		if (pearlType === "SI_chat3")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SI_chat4")
+		if (pearlType === "SI_chat4")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SI_chat5")
+		if (pearlType === "SI_chat5")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "Spearmasterpearl")
+		if (pearlType === "Spearmasterpearl")
 			c = [0.04, 0.01, 0.04];
-		if (pearlType == "SU_filt")
+		if (pearlType === "SU_filt")
 			c = [1, 0.75, 0.9];
-		if (pearlType == "DM")
+		if (pearlType === "DM")
 			c = [0.95686275, 0.92156863, 0.20784314];
-		if (pearlType == "LC")
+		if (pearlType === "LC")
 			c = HSL2RGB(0.34, 1, 0.2);
-		if (pearlType == "LC_second")
+		if (pearlType === "LC_second")
 			c = [0.6, 0, 0];
-		if (pearlType == "OE")
+		if (pearlType === "OE")
 			c = [0.54901963, 0.36862746, 0.8];
-		if (pearlType == "MS")
+		if (pearlType === "MS")
 			c = [0.8156863, 0.89411765, 0.27058825];
-		if (pearlType == "RM")
+		if (pearlType === "RM")
 			c = [0.38431373, 0.18431373, 0.9843137];
-		if (pearlType == "Rivulet_stomach")
+		if (pearlType === "Rivulet_stomach")
 			c = [0.5882353, 0.87058824, 0.627451];
-		if (pearlType == "CL")
+		if (pearlType === "CL")
 			c = [0.48431373, 0.28431374, 1];
-		if (pearlType == "VS")
+		if (pearlType === "VS")
 			c = [0.53, 0.05, 0.92];
-		if (pearlType == "BroadcastMisc")
+		if (pearlType === "BroadcastMisc")
 			c = [0.9, 0.7, 0.8];
-		if (pearlType == "CC")
+		if (pearlType === "CC")
 			c = [0.9, 0.6, 0.1];
-		if (pearlType == "DS")
+		if (pearlType === "DS")
 			c = [0, 0.7, 0.1];
-		if (pearlType == "GW")
+		if (pearlType === "GW")
 			c = [0, 0.7, 0.5];
-		if (pearlType == "HI")
+		if (pearlType === "HI")
 			c = [0.007843138, 0.19607843, 1];
-		if (pearlType == "LF_bottom")
+		if (pearlType === "LF_bottom")
 			c = [1, 0.1, 0.1];
-		if (pearlType == "LF_west")
+		if (pearlType === "LF_west")
 			c = [1, 0, 0.3];
-		if (pearlType == "SB_filtration")
+		if (pearlType === "SB_filtration")
 			c = [0.1, 0.5, 0.5];
-		if (pearlType == "SH")
+		if (pearlType === "SH")
 			c = [0.2, 0, 0.1];
-		if (pearlType == "SI_top")
+		if (pearlType === "SI_top")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SI_west")
+		if (pearlType === "SI_west")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SL_bridge")
+		if (pearlType === "SL_bridge")
 			c = [0.4, 0.1, 0.9];
-		if (pearlType == "SL_moon")
+		if (pearlType === "SL_moon")
 			c = [0.9, 0.95, 0.2];
-		if (pearlType == "SB_ravine")
+		if (pearlType === "SB_ravine")
 			c = [0.01, 0.01, 0.01];
-		if (pearlType == "SU")
+		if (pearlType === "SU")
 			c = [0.5, 0.6, 0.9];
-		if (pearlType == "UW")
+		if (pearlType === "UW")
 			c = [0.4, 0.6, 0.4];
-		if (pearlType == "SL_chimney")
+		if (pearlType === "SL_chimney")
 			c = [1, 0, 0.55];
-		if (pearlType == "Red_stomach")
+		if (pearlType === "Red_stomach")
 			c = [0.6, 1, 0.9];
 		return c;
 	}
@@ -6139,45 +6142,45 @@ function makePearlColors() {
 	function UniquePearlHighLightColor(intData) {
 		var pearlType = DataPearlList[intData];
 		var c;
-		if (pearlType == "SI_chat3")
+		if (pearlType === "SI_chat3")
 			c = [0.4, 0.1, 0.6];
-		if (pearlType == "SI_chat4")
+		if (pearlType === "SI_chat4")
 			c = [0.4, 0.6, 0.1];
-		if (pearlType == "SI_chat5")
+		if (pearlType === "SI_chat5")
 			c = [0.6, 0.1, 0.4];
-		if (pearlType == "Spearmasterpearl")
+		if (pearlType === "Spearmasterpearl")
 			c = [0.95, 0, 0];
-		if (pearlType == "RM")
+		if (pearlType === "RM")
 			c = [1, 0, 0];
-		if (pearlType == "LC_second")
+		if (pearlType === "LC_second")
 			c = [0.8, 0.8, 0];
-		if (pearlType == "CL")
+		if (pearlType === "CL")
 			c = [1, 0, 0];
-		if (pearlType == "VS")
+		if (pearlType === "VS")
 			c = [1, 0, 1];
-		if (pearlType == "BroadcastMisc")
+		if (pearlType === "BroadcastMisc")
 			c = [0.4, 0.9, 0.4];
-		if (pearlType == "CC")
+		if (pearlType === "CC")
 			c = [1, 1, 0];
-		if (pearlType == "GW")
+		if (pearlType === "GW")
 			c = [0.5, 1, 0.5];
-		if (pearlType == "HI")
+		if (pearlType === "HI")
 			c = [0.5, 0.8, 1];
-		if (pearlType == "SH")
+		if (pearlType === "SH")
 			c = [1, 0.2, 0.6];
-		if (pearlType == "SI_top")
+		if (pearlType === "SI_top")
 			c = [0.1, 0.4, 0.6];
-		if (pearlType == "SI_west")
+		if (pearlType === "SI_west")
 			c = [0.1, 0.6, 0.4];
-		if (pearlType == "SL_bridge")
+		if (pearlType === "SL_bridge")
 			c = [1, 0.4, 1];
-		if (pearlType == "SB_ravine")
+		if (pearlType === "SB_ravine")
 			c = [0.6, 0.1, 0.4];
-		if (pearlType == "UW")
+		if (pearlType === "UW")
 			c = [1, 0.7, 1];
-		if (pearlType == "SL_chimney")
+		if (pearlType === "SL_chimney")
 			c = [0.8, 0.3, 1];
-		if (pearlType == "Red_stomach")
+		if (pearlType === "Red_stomach")
 			c = [1, 1, 1];
 		return c;
 	}
