@@ -273,7 +273,7 @@
 },
 "ShortcutGate.png":
 {
-	"frame": {"x":48,"y":16,"w":14,"h":14},
+	"frame": {"x":44,"y":406,"w":14,"h":14},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":14},
