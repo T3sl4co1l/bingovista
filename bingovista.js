@@ -18,35 +18,6 @@ Stretchier goals:
 
 /* * * Constants and Defaults * * */
 
-/* HTML IDs */
-const ids = {
-	clear: "clear",
-	textbox: "textbox",
-	parse: "parse",
-	copy: "copy",
-	load: "fileload",
-	drop: "droptarget",
-	board: "board",
-	boardbox: "boardcontainer",
-	cursor: "cursor",
-	square: "square",
-	desc: "desctxt",
-	meta: "header",
-	metatitle: "hdrttl",
-	metasize: "hdrsize",
-	metabutton: "hdrshow",
-	metaperks: "hdrperks",
-	metamods: "hdrmods",
-	charsel: "hdrchar",
-	shelter: "hdrshel",
-	message: "errorbox",
-	darkstyle: "darkmode",
-	radio1: "dark",
-	radio2: "light",
-	detail: "kibitzing",
-	perks: "perkscheck"
-};
-
 /**
  *	List of sprite atlases, in order of precedence, highest to lowest.
  *	drawIcon() searches this list, in order, for an icon it needs.
@@ -85,7 +56,7 @@ const INT_MAX = 30000;
 const CHAR_MAX = 250;
 
 /**	Supported mod version */
-const VERSION_MAJOR = 1, VERSION_MINOR = 8;
+const VERSION_MAJOR = 1, VERSION_MINOR = 9;
 
 /** Binary header length, bytes */
 const HEADER_LENGTH = 21;
@@ -157,24 +128,24 @@ document.addEventListener("DOMContentLoaded", function() {
 	square.color = colorFloatToString(RainWorldColors.Unity_white);
 
 	//	File load stuff
-	document.getElementById(ids.clear).addEventListener("click", function(e) {
-		document.getElementById(ids.textbox).value = "";
+	document.getElementById("clear").addEventListener("click", function(e) {
+		document.getElementById("textbox").value = "";
 		var u = new URL(document.URL);
 		u.search = "";
 		history.replaceState(null, "", u.href);
 	});
-	document.getElementById(ids.parse).addEventListener("click", parseText);
-	document.getElementById(ids.copy).addEventListener("click", copyText);
-	document.getElementById(ids.textbox).addEventListener("paste", pasteText);
-	document.getElementById(ids.boardbox).addEventListener("click", clickBoard);
-	document.getElementById(ids.metabutton).addEventListener("click", clickShowPerks);
-	document.getElementById(ids.boardbox).addEventListener("keydown", navSquares);
-	document.getElementById(ids.load).addEventListener("change", function() { doLoadFile(this.files) } );
-	document.getElementById(ids.radio1).addEventListener("input", toggleDark);
-	document.getElementById(ids.radio2).addEventListener("input", toggleDark);
-	document.getElementById(ids.detail).addEventListener("input", toggleKibs);
+	document.getElementById("parse").addEventListener("click", parseText);
+	document.getElementById("copy").addEventListener("click", copyText);
+	document.getElementById("textbox").addEventListener("paste", pasteText);
+	document.getElementById("boardcontainer").addEventListener("click", clickBoard);
+	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
+	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
+	document.getElementById("fileload").addEventListener("change", function() { doLoadFile(this.files) } );
+	document.getElementById("dark").addEventListener("input", toggleDark);
+	document.getElementById("light").addEventListener("input", toggleDark);
+	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
 
-	var d = document.getElementById(ids.drop);
+	var d = document.getElementById("droptarget");
 	d.addEventListener("dragenter", dragEnterOver);
 	d.addEventListener("dragover", dragEnterOver);
 	d.addEventListener("dragleave", function(e) { this.style.backgroundColor = ""; } );
@@ -184,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		if (e.dataTransfer.types.includes("text/plain")
 				|| e.dataTransfer.types.includes("Files")) {
 			e.preventDefault();
-			if (document.getElementById(ids.radio1).checked)
+			if (document.getElementById("dark").checked)
 				this.style.backgroundColor = "#686868";
 			else
 				this.style.backgroundColor = "#c8c8c8";
@@ -242,30 +213,27 @@ document.addEventListener("DOMContentLoaded", function() {
 	}).finally(function() {
 
 		//	resources loaded, final init
-
 		var u = new URL(document.URL).searchParams;
 		if (u.has("a")) {
 			//	Plain text / ASCII string
 			//	very inefficient, unlikely to be used, but provided for completeness
-			document.getElementById(ids.textbox).value = u.get("a");
+			document.getElementById("textbox").value = u.get("a");
 		} else if (u.has("b")) {
 			//	Binary string, base64 encoded
-			var s = "";
 			try {
 				//	Undo URL-safe escapes...
-				s = u.get("b").replace(/-/g, "+").replace(/_/g, "/");
-				var ar = new Uint8Array(atob(s).split("").map( c => c.charCodeAt(0) ));
+				var ar = base64uToBin(u.get("b"));
 				board = binToString(ar);
-				var el = document.getElementById(ids.metatitle);
+				var el = document.getElementById("hdrttl");
 				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 				el.appendChild(document.createTextNode(board.comments));
-				el = document.getElementById(ids.metasize);
+				el = document.getElementById("hdrsize");
 				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 				el.appendChild(document.createTextNode(String(board.width) + " x " + String(board.height)));
-				el = document.getElementById(ids.charsel);
+				el = document.getElementById("hdrchar");
 				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 				el.appendChild(document.createTextNode(board.character || "Any"));
-				el = document.getElementById(ids.shelter);
+				el = document.getElementById("hdrshel");
 				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 				el.appendChild(document.createTextNode(board.shelter || "random"));
 				perksToChecksList(board.perks);
@@ -274,7 +242,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			} catch (e) {
 				setError("Error parsing URL: " + e.message);
 			}
-			document.getElementById(ids.textbox).value = board.text;
+			document.getElementById("textbox").value = board.text;
 		} else if (u.has("q")) {
 			//	Query, fetch from remote server to get board data
 
@@ -286,12 +254,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
 	//	Other housekeeping
 
-	if (document.getElementById(ids.radio1).checked)
-		document.getElementById(ids.darkstyle).media = "screen";
+	if (document.getElementById("dark").checked)
+		document.getElementById("darkmode").media = "screen";
 	else
-		document.getElementById(ids.darkstyle).media = "none";
+		document.getElementById("darkmode").media = "none";
 
-	kibitzing = !!document.getElementById(ids.detail).checked;
+	kibitzing = !!document.getElementById("kibitzing").checked;
 
 });
 
@@ -299,14 +267,14 @@ document.addEventListener("DOMContentLoaded", function() {
  *	Color theme button changed.
  */
 function toggleDark(e) {
-	if (document.getElementById(ids.radio1).checked)
-		document.getElementById(ids.darkstyle).media = "screen";
+	if (document.getElementById("dark").checked)
+		document.getElementById("darkmode").media = "screen";
 	else
-		document.getElementById(ids.darkstyle).media = "none";
+		document.getElementById("darkmode").media = "none";
 }
 
 function toggleKibs(e) {
-	kibitzing = !!document.getElementById(ids.detail).checked;
+	kibitzing = !!document.getElementById("kibitzing").checked;
 	if (selected !== undefined)
 		selectSquare(selected.col, selected.row);
 }
@@ -326,7 +294,7 @@ function dragDrop(e) {
 		for (var i = 0; i < d.items.length; i++) {
 			if (d.items[i].type.match("^text/plain")) {
 				d.items[i].getAsString(function(s) {
-					document.getElementById(ids.textbox).value = s;
+					document.getElementById("textbox").value = s;
 					parseText();
 				});
 				return;
@@ -340,7 +308,7 @@ function dragDrop(e) {
  *	Sets a message in the error box.
  */
 function setError(s) {
-	var mb = document.getElementById(ids.message);
+	var mb = document.getElementById("errorbox");
 	while (mb.childNodes.length) mb.removeChild(mb.childNodes[0]);
 	mb.appendChild(document.createTextNode(s));
 }
@@ -350,7 +318,7 @@ function doLoadFile(files) {
 		if (files[i].type.match("^text/plain")) {
 			var fr = new FileReader();
 			fr.onload = function() {
-				document.getElementById(ids.textbox).value = this.result;
+				document.getElementById("textbox").value = this.result;
 				parseText();
 			};
 			fr.onerror = function(e) {
@@ -374,9 +342,9 @@ function boardEncodeToText(s) {
  *	Parse Text button pressed.
  */
 function parseText(e) {
-	var s = document.getElementById(ids.textbox).value;
+	var s = document.getElementById("textbox").value;
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
-	document.getElementById(ids.textbox).value = s;
+	document.getElementById("textbox").value = s;
 	var goals = s.split(/bChG/);
 	var size = Math.ceil(Math.sqrt(goals.length));
 	if (board === undefined) {
@@ -394,16 +362,16 @@ function parseText(e) {
 		};
 	} else {
 		//	Board already exists, parse meta from the document
-		if (document.getElementById(ids.metatitle) !== null)
-			board.comments = document.getElementById(ids.metatitle).innerText || "Untitled";
-		if (document.getElementById(ids.charsel) !== null)
-			board.character = document.getElementById(ids.charsel).innerText;
-		if (document.getElementById(ids.shelter) !== null) {
-			board.shelter = document.getElementById(ids.shelter).innerText;
+		if (document.getElementById("hdrttl") !== null)
+			board.comments = document.getElementById("hdrttl").innerText || "Untitled";
+		if (document.getElementById("hdrchar") !== null)
+			board.character = document.getElementById("hdrchar").innerText;
+		if (document.getElementById("hdrshel") !== null) {
+			board.shelter = document.getElementById("hdrshel").innerText;
 			if (board.shelter === "random") board.shelter = "";
 		}
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-			el = document.getElementById(ids.perks + String(i));
+			el = document.getElementById("perkscheck" + String(i));
 			if (el !== null) {
 				if (el.checked)
 					board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
@@ -443,6 +411,7 @@ function parseText(e) {
 		if (goals[i].search("~") > 0 && goals[i].search("><") > 0) {
 			[type, desc] = goals[i].split("~");
 			desc = desc.split(/></);
+			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
 			if (CHALLENGES[type] !== undefined) {
 				try {
 					board.goals.push(CHALLENGES[type](desc));
@@ -494,13 +463,13 @@ function parseText(e) {
 		selectSquare(-1, -1);
 
 	//	Adjust graphical dimensions based on canvas and board sizes
-	var canv = document.getElementById(ids.board);
+	var canv = document.getElementById("board");
 	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
 	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
 	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
 
 	//	Redraw the board
-	var ctx = document.getElementById(ids.board).getContext("2d");
+	var ctx = document.getElementById("board").getContext("2d");
 	ctx.fillStyle = square.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 	for (var i = 0; i < board.goals.length; i++) {
@@ -513,16 +482,16 @@ function parseText(e) {
 	}
 
 	//	Fill meta table with board info
-	var el = document.getElementById(ids.metatitle);
+	var el = document.getElementById("hdrttl");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(board.comments));
-	el = document.getElementById(ids.metasize);
+	el = document.getElementById("hdrsize");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(String(board.width) + " x " + String(board.height)));
-	el = document.getElementById(ids.charsel);
+	el = document.getElementById("hdrchar");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(board.character || "Any"));
-	el = document.getElementById(ids.shelter);
+	el = document.getElementById("hdrshel");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(board.shelter || "random"));
 	perksToChecksList(board.perks);
@@ -530,9 +499,7 @@ function parseText(e) {
 
 	//	prepare board binary encoding
 	board.toBin = boardToBin(board);
-	//	Avoid some URL escaping with a simple substitution...
-	var s = btoa(String.fromCharCode.apply(null, board.toBin));
-	s = s.replace(/\+/g, "-").replace(/\//g, "_");
+	s = binToBase64u(board.toBin);
 	var u = new URL(document.URL);
 	u.searchParams.set("b", s);
 	history.replaceState(null, "", u.href);
@@ -551,14 +518,14 @@ function pasteText(e) {
  *	Clicked on Copy.
  */
 function copyText(e) {
-	navigator.clipboard.writeText(document.getElementById(ids.textbox).value);
+	navigator.clipboard.writeText(document.getElementById("textbox").value);
 }
 
 /**
  *	Clicked on Show/Hide.
  */
 function clickShowPerks(e) {
-	var elem = document.getElementById(ids.metaperks);
+	var elem = document.getElementById("hdrperks");
 	if (elem.style.display === "none")
 		elem.style.display = "initial";
 	else
@@ -570,7 +537,7 @@ function clickShowPerks(e) {
  */
 function clickBoard(e) {
 	if (board !== undefined) {
-		var rect = document.getElementById(ids.boardbox).getBoundingClientRect();
+		var rect = document.getElementById("boardcontainer").getBoundingClientRect();
 		var x = Math.floor(e.clientX - Math.round(rect.left)) - (square.border + square.margin) / 2;
 		var y = Math.floor(e.clientY - Math.round(rect.top )) - (square.border + square.margin) / 2;
 		var sqWidth = square.width + square.margin + square.border;
@@ -591,8 +558,8 @@ function clickBoard(e) {
  *	If either argument is out of range, clears the selection instead.
  */
 function selectSquare(col, row) {
-	var el = document.getElementById(ids.desc);
-	var ctx = document.getElementById(ids.square).getContext("2d");
+	var el = document.getElementById("desctxt");
+	var ctx = document.getElementById("square").getContext("2d");
 	if (row < 0 || col < 0 || row >= board.height || col >= board.width) {
 		clearDescription();
 		return;
@@ -650,7 +617,7 @@ function selectSquare(col, row) {
 	}
 
 	//	position cursor
-	var curSty = document.getElementById(ids.cursor).style;
+	var curSty = document.getElementById("cursor").style;
 	curSty.width  = String(square.width  + square.border - 4) + "px";
 	curSty.height = String(square.height + square.border - 4) + "px";
 	curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
@@ -664,7 +631,7 @@ function selectSquare(col, row) {
 		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 		while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 		el.appendChild(document.createTextNode("Select a square to view details."));
-		document.getElementById(ids.cursor).style.display = "none";
+		document.getElementById("cursor").style.display = "none";
 	}
 
 	/** maybe this is why I should build by objects instead of String into HTML directly? */
@@ -679,7 +646,7 @@ function selectSquare(col, row) {
  *	Key input to document; pare down to arrow keys for navigating squares
  */
 function navSquares(e) {
-	if (board !== undefined && [ids.board, ids.boardbox, ids.cursor].includes(e.target.id)) {
+	if (board !== undefined && ["board", "boardcontainer", "cursor"].includes(e.target.id)) {
 		var dRow = 0, dCol = 0;
 		if (e.key === "Up"    || e.key === "ArrowUp"   ) dRow = -1;
 		if (e.key === "Down"  || e.key === "ArrowDown" ) dRow = 1;
@@ -809,6 +776,9 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 
 /**
  *	Converts a validated board in text, to binary format.
+ *	The validated board contains toBin snippets; these are
+ *	concatenated, and a header is added.
+ *	@param b board structure (see global `board`)
  */
 function boardToBin(b) {
 	var e = new TextEncoder();
@@ -2578,11 +2548,8 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	//	added 1.08 (uncomment 1.09?)
-	BingoMoonCloak: function(desc) {
-		const thisname = "BingoMoonCloak";
-//	BingoMoonCloakChallenge: function(desc) {
-//		const thisname = "BingoMoonCloakChallenge";
+	BingoMoonCloakChallenge: function(desc) {
+		const thisname = "BingoMoonCloakChallenge";
 		//	desc of format ["System.Boolean|false|Deliver|0|NULL", "0", "0"]
 		checkDescriptors(thisname, desc.length, 3, "parameter item count");
 		var items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Deliver", , "NULL"], "delivery flag");
@@ -2590,16 +2557,9 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, delivery flag \"" + items[1] + "\" not 'true' or 'false'");
 		var p = [ { type: "icon", value: "Symbol_MoonCloak", scale: 1, color: colorFloatToString([0.8, 0.8, 0.8]), rotation: 0 } ];
 		if (items[1] === "true") {
-			p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_green), rotation: 0 } );
-//			p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
+			p.push( { type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 			p.push( { type: "icon", value: "GuidanceMoon", scale: 1, color: colorFloatToString(RainWorldColors["GuidanceMoon"]), rotation: 0 } );
 		}
-//		return new Phrase([new Icon("Symbol_MoonCloak", 1f, new Color(0.8f, 0.8f, 0.8f))], []);
-//		return new Phrase([
-//			new Icon("Symbol_MoonCloak", 1f, new Color(0.8f, 0.8f, 0.8f)),
-//			new Icon("singlearrow", 1f, Color.green),
-//			new Icon("GuidanceMoon" , 1f, new Color(1f, 0.8f, 0.3f))
-//		], []);
 		var b = Array(3); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyBool(b, 1, 4, items[1]);
@@ -5032,7 +4992,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
 		desc: "System.String|{0}|From|0|regionsreal><System.String|{1}|To|0|regionsreal><0><0"
 	},
 	{
-		name: "BingoMoonCloak",
+		name: "BingoMoonCloakChallenge",
 		params: [
 			{	//	0: Delivery choice
 				type: "bool",
@@ -5048,6 +5008,29 @@ const BINARY_TO_STRING_DEFINITIONS = [
 
 /* * * Utility Functions * * */
 
+/**
+ *	Converts a byte array to a "URL safe" base64 string,
+ *	using these substitutions:
+ *	'+' -> '-'
+ *	'/' -> '_'
+ *	'=' -> '~'
+ */
+function binToBase64u(a) {
+	var s = btoa(String.fromCharCode.apply(null, a));
+	return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "~");
+}
+
+/**
+ *	Converts a "URL safe" base64 string to a byte array,
+ *	using these substitutions:
+ *	'-' -> '+'
+ *	'_' -> '/'
+ *	'~' -> '='
+ */
+function base64uToBin(s) {
+	s = s.replace(/-/g, "+").replace(/_/g, "/").replace(/~/g, "=");
+	return new Uint8Array(atob(s).split("").map( c => c.charCodeAt(0) ));
+}
 
 /**
  *	Converts a string in the given shorthand named enum to its binary stored value.
@@ -5062,7 +5045,7 @@ function enumToValue(s, en) {
  *	Returns -1 if not found.
  */
 function challengeValue(s) {
-	return BINARY_TO_STRING_DEFINITIONS.findIndex(a => a.name == s);
+	return BINARY_TO_STRING_DEFINITIONS.findIndex(a => a.name === s);
 }
 
 /**
@@ -5182,14 +5165,14 @@ function regionOfRoom(r) {
  *	Populates the document with checkboxes tagged according to a `perks` bitmask.
  */
 function perksToChecksList(p) {
-	var elem = document.getElementById(ids.metaperks);
+	var elem = document.getElementById("hdrperks");
 	while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
 	var l = Object.keys(BingoEnum_EXPFLAGS);
 	for (var i = 0; i < l.length; i++) {
 		var label = document.createElement("label");
 		var check = document.createElement("input");
 		check.setAttribute("type", "checkbox");
-		check.setAttribute("id", ids.perks + String(i));
+		check.setAttribute("id", "perkscheck" + String(i));
 		if (p & BingoEnum_EXPFLAGS[l[i]])
 			check.setAttribute("checked", "");
 		label.appendChild(check);
@@ -5206,7 +5189,7 @@ function perksToChecksList(p) {
  *	]
  */
 function addModsToHeader(m) {
-	var elem = document.getElementById(ids.metamods);
+	var elem = document.getElementById("hdrmods");
 	while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
 	if (!m.length) {
 		elem.appendChild(document.createTextNode("none"));
@@ -5259,24 +5242,24 @@ function setMeta() {
 	var comm = arguments[0], character = arguments[1];
 	var shelter = arguments[2], perks = arguments[3];
 
-	if (board === undefined || document.getElementById(ids.metatitle) === null
-			|| document.getElementById(ids.charsel) === null
-			|| document.getElementById(ids.shelter) === null) {
+	if (board === undefined || document.getElementById("hdrttl") === null
+			|| document.getElementById("hdrchar") === null
+			|| document.getElementById("hdrshel") === null) {
 		console.log("Need a board to set.");
 		return;
 	}
 
 	if (comm !== undefined)
-		document.getElementById(ids.metatitle).innerText = comm;
+		document.getElementById("hdrttl").innerText = comm;
 	if (character !== undefined)
-		document.getElementById(ids.charsel).innerText = character;
+		document.getElementById("hdrchar").innerText = character;
 	if (shelter !== undefined) {
 		if (shelter === "random") shelter = "";
-		document.getElementById(ids.shelter).innerText = shelter;
+		document.getElementById("hdrshel").innerText = shelter;
 	}
 	if (perks !== undefined) {
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-			el = document.getElementById(ids.perks + String(i));
+			el = document.getElementById("perkscheck" + String(i));
 			if (el === null)
 				break;
 			if (perks.includes(i))
@@ -5309,8 +5292,8 @@ function setMeta() {
 
 function enumeratePerks() {
 	var a = [];
+		el = document.getElementById("perkscheck" + String(i));
 	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-		el = document.getElementById(ids.perks + String(i));
 		if (el !== null) {
 			if (el.checked)
 				a.push(i);
@@ -5321,7 +5304,7 @@ function enumeratePerks() {
 }
 
 function compressionRatio() {
-	return Math.round(1000 - 1000 * board.toBin.length / document.getElementById(ids.textbox).value.length) / 10;
+	return Math.round(1000 - 1000 * board.toBin.length / document.getElementById("textbox").value.length) / 10;
 }
 
 /**	approx. room count in Downpour, adding up Wiki region room counts */
@@ -5524,7 +5507,7 @@ function generateRandomGoals(g, n) {
 		if (++i >= n) break;
 		s += "bChG";
 	}
-	document.getElementById(ids.textbox).value = s;
+	document.getElementById("textbox").value = s;
 
 	return s;
 }
@@ -5563,7 +5546,7 @@ function generateRandomRandomGoals(n) {
 		if (retries >= 100) console.log("Really bad luck trying to generate a goal");
 		s += goalTxt;
 	}
-	document.getElementById(ids.textbox).value = s;
+	document.getElementById("textbox").value = s;
 
 	return s;
 }
