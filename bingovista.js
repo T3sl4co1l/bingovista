@@ -5013,11 +5013,11 @@ const BINARY_TO_STRING_DEFINITIONS = [
  *	using these substitutions:
  *	'+' -> '-'
  *	'/' -> '_'
- *	'=' -> '~'
+ *	'=' -> '*'
  */
 function binToBase64u(a) {
 	var s = btoa(String.fromCharCode.apply(null, a));
-	return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "~");
+	return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "*");
 }
 
 /**
@@ -5025,10 +5025,10 @@ function binToBase64u(a) {
  *	using these substitutions:
  *	'-' -> '+'
  *	'_' -> '/'
- *	'~' -> '='
+ *	'*' -> '='
  */
 function base64uToBin(s) {
-	s = s.replace(/-/g, "+").replace(/_/g, "/").replace(/~/g, "=");
+	s = s.replace(/-/g, "+").replace(/_/g, "/").replace(/\*/g, "=");
 	return new Uint8Array(atob(s).split("").map( c => c.charCodeAt(0) ));
 }
 
