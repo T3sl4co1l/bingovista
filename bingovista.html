@@ -236,7 +236,7 @@ textarea {
 	<p>For convenience, pasting into the text box also triggers parsing.  Parsing takes in any valid goals and renders them in the square as in-game.  Goals in error show a null symbol, with error information in the square's description.  If corrections are needed, or manual edits made, do them in the text box, then press Parse Text.  Parsing automatically detects and corrects for white space before and after the board, and between goals (delimited by "bChG" markers).  Parse also updates the URL to use the shorthand / encoded board string.</p>
 	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, and all parameters and values used in it.</p>
 	<p>Kibitzing enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
-	<p>Metadata is... not terribly convenient to update right now. It's not used by the mod as of v1.08, so it doesn't matter beyond appearances here, anyway. That said: Title, Shelter and Perks are read from the HTML when pressing Parse.  This doesn't help much, because only perks are selectable; Title and Shelter can be edited by choosing Inspect Element in your browser and modifying them, then pressing Parse to set the URL. For a more comprehensive method, try the setMeta() function in the debug console. Once encoded in the URL, the URL can be shared, and metadata will show as set.</p>
+	<p>Metadata is... not terribly convenient to update right now. It's not used by the mod as of v1.09, so it doesn't matter beyond appearances here, anyway. That said: Title, Shelter and Perks are read from the HTML when pressing Parse.  This doesn't help much, because only perks are selectable; Title and Shelter can be edited by choosing Inspect Element in your browser and modifying them, then pressing Parse to set the URL. For a more comprehensive method, try the setMeta() function in the debug console. Once encoded in the URL, the URL can be shared, and metadata will show as set.</p>
 	<p>Courtesy Bronsej, based on community maps from <a href="https://rainworld.miraheze.org/wiki/Regions">Regions - Official Rain World Wiki</a>, stock Vista Point locations can be found on these maps:</p>
 	<ul>
 	  <li><a href="worldmaps/Base_World_Map_Downpour_NewVistas.png">Full Downpour World Map</a> (all regions, non-timeline-specific versions)</li>
@@ -247,10 +247,12 @@ textarea {
 	  <li><a href="worldmaps/Undergrowth_Map_NewVistas.png">Undergrowth (UG)</a></li>
 	  <li><a href="worldmaps/Waterfront_Facility_Map_NewVistas.png">Waterfront Facility (LM)</a></li>
 	</ul>
-	<p><a href="https://noblecat57.github.io/">Rain World Downpour Map | noblecat57</a> interactive map viewer is recommended, generally, and is also linked by room-specific goal commentary where possible.</p>
-	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, and alphappy and diedirl for tips and help.</p>
+	<p>(As of v1.08, the customized vista points are disabled by default; they are planned to become available as an option in a future version.  If you like them, they can always be entered manually; see the <span class="code">BingoEnum_VistaPoints</span> array for suggested rooms and coordinates.)</p>
+	<p><a href="https://noblecat57.github.io/">Rain World Downpour Map | noblecat57</a> interactive map viewer is recommended, and is also linked by room-specific goal commentary where possible.</p>
+	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, DrekiOrmur and shrubfromtomorrow for contributions, and alphappy and diedirl for tips and help.</p>
 	<h2>Changelog</h2>
 	<ul>
+	  <li>2025/06/27: 1.09 mod support.</li>
 	  <li>2025/06/17: 1.08 mod support.</li>
 	  <li>2025/03/13: 1.04 mod support.</li>
 	  <li>2025/03/02: 0.90 mod support.</li>

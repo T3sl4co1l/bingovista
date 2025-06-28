@@ -1179,9 +1179,9 @@ const CHALLENGES = {
 			}
 			d = "Collect the " + dataPearlToDisplayTextMap[items[1]] + " pearl from " + r + ".";
 			p = [
-				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: colorFloatToString(dataPearlToColorMap[items[1]]), rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } },
-				{ type: "break" },
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
+				{ type: "break" },
+				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: colorFloatToString(dataPearlToColorMap[items[1]]), rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } },
 				{ type: "break" },
 				{ type: "text", value: "[0/1]", color: colorFloatToString(RainWorldColors.Unity_white) }
 			];
@@ -2574,7 +2574,38 @@ const CHALLENGES = {
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
-	}
+	},
+	BingoBroadcastChallenge: function(desc) {
+		const thisname = "BingoBroadcastChallenge";
+		//	desc of format ["System.String|Chatlog_SI3|Broadcast|0|chatlogs", "0", "0"]
+		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Broadcast", , "chatlogs"], "broadcast selection");
+		var iconName = "", iconColor = [];
+		var r = items[1].substring(items[1].search("_") + 1);
+		if (r.search(/[0-9]/) >= 0) r = r.substring(0, r.search(/[0-9]/));
+		r = (regionCodeToDisplayName[r] || "");
+		if (r > "") r = " in " + r;
+		if (enumToValue(items[1], "chatlogs") <= 0)
+			throw new TypeError(thisname + ": error, chatlog \"" + items[1] + "\" not found in BingoEnum_Chatlogs[]");
+		var b = Array(4); b.fill(0);
+		b[0] = challengeValue(thisname);
+		b[3] = enumToValue(items[1], "chatlogs");
+		b[2] = b.length - GOAL_LENGTH;
+		return {
+			name: thisname,
+			category: "Getting Chat Logs",
+			items: ["Broadcast"],
+			values: [items[1]],
+			description: "Get the " + items[1] + " chat log" + r,
+			comments: "",
+			paint: [
+				{ type: "icon", value: "arenaunlock", scale: 1, color: colorFloatToString(RainWorldColors.WhiteColor), rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) }
+			],
+			toBin: new Uint8Array(b)
+		};
+	},
 };
 
 
@@ -4168,6 +4199,27 @@ const BingoEnum_EnterableGates = [
 	"SB_DS", "SB_SL", "SB_VS"
 ];
 
+const BingoEnum_Chatlogs = [
+	"Chatlog_CC0",
+	"Chatlog_DS0",
+	"Chatlog_HI0",
+	"Chatlog_GW0",
+	"Chatlog_GW2",
+	"Chatlog_GW1",
+	"Chatlog_SI2",
+	"Chatlog_SI5",
+	"Chatlog_SI3",
+	"Chatlog_SI4",
+	"Chatlog_SI0",
+	"Chatlog_SI1",
+	"Chatlog_SH0",
+	"Chatlog_SB0",
+	"Chatlog_LM0",
+	"Chatlog_LM1",
+	"Chatlog_DM1",
+	"Chatlog_DM0"
+];
+
 /**
  *	Master list/map of all enums used.
  *	Key type: list name, as used in Bingo Mod SettingBox lists.
@@ -4199,7 +4251,8 @@ const ALL_ENUMS = {
 	"EXPFLAGS":       Object.keys(BingoEnum_EXPFLAGS),
 	"challenges":     BingoEnum_CHALLENGES,
 	"boolean":        BingoEnum_Boolean,
-	"vista_code":     BingoEnum_VistaPoints_Code
+	"vista_code":     BingoEnum_VistaPoints_Code,
+	"chatlogs":       BingoEnum_Chatlogs
 };
 
 /**
@@ -5002,6 +5055,18 @@ const BINARY_TO_STRING_DEFINITIONS = [
 			}
 		],
 		desc: "System.Boolean|{0}|Deliver|0|NULL><0><0"
+	},
+	{
+		name: "BingoBroadcastChallenge",
+		params: [
+			{	//	0: Chatlog selection
+				type: "number",
+				offset: 0,
+				size: 1,
+				formatter: "chatlogs"
+			}
+		],
+		desc: "System.String|{0}|Broadcast|0|chatlogs><0><0"
 	},
 ];
 
