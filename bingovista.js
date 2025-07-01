@@ -991,7 +991,10 @@ function binGoalToText(c) {
 		}
 		s = s.replace(RegExp("\\{" + String(j) + "\\}", "g"), replacer);
 	}
-	s = BINARY_TO_STRING_DEFINITIONS[c[0]].name + "~" + s;
+	s =
+			(ChallengeUpgrades[BINARY_TO_STRING_DEFINITIONS[c[0]].name]
+			|| BINARY_TO_STRING_DEFINITIONS[c[0]].name)
+			+ "~" + s;
 	return s;
 }
 
@@ -1314,47 +1317,94 @@ const CHALLENGES = {
 	},
 	BingoDamageChallenge: function(desc) {
 		const thisname = "BingoDamageChallenge";
-		//	desc of format ["System.String|JellyFish|Weapon|0|weapons", "System.String|WhiteLizard|Creature Type|1|creatures", "0", "System.Int32|6|Amount|2|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		//	desc of format (< v1.091) ["System.String|JellyFish|Weapon|0|weapons", "System.String|WhiteLizard|Creature Type|1|creatures", "0", "System.Int32|6|Amount|2|NULL", "0", "0"]
+		//	or (>= 1.091) ["System.String|JellyFish|Weapon|0|weapons", "System.String|AquaCenti|Creature Type|1|creatures", "0", "System.Int32|5|Amount|2|NULL", "System.Boolean|false|In One Cycle|0|NULL", "System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions", "0", "0"]
+		if (desc.length == 6) {
+			//	1.091 hack: allow 6 or 9 parameters; assume the existing parameters are ordered as expected
+			desc.splice(4, 0, "System.Boolean|false|In One Cycle|0|NULL", "System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions");
+		}
+		checkDescriptors(thisname, desc.length, 9, "parameter item count");
 		var v = [], i = [];
 		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Weapon", , "weapons"], "weapon choice"); v.push(items[1]); i.push(items[2]);
 		items = checkSettingbox(thisname, desc[1], ["System.String", , "Creature Type", , "creatures"], "creature choice"); v.push(items[1]); i.push(items[2]);
 		items = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "hit amount"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[4], ["System.Boolean", , "In One Cycle", , "NULL"], "one-cycle flag"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[5], ["System.String", , "Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[6], ["System.String", , "Subregion", , "subregions"], "subregion selection"); v.push(items[1]); i.push(items[2]);
 		var amt = parseInt(v[2]);
 		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + v[2] + "\" not a number or out of range");
 		if (!BingoEnum_Weapons.includes(v[0]))
 			throw new TypeError(thisname + ": error, item selection \"" + v[0] + "\" not found in BingoEnum_Weapons[]");
-		var p = [
-			{ type: "icon", value: "bingoimpact", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
-			{ type: "break" },
-			{ type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
-		];
-		var d = "Hit ";
-		if (v[1] !== "Any Creature") {
-			if (creatureNameToDisplayTextMap[v[1]] === undefined)
-				throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
-			p.splice(1, 0, { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: creatureToColor(v[1]), rotation: 0 } );
+		if (v[3] !== "true" && v[3] !== "false")
+			throw new TypeError(thisname + ": error, one-cycle flag \"" + v[3] + "\" not 'true' or 'false'");
+		var r = "";
+		if (v[4] !== "Any Region") {
+			r = (regionCodeToDisplayName[v[4]] || "") + " / " + (regionCodeToDisplayNameSaint[v[4]] || "");
+			r = r.replace(/^\s\/\s|\s\/\s$/g, "");
+			if (r === "")
+				throw new TypeError(thisname + ": error, region selection \"" + v[4] + "\" not found in regionCodeToDisplayName[]");
+			r = ", in " + r;
 		}
-		d += (creatureNameToDisplayTextMap[v[1]] || v[1]) + " with ";
+		if (v[5] !== "Any Subregion") {
+			if (v[5] === "Journey\\'s End") v[5] = "Journey\'s End";
+			r = ", in " + v[5];
+			if (BingoEnum_AllSubregions.indexOf(v[5]) == -1)
+				throw new TypeError(thisname + ": error, subregion selection \"" + v[5] + "\" not found in BingoEnum_AllSubregions[]");
+		}
+		var p = [];
 		if (v[0] !== "Any Weapon") {
 			if (itemNameToDisplayTextMap[v[0]] === undefined)
 				throw new TypeError(thisname + ": error, item type \"" + v[0] + "\" not found in itemNameToDisplayTextMap[]");
-			p.unshift( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1, color: itemToColor(v[0]), rotation: 0 } );
+			p.push( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1, color: itemToColor(v[0]), rotation: 0 } );
 		}
+		p.push( { type: "icon", value: "bingoimpact", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
+		if (v[1] !== "Any Creature") {
+			if (creatureNameToDisplayTextMap[v[1]] === undefined)
+				throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
+			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: creatureToColor(v[1]), rotation: 0 } );
+		}
+		var d = "Hit ";
+		if (v[5] === "Any Subregion") {
+			if (v[4] !== "Any Region") {
+				p.push( { type: "break" } );
+				p.push( { type: "text", value: v[4], color: colorFloatToString(RainWorldColors.Unity_white) } );
+			}
+		} else {
+			p.push( { type: "break" } );
+			p.push( { type: "text", value: v[5], color: colorFloatToString(RainWorldColors.Unity_white) } );
+		}
+		var d = "Hit ";
+		p.push( { type: "break" } );
+		d += (creatureNameToDisplayTextMap[v[1]] || v[1]) + " with ";
+		p.push( { type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
+		if (v[3] === "true")
+			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		d += itemNameToDisplayTextMap[v[0]] || v[0];
+		d += " " + String(amt) + ((amt > 1) ? " times" : " time");
+		if (r > "") d += r;
+		if (v[3] === "true") d += ", in one cycle";
+		d += ".";
+		//	start with classic format...
 		var b = Array(7); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(v[0], "weapons");
 		b[4] = enumToValue(v[1], "creatures");
 		applyShort(b, 5, amt);
+		if (v[3] !== "false" || v[4] !== "Any Region" || v[5] !== "Any Subregion") {
+			//	...have to use expanded form
+			b[0] = challengeValue("BingoDamageExChallenge");
+			applyBool(b, 1, 4, v[3]);
+			b.push(enumToValue(v[4], "regions"));
+			b.push(enumToValue(v[5], "subregions"));
+		}
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
 			category: "Hitting creatures with items",
 			items: i,
 			values: v,
-			description: d + " " + String(amt) + ((amt > 1) ? " times." : " time."),
+			description: d,
 			comments: "",
 			paint: p,
 			toBin: new Uint8Array(b)
@@ -1675,18 +1725,28 @@ const CHALLENGES = {
 	},
 	BingoItemHoardChallenge: function(desc) {
 		const thisname = "BingoItemHoardChallenge";
-		//	desc of format ["System.Int32|5|Amount|1|NULL", "System.String|PuffBall|Item|0|expobject", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
-		var amounts = checkSettingbox(thisname, desc[0], ["System.Int32", , "Amount", , "NULL"], "item count");
-		var items = checkSettingbox(thisname, desc[1], ["System.String", , "Item", , "expobject"], "item selection");
+		//	desc of format (< v1.092) ["System.Int32|5|Amount|1|NULL", "System.String|PuffBall|Item|0|expobject", "0", "0"]
+		//	or (>= 1.092) ["System.Boolean|true|Any Shelter|2|NULL", "0", "System.Int32|4|Amount|0|NULL", "System.String|DangleFruit|Item|1|expobject", "0", "0", ""]
+		if (desc.length == 4) {
+			//	1.092 hack: allow 4 or 7 parameters; assume the existing parameters are ordered as expected
+			desc.unshift("System.Boolean|false|Any Shelter|2|NULL", "0");
+			desc.push("");
+		}
+		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		var any = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Any Shelter", , "NULL"], "any shelter flag");
+		var amounts = checkSettingbox(thisname, desc[2], ["System.Int32", , "Amount", , "NULL"], "item count");
+		var items = checkSettingbox(thisname, desc[3], ["System.String", , "Item", , "expobject"], "item selection");
 		if (!BingoEnum_expobject.includes(items[1]))
 			throw new TypeError(thisname + ": error, item selection \"" + items[1] + "\" not found in BingoEnum_expobject[]");
 		var amt = parseInt(amounts[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 0)
 			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+		if (any[1] !== "true" && any[1] !== "false")
+			throw new TypeError(thisname + ": error, any shelter flag \"" + any[1] + "\" not 'true' or 'false'");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
+		applyBool(b, 1, 4, any[1]);
 		b[3] = amt;
 		b[4] = enumToValue(items[1], "expobject");
 		b[2] = b.length - GOAL_LENGTH;
@@ -1695,10 +1755,10 @@ const CHALLENGES = {
 			category: "Hoarding items in shelters",
 			items: [amounts[2], items[2]],
 			values: [String(amt), items[1]],
-			description: "Store " + creatureNameQuantify(amt, itemNameToDisplayTextMap[items[1]]) + " in " + ((amt == 1) ? "a" : "the same") + " shelter.",
+			description: "Store " + creatureNameQuantify(amt, itemNameToDisplayTextMap[items[1]]) + " in " + ((any[1] === "true") ? "any shelter(s)." : ((amt == 1) ? "a shelter." : "the same shelter.")),
 			comments: "",
 			paint: [
-				{ type: "icon", value: "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: (any[1] === "true") ? "doubleshelter" : "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1, color: itemToColor(items[1]), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
@@ -2261,30 +2321,55 @@ const CHALLENGES = {
 	BingoTameChallenge: function(desc) {
 		const thisname = "BingoTameChallenge";
 		//	assert: desc of format ["System.String|EelLizard|Creature Type|0|friend", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
-		var items = checkSettingbox(thisname, desc[0], ["System.String", , "Creature Type", , "friend"], "creature type");
-		if (!BingoEnum_Befriendable.includes(items[1]))
-			throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not found in BingoEnum_Befriendable[]");
-		var d = creatureNameToDisplayTextMap[items[1]];
-		if (d === undefined)
-			throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not found in creatureNameToDisplayTextMap[]");
-		d = creatureNameQuantify(1, d);
+		//	or ["System.Boolean|true|Specific Creature Type|0|NULL", "System.String|BlueLizard|Creature Type|0|friend", "0", "System.Int32|3|Amount|3|NULL", "0", "0", ""]
+		//	1.091 hack: allow 3 or 7 parameters; assume the existing parameters are ordered as expected
+		if (desc.length == 3) {
+			desc.unshift("System.Boolean|true|Specific Creature Type|0|NULL");
+			desc.splice(2, 0, "0", "System.Int32|1|Amount|3|NULL");
+			desc.push("");
+		}
+		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		var v = [], i = [];
+		var items = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Specific Creature Type", , "NULL"], "creature type flag"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[1], ["System.String", , "Creature Type", , "friend"], "friend selection"); v.push(items[1]); i.push(items[2]);
+		items = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "friend count"); v.push(items[1]); i.push(items[2]);
+		var amt = parseInt(v[2]);
+		amt = Math.min(amt, CHAR_MAX);
+		if (isNaN(amt) || amt < 0)
+			throw new TypeError(thisname + ": error, amount \"" + v[2] + "\" not a number or out of range");
+		if (v[1] !== "Any Creature" && creatureNameToDisplayTextMap[v[1]] === undefined)
+			throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
+		var c = creatureNameQuantify(1, creatureNameToDisplayTextMap[v[1]] || v[1]);
+		var p = [
+			{ type: "icon", value: "FriendB", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 }
+		];
+		if (v[0] === "true") {
+			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: creatureToColor(v[1]), rotation: 0 } );
+		} else if (v[0] === "false") {
+			p.push( { type: "break" } );
+			p.push( { type: "text", value: "[0/" + String(amt) + "]", color: colorFloatToString(RainWorldColors.Unity_white) } );
+		} else {
+			throw new TypeError(thisname + ": error, specific creature flag \"" + v[0] + "\" not 'true' or 'false'");
+		}
 		var b = Array(4); b.fill(0);
+		//	start with classic version...
 		b[0] = challengeValue(thisname);
-		b[3] = enumToValue(items[1], "friend");
+		b[3] = enumToValue(v[1], "friend");
+		if (v[0] === "false") {
+			//	...have to use expanded form
+			b[0] = challengeValue("BingoTameExChallenge");
+			applyBool(b, 1, 4, v[0]);
+			b.push(amt);
+		}
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
 			category: "Befriending a creature",
-			items: ["Creature Type"],
-			values: [items[1]],
-			description: "Befriend " + d + ".",
+			items: i,
+			values: v,
+			description: (v[0] === "true") ? ("Befriend " + c + ".") : ("Befriend [0/" + amt + "] unique creatures."),
 			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. \"Happy lizard noises\" indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).",
-			paint: [
-				{ type: "icon", value: "FriendB", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
-				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1,
-						color: creatureToColor(items[1]), rotation: 0 }
-			],
+			paint: p,
 			toBin: new Uint8Array(b)
 		};
 	},
@@ -2511,6 +2596,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
+	//	Challenges are alphabetical up to here (initial version); new challenges/variants added chronologically below
 	//	added 0.86 (in 0.90 update cycle)
 	BingoEnterRegionFromChallenge: function(desc) {
 		const thisname = "BingoEnterRegionFromChallenge";
@@ -2599,12 +2685,22 @@ const CHALLENGES = {
 			description: "Get the " + items[1] + " chat log" + r,
 			comments: "",
 			paint: [
-				{ type: "icon", value: "arenaunlock", scale: 1, color: colorFloatToString(RainWorldColors.WhiteColor), rotation: 0 },
+				{ type: "icon", value: "Symbol_Satellite", scale: 1, color: colorFloatToString(RainWorldColors.WhiteColor), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
 			toBin: new Uint8Array(b)
 		};
+	},
+	/*	added 1.091:
+	 *	Stubs to maintain extended BINARY_TO_STRING_DEFINITIONS entries.
+	 *	See binGoalToText() and ChallengeUpgrades[]; these names are
+	 *	replaced with their originals to maintain compatibility.  */
+	BingoDamageExChallenge: function(desc) {
+		return CHALLENGES.BingoDamageChallenge(desc);
+	},
+	BingoTameExChallenge: function(desc) {
+		return CHALLENGES.BingoTameChallenge(desc);
 	},
 };
 
@@ -4656,20 +4752,26 @@ const BINARY_TO_STRING_DEFINITIONS = [
 	{
 		name: "BingoItemHoardChallenge",
 		params: [
-			{	//	0: Item amount
+			{	//	0: Any shelter flag (added v1.092)
+				type: "bool",
+				offset: 0,
+				bit: 4,
+				formatter: "boolean"
+			},
+			{	//	1: Item amount
 				type: "number",
 				offset: 0,
 				size: 1,
 				formatter: ""
 			},
-			{	//	1: Item choice
+			{	//	2: Item choice
 				type: "number",
 				offset: 1,
 				size: 1,
 				formatter: "expobject"
 			}
 		],
-		desc: "System.Int32|{0}|Amount|1|NULL><System.String|{1}|Item|0|expobject><0><0"
+		desc: "System.Boolean|{0}|Any Shelter|2|NULL><0><System.Int32|{1}|Amount|0|NULL><System.String|{2}|Item|1|expobject><0><0><"
 	},
 	{
 		name: "BingoKarmaFlowerChallenge",
@@ -5068,7 +5170,90 @@ const BINARY_TO_STRING_DEFINITIONS = [
 		],
 		desc: "System.String|{0}|Broadcast|0|chatlogs><0><0"
 	},
+	{
+		//	added 1.092
+		name: "BingoDamageExChallenge",
+		params: [
+			{	//	0: Weapon choice
+				type: "number",
+				offset: 0,
+				size: 1,
+				formatter: "weapons"
+			},
+			{	//	1: Creature choice
+				type: "number",
+				offset: 1,
+				size: 1,
+				formatter: "creatures"
+			},
+			{	//	2: Hits amount
+				type: "number",
+				offset: 2,
+				size: 2,
+				formatter: ""
+			},
+			{	//	3: One Cycle flag
+				type: "bool",
+				offset: 0,
+				bit: 4,
+				formatter: "boolean"
+			},
+			{	//	4: Region choice
+				type: "number",
+				offset: 4,
+				size: 1,
+				formatter: "regions"
+			},
+			{	//	5: Subregion choice
+				type: "number",
+				offset: 5,
+				size: 1,
+				formatter: "subregions"
+			}
+		],
+		desc: "System.String|{0}|Weapon|0|weapons><System.String|{1}|Creature Type|1|creatures><0><System.Int32|{2}|Amount|2|NULL><System.Boolean|{3}|In One Cycle|0|NULL><System.String|{4}|Region|5|regions><System.String|{5}|Subregion|4|subregions><0><0"
+	},
+	{
+		name: "BingoTameExChallenge",
+		params: [
+			{	//	0: Specific flag
+				type: "bool",
+				offset: 0,
+				bit: 4,
+				formatter: "boolean"
+			},
+			{	//	1: Creature choice
+				type: "number",
+				offset: 0,
+				size: 1,
+				formatter: "friend"
+			},
+			{	//	2: Tame amount
+				type: "number",
+				offset: 1,
+				size: 1,
+				formatter: ""
+			}
+		],
+		desc: "System.Boolean|{0}|Specific Creature Type|0|NULL><System.String|{1}|Creature Type|0|friend><0><System.Int32|{2}|Amount|3|NULL><0><0><"
+	},
 ];
+
+/**
+ *	Used by binGoalToText(); list of upgraded challenges.
+ *	Hacky, but allows legacy BINARY_TO_STRING_DEFINITIONS[] indices to work
+ *	as intended, while updating CHALLENGES[].  Each updated challenge adds a
+ *	new index to BINARY_TO_STRING_DEFINITIONS[] and a stub function to
+ *	CHALLENGES[].
+ *	key: new internal name
+ *	value: old/external name
+ *	[not present]: no change
+ */
+ChallengeUpgrades = {
+	//	v1.092
+	"BingoDamageExChallenge":    "BingoDamageChallenge",
+	"BingoTameExChallenge":      "BingoTameChallenge"
+};
 
 
 /* * * Utility Functions * * */
@@ -5122,7 +5307,7 @@ function challengeValue(s) {
  */
 function applyBool(a, offs, bit, bool) {
 	a[offs] &= ~(1 << bit);
-	if (bool == ALL_ENUMS["boolean"][0]) return;
+	if (bool === ALL_ENUMS["boolean"][0]) return;
 	a[offs] |= (1 << bit);
 }
 

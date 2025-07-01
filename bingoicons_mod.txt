@@ -87,6 +87,14 @@
 	"spriteSourceSize": {"x":0,"y":0,"w":32,"h":32},
 	"sourceSize": {"w":32,"h":32}
 },
+"doubleshelter.png":
+{
+	"frame": {"x":63,"y":473,"w":24,"h":28},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":28},
+	"sourceSize": {"w":24,"h":28}
+},
 "echo_icon.png":
 {
 	"frame": {"x":43,"y":323,"w":17,"h":39},
