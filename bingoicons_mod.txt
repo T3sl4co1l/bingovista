@@ -89,7 +89,7 @@
 },
 "doubleshelter.png":
 {
-	"frame": {"x":63,"y":473,"w":24,"h":28},
+	"frame": {"x":39,"y":445,"w":24,"h":28},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":28},
