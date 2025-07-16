@@ -1758,7 +1758,7 @@ const CHALLENGES = {
 			description: "Store " + creatureNameQuantify(amt, itemNameToDisplayTextMap[items[1]]) + " in " + ((any[1] === "true") ? "any shelter(s)." : ((amt == 1) ? "a shelter." : "the same shelter.")),
 			comments: "",
 			paint: [
-				{ type: "icon", value: (any[1] === "true") ? "doubleshelter" : "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
+				{ type: "icon", value: ((any[1] === "true") ? "doubleshelter" : "ShelterMarker"), scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1, color: itemToColor(items[1]), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + amt + "]", color: colorFloatToString(RainWorldColors.Unity_white) }
