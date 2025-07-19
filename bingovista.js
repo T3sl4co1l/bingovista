@@ -1756,7 +1756,7 @@ const CHALLENGES = {
 			items: [amounts[2], items[2]],
 			values: [String(amt), items[1]],
 			description: "Store " + creatureNameQuantify(amt, itemNameToDisplayTextMap[items[1]]) + " in " + ((any[1] === "true") ? "any shelter(s)." : ((amt == 1) ? "a shelter." : "the same shelter.")),
-			comments: "",
+			comments: "The 'Any Shelter' option counts the total across any shelters in the world. Counts are per item ID, and are updated on shelter close. Counts never go down, so the items are free to use after bringing them into a shelter, including eating or removing them. Because items are tracked by ID, this goal cannot be cheesed by taking the same items between multiple shelters; multiple unique items must be hoarded. In short, it's the act of hoarding (putting new items in a shelter and closing the shelter) that counts up.",
 			paint: [
 				{ type: "icon", value: ((any[1] === "true") ? "doubleshelter" : "ShelterMarker"), scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1, color: itemToColor(items[1]), rotation: 0 },
@@ -2364,11 +2364,11 @@ const CHALLENGES = {
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
-			category: "Befriending a creature",
+			category: "Befriending creatures",
 			items: i,
 			values: v,
 			description: (v[0] === "true") ? ("Befriend " + c + ".") : ("Befriend [0/" + amt + "] unique creatures."),
-			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. \"Happy lizard noises\" indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).",
+			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. \"Happy lizard noises\" indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).<br>For the multiple-tame option, creature <i>types</i> count toward progress (multiple tames of a given type/color/species do not increase the count). Note that any befriendable creature type counts towards the total, including both Lizards and Squidcadas.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
@@ -2475,7 +2475,7 @@ const CHALLENGES = {
 			items: i,
 			values: v,
 			description: "Transport " + creatureNameQuantify(1, creatureNameToDisplayTextMap[v[2]]) + " from " + r1 + " to " + r2,
-			comments: "",
+			comments: "When a specific 'From' region is selected, that creature can be brought in from an outside region, dropped/thrown up, then touched in that region, to activate it for the goal. Note, keeping a swallowable creature always in stomach will NOT count in this way.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};

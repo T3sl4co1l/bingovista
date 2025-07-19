@@ -239,6 +239,7 @@ textarea {
 	<table class="droptbl"><tr><td class="drop" id="droptarget"><input type="file" id="fileload" accept=".txt,text/plain"></td></tr></table>
 	<p class="errorbox" id="errorbox"></p>
 	<p>&nbsp;</p>
+	<h2>About</h2>
 	<p>Bingo Board Viewer, by <a href="https://github.com/T3sl4co1l/bingovista/">T3sl4co1l</a>, for use with Rain World Bingo Mod v1.1 (by Nacu and others).</p>
 	<p>Usage: in-game, while configuring the board and selecting challenges, press "Copy".  Clipboard contents can be pasted into the cleared textbox above.  It can also pasted and copied between chat windows, etc., for easy sharing, or pasted into and saved as a text file (*.TXT) for storage.  These files can be loaded by clicking Choose File (or Browse... or etc., whatever your browser shows).  Or click-and-drag a text file from a file folder into the drop zone, on or around the file input area.  In any case, the text content is loaded into the text box to allow visual confirmation (and possible manual editing).</p>
 	<p>For convenience, pasting into the text box also triggers parsing.  Parsing takes in any valid goals and renders them in the square as in-game.  Goals in error show a null symbol, with error information in the square's description.  If corrections are needed, or manual edits made, do them in the text box, then press Parse Text.  Parsing automatically detects and corrects for white space before and after the board, and between goals (delimited by "bChG" markers).  Parse also updates the URL to use the shorthand / encoded board string.</p>
@@ -246,7 +247,17 @@ textarea {
 	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, and all parameters and values used in it.</p>
 	<p>Kibitzing enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
 	<p>Metadata is... not terribly convenient to update right now. It's not used by the mod as of v1.1, so it doesn't matter beyond appearances here, anyway. That said: Title, Shelter and Perks are read from this page's HTML, when pressing Parse.  This doesn't help much, because only perks are selectable; Title and Shelter can be edited by choosing Inspect Element in your browser and modifying them manually.  Then pressing Parse to set the URL.  For a more comprehensive method, try the <span class="code">setMeta()</span> function in the debug console. Once encoded in the URL, the URL can be shared, and metadata will show as set.</p>
-	<p>Courtesy Bronsej, based on community maps from <a href="https://rainworld.miraheze.org/wiki/Regions">Regions - Official Rain World Wiki</a>, stock Vista Point locations can be found on these maps:</p>
+	<h2>Tips and Guides</h2>
+	<p>[Base expedition and v1.08+] Vista point locations can be found on these community maps from <a href="https://rainworld.miraheze.org/wiki/Regions">Regions - Official Rain World Wiki</a>:</p>
+	<ul>
+	  <li><a href="worldmaps/Base_World_Map_DownpourWith_Vistas.png">Full Downpour World Map</a></li>
+	  <li><a href="worldmaps/Looks_to_the_Moon_Map_With_Vistas.png">Looks To The Moon (DM)</a></li>
+	  <li><a href="worldmaps/Metropolis_Map_With_Vistas.png">Metropolis (LC)</a></li>
+	  <li><a href="worldmaps/Silent_Construct_Map_With_Vistas.png">Silent Construct (CL)</a></li>
+	  <li><a href="worldmaps/The_Rot_Map_With_Vistas.png">The Rot (RM)</a></li>
+	  <li><a href="worldmaps/Undergrowth_Map_With_Vistas.png">Undergrowth (UG)</a></li>
+	</ul>
+	<p>[v0.9 to v1.08] Courtesy Bronsej, these include customized Vista Point locations:</p>
 	<ul>
 	  <li><a href="worldmaps/Base_World_Map_Downpour_NewVistas.png">Full Downpour World Map</a> (all regions, non-timeline-specific versions)</li>
 	  <li><a href="worldmaps/Looks_to_the_Moon_Map_NewVistas.png">Looks To The Moon (DM)</a></li>
@@ -256,11 +267,12 @@ textarea {
 	  <li><a href="worldmaps/Undergrowth_Map_NewVistas.png">Undergrowth (UG)</a></li>
 	  <li><a href="worldmaps/Waterfront_Facility_Map_NewVistas.png">Waterfront Facility (LM)</a></li>
 	</ul>
-	<p>(As of v1.08, the customized vista points are disabled by default; they are planned to become available as an option in a future version.  If you liked them, they can always be entered manually; see the <span class="code">BingoEnum_VistaPoints</span> array for suggested rooms and coordinates.)</p>
+	<p>(As of v1.08, the customized vista points are disabled by default; they are planned to become available <em>as an option</em> in a future version.  If you liked them, they can always be entered manually; see the <span class="code">BingoEnum_VistaPoints</span> array for suggested rooms and coordinates.)</p>
 	<p><a href="https://noblecat57.github.io/">Rain World Downpour Map | noblecat57</a> interactive map viewer is recommended, and is also linked by room-specific goal commentary where possible.</p>
 	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, DrekiOrmur and shrubfromtomorrow for contributions, and alphappy and diedirl for tips and help.</p>
 	<h2>Changelog</h2>
 	<ul>
+	  <li>2025/07/18: Improved commentary on item hoard, tame and transport goals.</li>
 	  <li>2025/07/01: 1.1 mod support.</li>
 	  <li>2025/06/27: 1.09 mod support.</li>
 	  <li>2025/06/17: 1.08 mod support.</li>
