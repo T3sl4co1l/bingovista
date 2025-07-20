@@ -1,6 +1,6 @@
 /*
 some more TODOs:
-- categorize vista points by source (stock = base game; bingo extended = from mod; or other strings from modpacks)
+- [DONE] categorize vista points by source (stock = base game; bingo extended = from mod; or other strings from modpacks)
 - nudge around board view by a couple pixels to spread out rounding errors
 - board server to...basically URL-shorten?
 - ???
@@ -12,7 +12,7 @@ Stretchier goals:
 - Board editing, of any sort
     * Drag and drop to move goals around
 	* Make parameters editable
-	* Port generator code over??
+	* Port generator code to C#??
 */
 
 
@@ -811,7 +811,9 @@ function boardToBin(b) {
 	for (var i = 0; i < b.goals.length; i++) {
 		gLen += b.goals[i].toBin.length;
 	}
-	var r = new Uint8Array(hdr.length + comm.length + shelter.length + mods.length + gLen);
+	gLen += hdr.length + comm.length + shelter.length + mods.length;
+	gLen = Math.ceil(gLen / 3) * 3;	//	round up to pad with zeroes; no effect on board, removes base64 padding
+	var r = new Uint8Array(gLen);
 	var offs = 0;
 	r.set(hdr, offs); offs += hdr.length;
 	r.set(comm, offs); offs += comm.length;
