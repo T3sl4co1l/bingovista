@@ -1001,17 +1001,27 @@ function binGoalToText(c) {
 }
 
 /**
- *	Challenge classes from Bingomod decomp.
- *	Used by parseText().
- *	Note: `board` header properties have been set, and can be read at this point.
+ *	Challenge classes; used by parseText().
+ *	From Bingomod decomp/source, with some customization (particularly across
+ *	versions).
+ *
+ *	Assumption: global `board` variable's header properties have been set, and can
+ *	be read at this point.
  *
  *	Adding new challenges:
  *	Append at the bottom. Yeah, they're not going to be alphabetical order anymore.
  *	Order is used by challengeValue, and thus translate names to binary identifier;
  *	to minimize changes in binary format, preserve existing ordering when possible.
+ *
  *	Modifying existing challenges:
- *	If possible, preserve compatibility between formats, auto-detect differences
- *	where possible, or use board.version to select method when not.
+ *	Where possible, preserve compatibility between formats, auto-detect differences,
+ *	or use board.version to select method when not otherwise suitable.
+ *	Reference hacks for example: BingoDamageChallenge / BingoDamageExChallenge,
+ *	BingoTameChallenge and BingoTameExChallenge (and respective entries in
+ *	BINARY_TO_STRING_DEFINITIONS).
+ *
+ *	Maintain sync between CHALLENGES, BINARY_TO_STRING_DEFINITIONS and
+ *	BingoEnum_CHALLENGES.
  */
 const CHALLENGES = {
 	BingoChallenge: function(desc) {
@@ -1278,7 +1288,7 @@ const CHALLENGES = {
 			items: [items[2], amounts[2], "Dictionary"],
 			values: [items[1], amounts[1], desc[3]],
 			description: "Transport " + creatureNameQuantify(1, creatureNameToDisplayTextMap[items[1]]) + " through " + String(amt) + " gate" + ((amt > 1) ? "s." : "."),
-			comments: "When a creature is taken through a gate, its ID is logged, and its gate-crossing count is incremented. When any logged creature meets the gate count, credit is awarded.",
+			comments: "When a creature is taken through a gate, that gate room is added to a list. If a gate already appears in the list, taking that gate again will not advance the count. Thus, you can't grind progress by taking one gate back and forth. The list is stored per creature transported; thus, taking a new different creature does not advance the count, nor does piling creatures into one gate. When the gate count of any logged creature reaches the goal, credit is awarded.",
 			paint: [
 				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1, color: creatureToColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
@@ -1491,7 +1501,7 @@ const CHALLENGES = {
 			items: [items[2], "isFood", "isCreature"],
 			values: [items[2], desc[1] === "1", desc[4] === "1"],
 			description: "Never " + ((desc[1] === "1") ? "eat" : "use") + " " + d + ".",
-			comments: "\"Using\" an item involves throwing a throwable item, eating a food item, or holding any other type of item for 5 seconds.",
+			comments: "\"Using\" an item involves throwing a throwable item, eating a food item, or holding any other type of item for 5 seconds. (When sheltering with insufficient food pips (currently eaten), food items in the shelter are consumed automatically. Auto-eating on shelter <em>will not</em> count against this goal!)",
 			paint: [
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: colorFloatToString(RainWorldColors.Unity_red), rotation: 0 },
 				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 }
@@ -1898,7 +1908,7 @@ const CHALLENGES = {
 			description: "Kill " + c + r + w
 					+ ((v[7] === "true") ? ", while starving" : "")
 					+ ((v[5] === "true") ? ", in one cycle"   : "") + ".",
-			comments: "(If defined, subregion takes precedence over region. If set, Death Pit takes precedence over weapon selection.)<br>Credit is determined by the last source of 'blame' at time of death. For creatures that take multiple hits, try to \"soften them up\" with more common items, before using limited ammunition to deliver the killing blow.  Creatures that \"bleed out\", can be mortally wounded (brought to or below 0 HP), before being tagged with a specific weapon to obtain credit. Starving: must be in the \"malnourished\" state; this state is cleared after eating to full.",
+			comments: "(If defined, subregion takes precedence over region. If set, Death Pit takes precedence over weapon selection.)<br>Credit is determined by the last source of 'blame' at time of death. For creatures that take multiple hits, try to \"soften them up\" with more common items, before using limited ammunition to deliver the killing blow.  Creatures that \"bleed out\", can be mortally wounded (brought to or below 0 HP), before being tagged with a specific weapon to obtain credit. Conversely, weapons that do slow damage (like Spore Puff) can lose blame over time; consider carrying additional ammunition to deliver the killing blow. Starving: must be in the \"malnourished\" state; this state is cleared after eating to full.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
@@ -1909,7 +1919,7 @@ const CHALLENGES = {
 		checkDescriptors(thisname, desc.length, 5, "parameter item count");
 		var items = checkSettingbox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "maul amount");
 		var amt = parseInt(items[1]);
-		if (isNaN(amt) || amt < 0 || amt >= ALL_ENUMS["creatures"].length)
+		if (isNaN(amt) || amt < 0 || amt > ALL_ENUMS["creatures"].length)
 			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2105,7 +2115,7 @@ const CHALLENGES = {
 			items: i,
 			values: v,
 			description: "Store " + String(amt) + pearl + " in a shelter in " + r + ".",
-			comments: "Faded pearls (colored pearl spawns in Saint campaign) do not count towards a \"common pearls\" goal.",
+			comments: "Note: faded pearls (colored pearl spawns in Saint campaign) do not count toward a \"common pearls\" goal.",
 			paint: [
 				{ type: "icon", value: "ShelterMarker", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: ((v[0] === "true") ? "pearlhoard_normal" : "pearlhoard_color"), scale: 1, color: colorFloatToString(itemNameToIconColorMap["Pearl"]), rotation: 0 },
@@ -2212,7 +2222,7 @@ const CHALLENGES = {
 			items: [],
 			values: [],
 			description: "Feed the Rarefaction Cell to a Leviathan (completes if you die).",
-			comments: "Truly, the Rarefaction Cell's explosion transcends time and space; hence, this goal is awarded even if the player dies in the process.",
+			comments: "Truly, the Rarefaction Cell's explosion transcends time and space; hence, this goal is awarded even if the player dies in the process. Godspeed, little Water Dancer.",
 			paint: [
 				{ type: "icon", value: "Symbol_EnergyCell", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: "Kill_BigEel", scale: 1, color: colorFloatToString(creatureNameToIconColorMap["BigEel"] || creatureNameToIconColorMap["Default"]), rotation: 0 }
@@ -2370,7 +2380,7 @@ const CHALLENGES = {
 			items: i,
 			values: v,
 			description: (v[0] === "true") ? ("Befriend " + c + ".") : ("Befriend [0/" + amt + "] unique creatures."),
-			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. \"Happy lizard noises\" indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).<br>For the multiple-tame option, creature <i>types</i> count toward progress (multiple tames of a given type/color/species do not increase the count). Note that any befriendable creature type counts towards the total, including both Lizards and Squidcadas.",
+			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when: 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. A \"happy lizard\" sound indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when: 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).<br>For the multiple-tame option, creature <i>types</i> count toward progress (multiple tames of a given type/color/species do not increase the count). Note that any befriendable creature type counts towards the total, including both Lizards and Squidcadas.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
@@ -2393,7 +2403,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [String(amt)],
 			description: "Trade " + String(amt) + " points worth of items to Scavenger Merchants.",
-			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. When the Scavenger is also a Merchant, points will be awarded. Any item can be traded once to award points according to its value; this includes items initially held by (then dropped or traded) by Scavengers. If an item seems to have been ignored or missed, try trading it again. Stealing and murder will not result in points being awarded.",
+			comments: "A trade occurs when: 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. When the Scavenger is also a Merchant, points will be awarded. Any item can be traded once to award points according to its value; this includes items initially held (then dropped/traded) by Scavenger Merchants. If an item seems to have been ignored or missed, try trading it again.<br>Stealing and murder will <em>not</em> result in points being awarded.",
 			paint: [
 				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
@@ -2420,7 +2430,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [String(amt)],
 			description: "Trade " + String(amt) + ((amt == 1) ? " item" : " items") + " from Scavenger Merchants to other Scavenger Merchants.",
-			comments: "A trade occurs when 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. While this challenge is active, any item dropped by a Merchant, due to a trade, will be \"blessed\" and thereafter bear a mark indicating its eligibility for this challenge. In a Merchant room, the Merchant bears a '<span style=\"color: #00ff00; font-weight: bold;\">✓</span>' tag to show who you should trade with; other Scavengers in the room are tagged with '<span style=\"color: #ff0000; font-weight: bold;\">X</span>'. Stealing from or murdering a Merchant will not result in \"blessed\" items dropping (unless they were already traded). A \"blessed\" item can then be brought to any <em>other</em> Merchant and traded, to award credit.",
+			comments: "A trade occurs when: 1. a Scavenger sees you with item in hand, 2. sees you drop the item, and 3. picks up that item. While this challenge is active, any item dropped by a Merchant, due to a trade, will be \"blessed\" and thereafter bear a mark indicating its eligibility for this challenge.<br>In a Merchant room, the Merchant bears a '<span style=\"color: #00ff00; font-weight: bold;\">✓</span>' tag to show who you should trade with; other Scavengers in the room are tagged with '<span style=\"color: #ff0000; font-weight: bold;\">X</span>'.<br>A \"blessed\" item can then be brought to any <em>other</em> Merchant and traded, to award credit.<br>Stealing from or murdering a Merchant will not result in \"blessed\" items dropping (unless they were already traded).",
 			paint: [
 				{ type: "icon", value: "scav_merchant", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "icon", value: "Menu_Symbol_Shuffle", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
@@ -2477,7 +2487,7 @@ const CHALLENGES = {
 			items: i,
 			values: v,
 			description: "Transport " + creatureNameQuantify(1, creatureNameToDisplayTextMap[v[2]]) + " from " + r1 + " to " + r2,
-			comments: "When a specific 'From' region is selected, that creature can be brought in from an outside region, dropped/thrown up, then touched in that region, to activate it for the goal. Note, keeping a swallowable creature always in stomach will NOT count in this way.",
+			comments: "When a specific 'From' region is selected, that creature can also be brought in from an outside region, placed on the ground, then picked up in that region, to activate it for the goal. Note: keeping a swallowable creature always in stomach will NOT count in this way, nor will throwing it up and only holding in hand, but not dropping then grabbing.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
@@ -3993,6 +4003,14 @@ const BingoEnum_CharToDisplayText = {
 	"Night":      "Nightcat"
 };
 
+/**
+ *	This is kept more for reference, or future use; prefer using challengeValue()
+ *  or e.g.
+ *		Object.keys(BINARY_TO_STRING_DEFINITIONS)[idx].name
+ *		BINARY_TO_STRING_DEFINITIONS.findIndex(a => a.name === txt)
+ *	Note that BINARY_TO_STRING_DEFINITIONS[] can contain duplicates:
+ *	"BingoVistaChallenge" is one example.
+ */
 const BingoEnum_CHALLENGES = [
 	"BingoChallenge",
 	"BingoAchievementChallenge",
@@ -4034,7 +4052,12 @@ const BingoEnum_CHALLENGES = [
 	"BingoTradeTradedChallenge",
 	"BingoTransportChallenge",
 	"BingoUnlockChallenge",
-	"BingoVistaChallenge"
+	"BingoVistaChallenge",
+	"BingoEnterRegionFromChallenge",
+	"BingoMoonCloakChallenge",
+	"BingoBroadcastChallenge",
+	"BingoDamageExChallenge",
+	"BingoTameExChallenge"
 ];
 
 const BingoEnum_EXPFLAGS = {
@@ -4186,7 +4209,8 @@ const BingoEnum_VistaPoints = [
 	{ region: "SU", room: "SU_B11",         x:  770, y:   48  },
 	{ region: "UG", room: "UG_A19",         x:  545, y:   43  },
 	{ region: "UW", room: "UW_D05",         x:  760, y:  220  },
-	{ region: "VS", room: "VS_E06",         x:  298, y:  1421 }
+	{ region: "VS", room: "VS_E06",         x:  298, y:  1421 },
+	{ region: "LM", room: "LM_C04",         x:  542, y: 1295  },	//	append to fix typo in list
 ];
 
 /**
@@ -5656,7 +5680,12 @@ function goalFromNumber(g, n) {
 			bytes = Math.max(bytes, desc.params[i].offset - 1);
 		} else if (desc.params[i].type === "number") {
 			val = 0;
-			if (desc.params[i].formatter === "") {
+			if (desc.name === "BingoMaulTypesChallenge") {
+				n *= ALL_ENUMS["creatures"].length + 1;
+			} else if (desc.name === "BingoEnterRegionChallenge") {
+				n *= ALL_ENUMS[desc.params[i].formatter].length - 1;
+				val = 2;	//	exclude "Any Region" option
+			} else if (desc.params[i].formatter === "") {
 				if (desc.params[i].size == 1) {
 					n *= CHAR_MAX + 1;
 				} else if (desc.params[i].size == 2) {
@@ -5764,17 +5793,18 @@ function generateRandomGoals(g, n) {
 	return s;
 }
 
+/**	Exclude these challenges from generation: */
+const GENERATE_BLACKLIST = [
+	Object.keys(CHALLENGES).indexOf("BingoChallenge"),    	//	Base class, useless in game
+	Object.keys(CHALLENGES).indexOf("BingoVistaChallenge")	//	full-general vista goal can't generate real room names
+];
+
 /**
  *	Generates n goals, of random types, with *very* random settings.
  */
 function generateRandomRandomGoals(n) {
 	n = parseInt(n);
 	if (n < 0) return;
-	//	Exclude these challenges from generation:
-	var blacklist = [
-		Object.keys(CHALLENGES).indexOf("BingoChallenge"),    	//	Base class, useless in game
-		Object.keys(CHALLENGES).indexOf("BingoVistaChallenge")	//	full-general vista goal can't generate real room names
-	];
 	var s = BingoEnum_CHARACTERS[Math.floor(Math.random() * BingoEnum_CHARACTERS.length)]
 			+ ";";
 	for (var i = 0; i < n; i++) {
@@ -5782,9 +5812,9 @@ function generateRandomRandomGoals(n) {
 		//	Try generating goals until one passes; the raw encoding
 		//	supports some disallowed values, filter them out
 		var goalNum, goalTxt = "", goal, retries;
-		goalNum = Math.floor(Math.random() * (BINARY_TO_STRING_DEFINITIONS.length - blacklist.length));
-		for (var j = 0; j < blacklist.length; j++) {
-			if (goalNum >= blacklist[j]) goalNum++;
+		goalNum = Math.floor(Math.random() * (BINARY_TO_STRING_DEFINITIONS.length - GENERATE_BLACKLIST.length));
+		for (var j = 0; j < GENERATE_BLACKLIST.length; j++) {
+			if (goalNum >= GENERATE_BLACKLIST[j]) goalNum++;
 		}
 		for (retries = 0; retries < 100; retries++) {
 			goalTxt = binGoalToText(goalFromNumber(goalNum, Math.random()));
@@ -5798,6 +5828,24 @@ function generateRandomRandomGoals(n) {
 		if (retries >= 100) console.log("Really bad luck trying to generate a goal");
 		s += goalTxt;
 	}
+	document.getElementById("textbox").value = s;
+
+	return s;
+}
+
+/**
+ *	Generates one random example of each possible goal type.
+ */
+function generateOneOfEverything() {
+	var s = "White;";
+	for (var i = 0; i < BINARY_TO_STRING_DEFINITIONS.length - GENERATE_BLACKLIST.length; i++) {
+		goalNum = i;
+		for (var j = 0; j < GENERATE_BLACKLIST.length; j++) {
+			if (goalNum >= GENERATE_BLACKLIST[j]) goalNum++;
+		}
+		s += binGoalToText(goalFromNumber(goalNum, Math.random())) + "bChG";
+	}
+	s = s.substring(0, s.length - 4);
 	document.getElementById("textbox").value = s;
 
 	return s;
