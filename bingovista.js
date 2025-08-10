@@ -1,19 +1,22 @@
 /*
-some more TODOs:
-- [DONE] categorize vista points by source (stock = base game; bingo extended = from mod; or other strings from modpacks)
-- nudge around board view by a couple pixels to spread out rounding errors
-- board server to...basically URL-shorten?
-- ???
-- no profit, this is for free GDI
-- Streamline challenge parsing? compactify functions? or reduce to structures if possible?
-- cursor isn't reset on loading new board size
-
-Stretchier goals:
-- Board editing, of any sort
-    * Drag and drop to move goals around
-	* Make parameters editable
-	* Port generator code to C#??
-*/
+ *	bingovista.js
+ *	RW Bingo Board Viewer JS module
+ *	(c) 2025 T3sl4co1l
+ *	some more TODOs:
+ *	- [DONE] categorize vista points by source (stock = base game; bingo extended = from mod; or other strings from modpacks)
+ *	- nudge around board view by a couple pixels to spread out rounding errors
+ *	- board server to...basically URL-shorten?
+ *	- ???
+ *	- no profit, this is for free GDI
+ *	- Streamline challenge parsing? compactify functions? or reduce to structures if possible?
+ *	- cursor isn't reset on loading new board size
+ *	
+ *	Stretchier goals:
+ *	- Board editing, of any sort
+ *	    * Drag and drop to move goals around
+ *		* Make parameters editable
+ *		* Port generator code to C#??
+ */
 
 
 /* * * Constants and Defaults * * */
@@ -23,10 +26,11 @@ Stretchier goals:
  *	drawIcon() searches this list, in order, for an icon it needs.
  *	These are pre-loaded on startup from the named references, but unnamed or external
  *	references can be added by pushing (least priority), shifting (most), or inserting
- *	(anywhere) additional data.
+ *	(anywhere) more entries.  Make sure `canv` contains a valid canvas of the sprite
+ *	sheet, and `frames`, the collection of sprite names and coordinates.
  */
 const atlases = [
-	{ img: "bingoicons_mod.png", txt: "bingoicons_mod.txt", canv: undefined, frames: {} },	/**< from Bingo mod (with Vista additions) */
+	{ img: "bingoicons_mod.png", txt: "bingoicons_mod.txt", canv: undefined, frames: {} },	/**< from Bingo mod (with Bingo Vista additions) */
 	{ img: "uispritesmsc.png",   txt: "uispritesmsc.txt",   canv: undefined, frames: {} }, 	/**< from DLC */
 	{ img: "uiSprites.png",      txt: "uiSprites.txt",      canv: undefined, frames: {} } 	/**< from base game */
 ];
@@ -121,28 +125,27 @@ var kibitzing = false;
 
 /* * * Functions * * */
 
-/* * * Event Handlers and Initialization * * */
+/* * * Event Listeners and Initialization * * */
 
 document.addEventListener("DOMContentLoaded", function() {
 
 	square.color = colorFloatToString(RainWorldColors.Unity_white);
 
-	//	File load stuff
+	//	Nav, header and file handling buttons
+	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
 	document.getElementById("clear").addEventListener("click", function(e) {
 		document.getElementById("textbox").value = "";
 		var u = new URL(document.URL);
 		u.search = "";
-		history.replaceState(null, "", u.href);
+		history.pushState(null, "", u.href);
 	});
 	document.getElementById("parse").addEventListener("click", parseText);
 	document.getElementById("copy").addEventListener("click", copyText);
+	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
 	document.getElementById("textbox").addEventListener("paste", pasteText);
 	document.getElementById("boardcontainer").addEventListener("click", clickBoard);
-	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
 	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
 	document.getElementById("fileload").addEventListener("change", function() { doLoadFile(this.files) } );
-	document.getElementById("dark").addEventListener("input", toggleDark);
-	document.getElementById("light").addEventListener("input", toggleDark);
 	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
 
 	var d = document.getElementById("droptarget");
@@ -155,10 +158,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		if (e.dataTransfer.types.includes("text/plain")
 				|| e.dataTransfer.types.includes("Files")) {
 			e.preventDefault();
-			if (document.getElementById("dark").checked)
-				this.style.backgroundColor = "#686868";
-			else
-				this.style.backgroundColor = "#c8c8c8";
+			this.style.backgroundColor = "#686868";
 		}
 	}
 
@@ -219,60 +219,98 @@ document.addEventListener("DOMContentLoaded", function() {
 			//	very inefficient, unlikely to be used, but provided for completeness
 			document.getElementById("textbox").value = u.get("a");
 		} else if (u.has("b")) {
+
 			//	Binary string, base64 encoded
 			try {
 				//	Undo URL-safe escapes...
 				var ar = base64uToBin(u.get("b"));
 				board = binToString(ar);
-				var el = document.getElementById("hdrttl");
-				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-				el.appendChild(document.createTextNode(board.comments));
-				el = document.getElementById("hdrsize");
-				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-				el.appendChild(document.createTextNode(String(board.width) + " x " + String(board.height)));
-				el = document.getElementById("hdrchar");
-				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-				el.appendChild(document.createTextNode(board.character || "Any"));
-				el = document.getElementById("hdrshel");
-				while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-				el.appendChild(document.createTextNode(board.shelter || "random"));
-				perksToChecksList(board.perks);
-				addModsToHeader(board.mods);
+				setHeaderFromBoard(board);
 
 			} catch (e) {
 				setError("Error parsing URL: " + e.message);
 			}
 			document.getElementById("textbox").value = board.text;
-		} else if (u.has("q")) {
-			//	Query, fetch from remote server to get board data
+			parseText();
 
-			//
+		} else if (u.has("q")) {
+
+			//	Query, fetch from remote server to get board data
+			var q = u.get("q");
+			if (!validateQuery(q)) {
+				console.log("Invalid query.");
+				return;
+			}
+			var requrl = "https://" + "www.seventransistorlabs.com/bserv/BingoServer.dll?q=" + q;
+			console.log("Requesting short key \"" + q + "\" from server...");
+			fetch(new URL(requrl), { method: "GET" }
+			).then(function(r) {
+				//	Request succeeds
+				console.log("Server accepted, status " + r.status + "...");
+				return r.arrayBuffer();
+			}, function(r) {
+				//	Request failed (connection, invalid CORS, etc. error)
+				setError("Error connecting to server.");
+			} ).then(function(a) {
+				//	success, arrayBuffer() complete
+				console.log("...data received.");
+				var ar = new Uint8Array(a.slice(0, 1));
+				//console.log("Assert: server response header 0: " + ar[0]);
+				ar = new Uint8Array(a.slice(1));
+				var s = "0x";
+				ar.forEach(a => s += a.toString(16) + ", 0x");
+				s = s.substring(0, s.length - 4);
+				//console.log("Array: " + s);
+				//	trim server response header
+				board = binToString(ar);
+				document.getElementById("textbox").value = board.text;
+				parseText();
+			} );
+
+			function validateQuery(s) {
+				if (s.length < 4 || s.length > 13) return false;
+				for (var i = 0; i < s.length; i++) {
+					var c = s.charCodeAt(i);
+					if (c < '0'.charCodeAt(0) || c > 'z'.charCodeAt(0) ||
+							(c > '9'.charCodeAt(0) && c < 'a'.charCodeAt(0)))
+						return false;
+				}
+				return true;
+			}
+
 		}
-		parseText();
 
 	});
 
 	//	Other housekeeping
-
-	if (document.getElementById("dark").checked)
-		document.getElementById("darkmode").media = "screen";
-	else
-		document.getElementById("darkmode").media = "none";
 
 	kibitzing = !!document.getElementById("kibitzing").checked;
 
 });
 
 /**
- *	Color theme button changed.
+ *	Set header table from board data as returned from binToString.
  */
-function toggleDark(e) {
-	if (document.getElementById("dark").checked)
-		document.getElementById("darkmode").media = "screen";
-	else
-		document.getElementById("darkmode").media = "none";
+function setHeaderFromBoard(b) {
+	var el = document.getElementById("hdrttl");
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(b.comments));
+	el = document.getElementById("hdrsize");
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(String(b.width) + " x " + String(b.height)));
+	el = document.getElementById("hdrchar");
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(b.character || "Any"));
+	el = document.getElementById("hdrshel");
+	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
+	el.appendChild(document.createTextNode(b.shelter || "random"));
+	perksToChecksList(b.perks);
+	addModsToHeader(b.mods);
 }
 
+/**
+ *	Kibitzing check toggled.
+ */
 function toggleKibs(e) {
 	kibitzing = !!document.getElementById("kibitzing").checked;
 	if (selected !== undefined)
@@ -332,13 +370,6 @@ function doLoadFile(files) {
 }
 
 /**
- *	Parses an encoded string into a text-formatted board.
- */
-function boardEncodeToText(s) {
-	return s;
-}
-
-/**
  *	Parse Text button pressed.
  */
 function parseText(e) {
@@ -387,7 +418,7 @@ function parseText(e) {
 	//	Detect board version:
 	//	assertion: no challenge names are shorter than 14 chars (true as of 0.90)
 	//	assertion: no character names are longer than 10 chars (true of base game + Downpour)
-	//	0.90: character prefix, ";" delimited --> check within first 12 chars
+	//	0.90+: character prefix, ";" delimited --> check within first 12 chars
 	//	0.86: character prefix, "_" delimited --> check within first 12 chars
 	//	0.85: no prefix, gonzo right into the goal list --> first token (to "~") is valid goal name or error
 	if (goals[0].search(/[A-Za-z]{1,12}[_;]/) == 0) {
@@ -418,16 +449,9 @@ function parseText(e) {
 				} catch (er) {
 					board.goals.push(CHALLENGES["BingoChallenge"]( [
 						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
-//					board.goals.push(defaultGoal(type, desc));
-//					board.goals[board.goals.length - 1].description = "Error: " + er.message + "; Descriptor: " + goals[i].split("~")[1];
-//					var b = [challengeValue("BingoChallenge"), 0, 0];
-//					b = b.concat(new TextEncoder().encode(board.goals[board.goals.length - 1].description));
-//					b[2] = b.length - GOAL_LENGTH;
-//					board.goals[board.goals.length - 1].toBin = new Uint8Array(b);
 				}
 			} else {
 				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
-				//board.goals.push(defaultGoal(type, desc));
 			}
 		} else {
 			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
@@ -482,27 +506,17 @@ function parseText(e) {
 	}
 
 	//	Fill meta table with board info
-	var el = document.getElementById("hdrttl");
-	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(board.comments));
-	el = document.getElementById("hdrsize");
-	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(String(board.width) + " x " + String(board.height)));
-	el = document.getElementById("hdrchar");
-	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(board.character || "Any"));
-	el = document.getElementById("hdrshel");
-	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(board.shelter || "random"));
-	perksToChecksList(board.perks);
-	addModsToHeader(board.mods);
+	setHeaderFromBoard(board);
 
 	//	prepare board binary encoding
 	board.toBin = boardToBin(board);
 	s = binToBase64u(board.toBin);
 	var u = new URL(document.URL);
 	u.searchParams.set("b", s);
-	history.replaceState(null, "", u.href);
+	history.pushState(null, "", u.href);
+
+	if (selected !== undefined)
+		selectSquare(selected.col, selected.row);
 
 }
 
@@ -519,6 +533,7 @@ function pasteText(e) {
  */
 function copyText(e) {
 	navigator.clipboard.writeText(document.getElementById("textbox").value);
+	setError("Text copied to clipboard.");
 }
 
 /**
@@ -643,7 +658,7 @@ function selectSquare(col, row) {
 }
 
 /**
- *	Key input to document; pare down to arrow keys for navigating squares
+ *	Key input to board container; pare down to arrow keys for navigating squares
  */
 function navSquares(e) {
 	if (board !== undefined && ["board", "boardcontainer", "cursor"].includes(e.target.id)) {
@@ -831,7 +846,7 @@ function boardToBin(b) {
 		for (var i = 0; i < m.length; i++) {
 			//	serialize mod entries here
 		}
-		return Uint8Array.from(a);
+		return new Uint8Array(a);
 	}
 
 }
@@ -872,22 +887,34 @@ function binToString(a) {
 	b.text += ";";
 	//	uint16_t shelter;
 	var ptr = readShort(a, 9);
-	if (ptr > 0)
+	if (ptr > 0) {
+		if (ptr >= a.length)
+			throw new TypeError("binToString: shelter pointer 0x" + ptr.toString(16) + " out of bounds");
+		if (a.indexOf(0, ptr) < 0)
+			throw new TypeError("binToString: shelter missing terminator");
 		b.shelter = d.decode(a.subarray(ptr, a.indexOf(0, ptr)));
+	}
 	//	uint32_t perks;
 	b.perks = readLong(a, 11);
 	//	uint16_t mods;
 	ptr = readShort(a, 17);
-	if (ptr > 0)
+	if (ptr > 0) {
+		if (ptr >= a.length)
+			throw new TypeError("binToString: mods pointer 0x" + ptr.toString(16) + " out of bounds");
 		b.mods = readMods(a, ptr);
+	}
 	//	uint16_t reserved;
 	if (readShort(a, 19) != 0)
 		throw new TypeError("binToString: reserved: 0x" + readShort(a, 19).toString(16) + ", expected: 0x0");
 	//	(21) uint8_t[] comments;
+	if (a.indexOf(0, HEADER_LENGTH) < 0)
+		throw new TypeError("binToString: comments missing terminator");
 	b.comments = d.decode(a.subarray(HEADER_LENGTH, a.indexOf(0, HEADER_LENGTH)));
 
 	//	uint16_t goals;
 	ptr = readShort(a, 15);
+	if (ptr == 0 || ptr >= a.length)
+		throw new TypeError("binToString: goals pointer 0x" + ptr.toString(16) + " out of bounds");
 	var goal, type, desc;
 	for (var i = 0; i < b.width * b.height && ptr < a.length; i++) {
 		try {
@@ -896,6 +923,7 @@ function binToString(a) {
 			goal = "BingoChallenge~Error: " + er.message + "><";
 		}
 		ptr += GOAL_LENGTH + a[ptr + 2];
+		//	could also, at this point, enumerate goals in the data structure; need a direct binary to JS codec
 		//[type, desc] = goal.split("~");
 		//desc = desc.split(/></);
 		//board.goals.push(CHALLENGES[type](desc));
@@ -1908,7 +1936,9 @@ const CHALLENGES = {
 			description: "Kill " + c + r + w
 					+ ((v[7] === "true") ? ", while starving" : "")
 					+ ((v[5] === "true") ? ", in one cycle"   : "") + ".",
-			comments: "(If defined, subregion takes precedence over region. If set, Death Pit takes precedence over weapon selection.)<br>Credit is determined by the last source of 'blame' at time of death. For creatures that take multiple hits, try to \"soften them up\" with more common items, before using limited ammunition to deliver the killing blow.  Creatures that \"bleed out\", can be mortally wounded (brought to or below 0 HP), before being tagged with a specific weapon to obtain credit. Conversely, weapons that do slow damage (like Spore Puff) can lose blame over time; consider carrying additional ammunition to deliver the killing blow. Starving: must be in the \"malnourished\" state; this state is cleared after eating to full.",
+			comments: "(If defined, subregion takes precedence over region. If set, Death Pit takes precedence over weapon selection.)<br>" +
+					"Credit is determined by the last source of 'blame' at time of death. For creatures that take multiple hits, try to \"soften them up\" with more common items, before using limited ammunition to deliver the killing blow.  Creatures that \"bleed out\", can be mortally wounded (brought to or below 0 HP), before being tagged with a specific weapon to obtain credit. Conversely, weapons that do slow damage (like Spore Puff) can lose blame over time; consider carrying additional ammunition to deliver the killing blow. Starving: must be in the \"malnourished\" state; this state is cleared after eating to full.<br>" +
+					"Note: the reskinned BLLs in the Past Garbage Wastes tunnel, count as both BLL and DLL for this challenge.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
@@ -2599,7 +2629,7 @@ const CHALLENGES = {
 			items: ["Region"],
 			values: [desc[0]],
 			description: "Reach the vista point in " + v + ".",
-			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1]),
+			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1]) + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
 				{ type: "break" },
@@ -3578,9 +3608,9 @@ const creatureNameToIconColorMap = {
 	"MirosVulture":   	[0.901961, 0.054902, 0.054902],
 	"SpitLizard":     	[0.55,     0.4,      0.2     ],
 	"Inspector":      	[0.447059, 0.901961, 0.768627],
-	"Yeek":           	[0.9,      0.9,    0.9       ],
-	"BigJelly":       	[1,        0.85,   0.7       ],
-	"Default":        	[0.66384,  0.6436, 0.6964    ]
+	"Yeek":           	[0.9,      0.9,      0.9     ],
+	"BigJelly":       	[1,        0.85,     0.7     ],
+	"Default":        	[0.66384,  0.6436,   0.6964  ]
 };
 
 /**
@@ -4209,7 +4239,7 @@ const BingoEnum_VistaPoints = [
 	{ region: "SU", room: "SU_B11",         x:  770, y:   48  },
 	{ region: "UG", room: "UG_A19",         x:  545, y:   43  },
 	{ region: "UW", room: "UW_D05",         x:  760, y:  220  },
-	{ region: "VS", room: "VS_E06",         x:  298, y:  1421 },
+	{ region: "VS", room: "VS_E06",         x:  298, y: 1421  },
 	{ region: "LM", room: "LM_C04",         x:  542, y: 1295  },	//	append to fix typo in list
 ];
 
@@ -4304,7 +4334,8 @@ const BingoEnum_VistaPoints_Code = [
 	"SU><System.String|SU_B11|Room|0|vista><770><48",
 	"UG><System.String|UG_A19|Room|0|vista><545><43",
 	"UW><System.String|UW_D05|Room|0|vista><760><220",
-	"VS><System.String|VS_E06|Room|0|vista><298><142"
+	"VS><System.String|VS_E06|Room|0|vista><298><142",
+	"LM><System.String|LM_C04|Room|0|vista><542><1295",
 ];
 
 const BingoEnum_EnterableGates = [
@@ -5520,18 +5551,18 @@ function setMeta() {
 
 	if (board === undefined || document.getElementById("hdrttl") === null
 			|| document.getElementById("hdrchar") === null
-			|| document.getElementById("hdrshel") === null) {
+			|| getElementContent("hdrshel") === null) {
 		console.log("Need a board to set.");
 		return;
 	}
 
 	if (comm !== undefined)
-		document.getElementById("hdrttl").innerText = comm;
+		document.getElementById("hdrttl").value = comm;
 	if (character !== undefined)
 		document.getElementById("hdrchar").innerText = character;
 	if (shelter !== undefined) {
 		if (shelter === "random") shelter = "";
-		document.getElementById("hdrshel").innerText = shelter;
+		document.getElementById("hdrshel").value = shelter;
 	}
 	if (perks !== undefined) {
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
@@ -5876,59 +5907,6 @@ function colorFloatToString(colr) {
 }
 
 /**
- *	Grabbed from RWCustom.Custom::HSL2RGB
- */
-function HSL2RGB(h, s, l) {
-	var r = l;
-	var g = l;
-	var b = l;
-	var num = (l <= 0.5) ? (l * (1 + s)) : (l + s - l * s);
-	if (num > 0) {
-		var num2 = l + l - num;
-		var num3 = (num - num2) / num;
-		h *= 6;
-		var num4 = Math.floor(h);
-		var num5 = h - num4;
-		var num6 = num * num3 * num5;
-		var num7 = num2 + num6;
-		var num8 = num - num6;
-		switch (num4) {
-		case 0:
-			r = num;
-			g = num7;
-			b = num2;
-			break;
-		case 1:
-			r = num8;
-			g = num;
-			b = num2;
-			break;
-		case 2:
-			r = num2;
-			g = num;
-			b = num7;
-			break;
-		case 3:
-			r = num2;
-			g = num8;
-			b = num;
-			break;
-		case 4:
-			r = num7;
-			g = num2;
-			b = num;
-			break;
-		case 5:
-			r = num;
-			g = num2;
-			b = num8;
-			break;
-		}
-	}
-	return [r, g, b];
-}
-
-/**
  *	Default: for n != 1, concatenates number, space, name.
  *	For n == 1, tests for special cases (ref: creatureNameToDisplayTextMap,
  *	itemNameToDisplayTextMap), converting it to the English singular case
@@ -5943,553 +5921,4 @@ function creatureNameQuantify(n, s) {
 	else
 		s = "a " + s;
 	return s;
-}
-
-/**
- *	Helper functions to generate below tables.
- *	Convert creature value string to atlas name string.
- *	Ported from game/mod.
- *	TODO?: Throws if key not found (currently returns "Futile_White" game default)
- *	TODO?: refactor to associative array (convert ifs, ||s into more properties?
- *	    minor manual edit overhead)
- *	--> done
- */
-function creatureNameToIconAtlas(type) {
-	/*
-	 *	Game extract: CreatureSymbol::SpriteNameOfCreature
-	 *	Paste in verbatim, then make these changes:
-	 *	- Adjust tabbing level to current scope
-	 *	- Search and replace:
-	 *		/CreatureTemplate\.Type\.|MoreSlugcatsEnums\.CreatureTemplateType\./ --> "\""
-	 *		/iconData\.critType/ --> "type"
-	 *		/\)\r\n\t{1,2}\{\r\n\t{2,3}/ --> "\"\)\r\n\t\t"
-	 *		/\t{1,2}\}\r\n\t{1,2}if/ --> "\tif"
-	 *		/\s\|\|\s/ --> "\" || "
-	 *	- Remove MSC sub-clause
-	 *	- Centipede clause: changed to use default index 2, since Bingo doesn't
-	 *		distinguish between centipede sizes
-	 *	- Yes, using regex on code is messy, inspect the results!  Don't be a dummy!
-	 *	- Assumes CreatureTemplate enums use symbols equal to string contents; this appears to
-	 *		always be the case, but may vary with future updates, or modded content.  Beware!
-	 */
-	if (type === "Slugcat")
-		return "Kill_Slugcat";
-	if (type === "GreenLizard")
-		return "Kill_Green_Lizard";
-	if (type === "PinkLizard" || type === "BlueLizard" || type === "CyanLizard" || type === "RedLizard")
-		return "Kill_Standard_Lizard";
-	if (type === "WhiteLizard")
-		return "Kill_White_Lizard";
-	if (type === "BlackLizard")
-		return "Kill_Black_Lizard";
-	if (type === "YellowLizard")
-		return "Kill_Yellow_Lizard";
-	if (type === "Salamander")
-		return "Kill_Salamander";
-	if (type === "Scavenger")
-		return "Kill_Scavenger";
-	if (type === "Vulture")
-		return "Kill_Vulture";
-	if (type === "KingVulture")
-		return "Kill_KingVulture";
-	if (type === "CicadaA" || type === "CicadaB")
-		return "Kill_Cicada";
-	if (type === "Snail")
-		return "Kill_Snail";
-	if (type === "Centiwing")
-		return "Kill_Centiwing";
-	if (type === "SmallCentipede")
-		return "Kill_Centipede1";
-	if (type === "Centipede")
-		return "Kill_Centipede2";
-	if (type === "RedCentipede")
-		return "Kill_Centipede3";
-	if (type === "BrotherLongLegs" || type === "DaddyLongLegs")
-		return "Kill_Daddy";
-	if (type === "LanternMouse")
-		return "Kill_Mouse";
-	if (type === "GarbageWorm")
-		return "Kill_Garbageworm";
-	if (type === "Fly")
-		return "Kill_Bat";
-	if (type === "Leech" || type === "SeaLeech")
-		return "Kill_Leech";
-	if (type === "Spider")
-		return "Kill_SmallSpider";
-	if (type === "JetFish")
-		return "Kill_Jetfish";
-	if (type === "BigEel")
-		return "Kill_BigEel";
-	if (type === "Deer")
-		return "Kill_RainDeer";
-	if (type === "TubeWorm")
-		return "Kill_Tubeworm";
-	if (type === "TentaclePlant")
-		return "Kill_TentaclePlant";
-	if (type === "PoleMimic")
-		return "Kill_PoleMimic";
-	if (type === "MirosBird")
-		return "Kill_MirosBird";
-	if (type === "Overseer")
-		return "Kill_Overseer";
-	if (type === "VultureGrub")
-		return "Kill_VultureGrub";
-	if (type === "EggBug")
-		return "Kill_EggBug";
-	if (type === "BigSpider" || type === "SpitterSpider")
-		return "Kill_BigSpider";
-	if (type === "BigNeedleWorm")
-		return "Kill_NeedleWorm";
-	if (type === "SmallNeedleWorm")
-		return "Kill_SmallNeedleWorm";
-	if (type === "DropBug")
-		return "Kill_DropBug";
-	if (type === "Hazer")
-		return "Kill_Hazer";
-	if (type === "TrainLizard")
-		return "Kill_Standard_Lizard";
-	if (type === "ZoopLizard")
-		return "Kill_White_Lizard";
-	if (type === "EelLizard")
-		return "Kill_Salamander";
-	if (type === "JungleLeech")
-		return "Kill_Leech";
-	if (type === "TerrorLongLegs")
-		return "Kill_Daddy";
-	if (type === "MotherSpider")
-		return "Kill_BigSpider";
-	if (type === "StowawayBug")
-		return "Kill_Stowaway";
-	if (type === "HunterDaddy")
-		return "Kill_Slugcat";
-	if (type === "FireBug")
-		return "Kill_FireBug";
-	if (type === "AquaCenti")
-		return "Kill_Centiwing";
-	if (type === "MirosVulture")
-		return "Kill_MirosBird";
-	if (type === "FireBug")	//	bug in original code, extraneous clause left in, and not optimized out
-		return "Kill_EggBug";
-	if (type === "ScavengerElite")
-		return "Kill_ScavengerElite";
-	if (type === "ScavengerKing")
-		return "Kill_ScavengerKing";
-	if (type === "SpitLizard")
-		return "Kill_Spit_Lizard";
-	if (type === "Inspector")
-		return "Kill_Inspector";
-	if (type === "Yeek")
-		return "Kill_Yeek";
-	if (type === "BigJelly")
-		return "Kill_BigJellyFish";
-	if (type === "SlugNPC")
-		return "Kill_Slugcat";
-	return "Futile_White";
-}
-
-/**
- *	Helper functions to generate below tables.
- *	Convert creature value string to HTML color.
- *	Converts item value string to HTML color; ported from game/mod.
- *	TODOs: same as creatureNameToIconAtlas().
- */
-function creatureNameToIconColor(type) {
-	//	values excerpted from LizardBreeds::BreedTemplate; returns array [r, g, b]
-	//	(base body colors, not necessarily icon colors? hence the unused values?)
-	const standardColor = {
-		"GreenLizard":  [0.2,      1,       0       ],
-		"PinkLizard":   [1,        0,       1       ],
-		"BlueLizard":   [0,        0.5,     1       ],
-		"YellowLizard": [1,        0.6,     0       ],
-		"WhiteLizard":  [1,        1,       1       ],
-		"RedLizard":    [1,        0,       0       ],	//	unused
-		"BlackLizard":  [0.1,      0.1,     0.1     ],	//	unused
-		"Salamander":   [1,        1,       1       ],	//	unused
-		"CyanLizard":   [0,        1,       0.9     ],	//	unused
-		"SpitLizard":   [0.55,     0.4,     0.2     ],
-		"ZoopLizard":   [0.95,     0.73,    0.73    ],	//	unused
-		"TrainLizard":  [0.254902, 0,       0.215686]	//	unused
-	};
-	/*
-	 *	Game extract: CreatureSymbol::ColorOfCreature
-	 *	Paste in verbatim, then make these changes:
-	 *	- Adjust tabbing level to current scope
-	 *	- Search and replace:
-	 *		/iconData\.critType\s==\sCreatureTemplate\.Type\.|iconData\.critType\s==\sMoreSlugcatsEnums\.CreatureTemplateType\./ --> "type == \""
-	 *		/\)\r\n\t{1,2}\{\r\n\t{2,3}/ --> "\"\)\r\n\t\t"
-	 *		/\t{1,2}\}\r\n\t{1,2}if/ --> "\tif"
-	 *		/\s\|\|\s/ --> "\" || "
-	 *		/return\snew\sColor\(/ --> "c = ["
-	 *		/\);\r\n\t{1,2}\}/ --> "];"
-	 *		/return\s\(StaticWorld\.GetCreatureTemplate\(iconData\.critType\)\.breedParameters\sas\sLizardBreedParams\)\.standardColor;\r\n\t\}/ --> "c = standardColor\[type\];"
-	 *	- remove f's on colors (e.g. /f\,\s/ --> ", " then /f]/ --> ", " then 
-	 *	- Remove MSC sub-clause
-	 *	- Manually find and replace targets for slugcat ArenaColor, HunterDaddy and MenuColors.MediumGrey
-	 *	- Yes, using regex on code is messy, inspect the results!  Don't be a dummy!
-	 *	- Assumes CreatureTemplate enums use symbols equal to string contents; this appears to
-	 *		always be the case, but may vary with future updates, or modded content.  Beware!
-	 */
-	var c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu.Menu::MenuColor (default value hoisted from end)
-	if (type === "Slugcat")
-		c = [1, 1, 1];	//	PlayerGraphics::DefaultSlugcatColor (White)
-	if (type === "GreenLizard")
-		c = standardColor[type];
-	if (type === "PinkLizard")
-		c = standardColor[type];
-	if (type === "BlueLizard")
-		c = standardColor[type];
-	if (type === "WhiteLizard")
-		c = standardColor[type];
-	if (type === "RedLizard")
-		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type === "BlackLizard")
-		c = [0.36862746, 0.36862746, 0.43529412];
-	if (type === "YellowLizard" || type === "SmallCentipede" || type === "Centipede")
-		c = [1, 0.6, 0];
-	if (type === "RedCentipede")
-		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type === "CyanLizard" || type === "Overseer")
-		c = [0, 0.9098039, 0.9019608];
-	if (type === "Salamander")
-		c = [0.93333334, 0.78039217, 0.89411765];
-	if (type === "CicadaB")
-		c = [0.36862746, 0.36862746, 0.43529412];
-	if (type === "CicadaA")
-		c = [1, 1, 1];
-	if (type === "SpitterSpider" || type === "Leech")
-		c = [0.68235296, 0.15686275, 0.11764706];
-	if (type === "SeaLeech" || type === "TubeWorm")
-		c = [0.05, 0.3, 0.7];
-	if (type === "Centiwing")
-		c = [0.05490196, 0.69803923, 0.23529412];
-	if (type === "BrotherLongLegs")
-		c = [0.45490196, 0.5254902, 0.30588236];
-	if (type === "DaddyLongLegs")
-		c = [0, 0, 1];
-	if (type === "VultureGrub")
-		c = [0.83137256, 0.7921569, 0.43529412];
-	if (type === "EggBug")
-		c = [0, 1, 0.47058824];
-	if (type === "BigNeedleWorm" || type === "SmallNeedleWorm")
-		c = [1, 0.59607846, 0.59607846];
-	if (type === "Hazer")
-		c = [0.21176471, 0.7921569, 0.3882353];
-	if (type === "Vulture" || type === "KingVulture")
-		c = [0.83137256, 0.7921569, 0.43529412];
-	if (type === "ZoopLizard")
-		c = [0.95, 0.73, 0.73];
-	if (type === "StowawayBug")
-		c = [0.36862746, 0.36862746, 0.43529412];
-	if (type === "AquaCenti")
-		c = [0, 0, 1];
-	if (type === "TerrorLongLegs" || type === "TrainLizard")
-		c = [0.3, 0, 1];
-	if (type === "MotherSpider" || type === "JungleLeech")
-		c = [0.1, 0.7, 0.1];
-	if (type === "HunterDaddy")
-		//	var a = {r: 1, g: 0.4509804, b: 0.4509804};	//	PlayerGraphics::DefaultSlugcatColor (Red)
-		//	var b = {r: 0.5, g: 0.5, b: 0.5}, t = 0.4;	//	UnityEngine.Color::gray
-		//	//	Lerp 0.4:
-		//	var c = {r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t};	//	UnityEngine.Color::Lerp(a, b)
-		//	-> c = {r: 0.8, g: 0.47058824, b: 0.47058824}
-		c = [0.8, 0.47058824, 0.47058824];
-	if (type === "MirosVulture")
-		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type === "FireBug")
-		c = [1, 0.47058824, 0.47058824];
-	if (type === "SpitLizard")
-		c = standardColor[type];
-	if (type === "EelLizard")
-		c = [0.02, 0.78039217, 0.2];
-	if (type === "Inspector")
-		c = [0.44705883, 0.9019608, 0.76862746];
-	if (type === "Yeek")
-		c = [0.9, 0.9, 0.9];
-	if (type === "BigJelly")
-		c = [1, 0.85, 0.7];
-	/* end copy */
-
-	return colorFloatToString(c);
-}
-
-/**
- *	Helper functions to generate below tables.
- *	Converts item value string to HTML color; ported from game/mod.
- *	TODOs: same as creatureNameToIconAtlas().
- */
-function itemNameToIconColor(type) {
-	/*
-	 *	Game extract: ItemSymbol::ColorForItem
-	 *	Paste in verbatim, then make these changes:
-	 *	- Adjust tabbing level to current scope
-	 *	- Search and replace:
-	 *		/itemType == AbstractPhysicalObject\.AbstractObjectType\./ --> "type == \""
-	 *		/ModManager.MSC && itemType == MoreSlugcatsEnums.AbstractObjectType./ --> "type == \""
-	 *		/\)\r\n\t{1,2}\{\r\n\t{2,3}/ --> "\"\)\r\n\t\t"
-	 *		/\t{1,2}\}\r\n\t{1,2}if/ --> "\tif"
-	 *		/ \|\| / --> "\" || "
-	 *		/return new Color\(/ --> "c = ["
-	 *		/\);\r\n\t+\}/ --> "];"
-	 *		/return\s\(StaticWorld\.GetCreatureTemplate\(iconData\.critType\)\.breedParameters\sas\sLizardBreedParams\)\.standardColor;\r\n\t\}/ --> "c = standardColor\[type\];"
-	 *	- ummm doing this one after creatureNameToIconColor, kinda don't care about exact refactoring notes
-	 *	- For items with intData, append the value to type; these are enumerated individually
-	 *	- except for PebblesPearl3 (includes any intData >= 3), PebblesPearl (intData < 0)
-	 */
-	var c = HSL2RGB(0.73055553, 0.08, 0.67);	//	Menu::MenuColors.MediumGrey
-	if (type === "SporePlant")
-		c = [0.68235296, 0.15686275, 0.11764706];
-	if (type === "FirecrackerPlant")
-		c = [0.68235296, 0.15686275, 0.11764706];
-	if (type === "ScavengerBomb")
-		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type === "Spear1")
-		c = [0.9019608, 0.05490196, 0.05490196];
-	if (type === "Spear2")
-		c = [0, 0, 1];
-	if (type === "Spear3")
-		c = [1, 0.47058824, 0.47058824];
-	if (type === "Lantern")
-		c = [1, 0.57254905, 0.31764707];
-	if (type === "FlareBomb")
-		c = [0.73333335, 0.68235296, 1];
-	if (type === "SlimeMold")
-		c = [1, 0.6, 0];
-	if (type === "BubbleGrass")
-		c = [0.05490196, 0.69803923, 0.23529412];
-	if (type === "DangleFruit")
-		c = [0, 0, 1];
-	if (type === "Mushroom")
-		c = [1, 1, 1];
-	if (type === "WaterNut")
-		c = [0.05, 0.3, 0.7];
-	if (type === "EggBugEgg")
-		c = [0, 1, 0.47058824];
-	if (type === "FlyLure")
-		c = [0.6784314, 0.26666668, 0.21176471];
-	if (type === "SSOracleSwarmer")
-		c = [1, 1, 1];
-	if (type === "NSHSwarmer")
-		c = [0, 1, 0.3];
-	if (type === "NeedleEgg")
-		c = [0.5764706, 0.16078432, 0.2509804];
-	if (type === "PebblesPearl1")
-		c = [0.7, 0.7, 0.7];
-	if (type === "PebblesPearl2")
-		c = HSL2RGB(0.73055553, 0.08, 0.3);
-	if (type === "PebblesPearl3")	//	intData >= 3
-		c = [1, 0.47843137, 0.007843138];
-	if (type === "PebblesPearl") 	//	intData < 0
-		c = [0, 0.45490196, 0.6392157];
-	if (type === "DataPearl" || itemType === "HalcyonPearl") {
-		if (intData > 1 && intData < DataPearlList.length) {
-				var mc = UniquePearlMainColor(intData);
-				var hc = UniquePearlHighLightColor(intData);
-				if (hc != null)
-					mc = ColorScreen(mc, ColorQuickSaturation(hc, 0.5));
-				else
-					mc = ColorLerp(mc, [1, 1, 1], 0.15);
-				if (mc[0] < 0.1 && mc[1] < 0.1 && mc[2] < 0.1)
-					mc = ColorLerp(mc, HSL2RGB(0.73055553, 0.08, 0.67), 0.3);
-				c = mc;
-		} else if (intData == 1)
-			c = [1, 0.6, 0.9];
-		else
-			c = [0.7, 0.7, 0.7];
-	} else {
-		if (type === "Spearmasterpearl")
-			c = ColorLerp([0.45, 0.01, 0.04], [1, 1, 1], 0.15);
-		if (type === "EnergyCell")
-			c = [0.01961, 0.6451, 0.85];
-		if (type === "SingularityBomb")
-			c = [0.01961, 0.6451, 0.85];
-		if (type === "GooieDuck")
-			c = [0.44705883, 0.9019608, 0.76862746];
-		if (type === "LillyPuck")
-			c = [0.17058827, 0.9619608, 0.9986275];
-		if (type === "GlowWeed")
-			c = [0.94705886, 1, 0.26862746];
-		if (type === "DandelionPeach")
-			c = [0.59, 0.78, 0.96];
-		if (type === "MoonCloak")
-			c = [0.95, 1, 0.96];
-		if (type === "FireEgg")
-			c = [1, 0.47058824, 0.47058824];
-	}
-	return c;
-}
-
-/**
- *	Helper functions:
- *	Port of various functions to enumerate and calculate pearl colors.
- */
-function makePearlColors() {
-	for (var intData = 2; intData < DataPearlList.length; intData++) {
-		var name = DataPearlList[intData];
-		var mc = UniquePearlMainColor(intData);
-		var hc = UniquePearlHighLightColor(intData);
-		if (hc !== undefined)
-			mc = ColorScreen(mc, ColorQuickSaturation(hc, 0.5));
-		else
-			mc = ColorLerp(mc, [1, 1, 1], 0.15);
-		if (mc[0] < 0.1 && mc[1] < 0.1 && mc[2] < 0.1)
-			mc = ColorLerp(mc, HSL2RGB(0.73055553, 0.08, 0.67), 0.3);
-		var s = "\t\"" + name + "\": [";
-		s += ((Math.round(mc[0] * 1e6) / 1e6).toString() + "       ").substring(0, 8);
-		for (var i = 1; i < mc.length; i++)
-			s += ", " + ((Math.round(mc[i] * 1e6) / 1e6).toString() + "       ").substring(0, 8);
-		s += "],";
-		console.log(s);
-	}
-
-	/**
-	 *	From base game, DataPearl
-	 *	s/DataPearl\.AbstractDataPearl\.DataPearlType\.|MoreSlugcatsEnums\.DataPearlType\./\"/
-	 *	s/ \|\| /\" || /
-	 *	s/\)\r\n\t+\{/\"\) \{/
-	 *	etc.
-	 */
-	function UniquePearlMainColor(intData) {
-		var pearlType = DataPearlList[intData];
-		var c = [0.7, 0.7, 0.7];
-		if (pearlType === "SI_west")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SI_top")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SI_chat3")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SI_chat4")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SI_chat5")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "Spearmasterpearl")
-			c = [0.04, 0.01, 0.04];
-		if (pearlType === "SU_filt")
-			c = [1, 0.75, 0.9];
-		if (pearlType === "DM")
-			c = [0.95686275, 0.92156863, 0.20784314];
-		if (pearlType === "LC")
-			c = HSL2RGB(0.34, 1, 0.2);
-		if (pearlType === "LC_second")
-			c = [0.6, 0, 0];
-		if (pearlType === "OE")
-			c = [0.54901963, 0.36862746, 0.8];
-		if (pearlType === "MS")
-			c = [0.8156863, 0.89411765, 0.27058825];
-		if (pearlType === "RM")
-			c = [0.38431373, 0.18431373, 0.9843137];
-		if (pearlType === "Rivulet_stomach")
-			c = [0.5882353, 0.87058824, 0.627451];
-		if (pearlType === "CL")
-			c = [0.48431373, 0.28431374, 1];
-		if (pearlType === "VS")
-			c = [0.53, 0.05, 0.92];
-		if (pearlType === "BroadcastMisc")
-			c = [0.9, 0.7, 0.8];
-		if (pearlType === "CC")
-			c = [0.9, 0.6, 0.1];
-		if (pearlType === "DS")
-			c = [0, 0.7, 0.1];
-		if (pearlType === "GW")
-			c = [0, 0.7, 0.5];
-		if (pearlType === "HI")
-			c = [0.007843138, 0.19607843, 1];
-		if (pearlType === "LF_bottom")
-			c = [1, 0.1, 0.1];
-		if (pearlType === "LF_west")
-			c = [1, 0, 0.3];
-		if (pearlType === "SB_filtration")
-			c = [0.1, 0.5, 0.5];
-		if (pearlType === "SH")
-			c = [0.2, 0, 0.1];
-		if (pearlType === "SI_top")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SI_west")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SL_bridge")
-			c = [0.4, 0.1, 0.9];
-		if (pearlType === "SL_moon")
-			c = [0.9, 0.95, 0.2];
-		if (pearlType === "SB_ravine")
-			c = [0.01, 0.01, 0.01];
-		if (pearlType === "SU")
-			c = [0.5, 0.6, 0.9];
-		if (pearlType === "UW")
-			c = [0.4, 0.6, 0.4];
-		if (pearlType === "SL_chimney")
-			c = [1, 0, 0.55];
-		if (pearlType === "Red_stomach")
-			c = [0.6, 1, 0.9];
-		return c;
-	}
-
-	function UniquePearlHighLightColor(intData) {
-		var pearlType = DataPearlList[intData];
-		var c;
-		if (pearlType === "SI_chat3")
-			c = [0.4, 0.1, 0.6];
-		if (pearlType === "SI_chat4")
-			c = [0.4, 0.6, 0.1];
-		if (pearlType === "SI_chat5")
-			c = [0.6, 0.1, 0.4];
-		if (pearlType === "Spearmasterpearl")
-			c = [0.95, 0, 0];
-		if (pearlType === "RM")
-			c = [1, 0, 0];
-		if (pearlType === "LC_second")
-			c = [0.8, 0.8, 0];
-		if (pearlType === "CL")
-			c = [1, 0, 0];
-		if (pearlType === "VS")
-			c = [1, 0, 1];
-		if (pearlType === "BroadcastMisc")
-			c = [0.4, 0.9, 0.4];
-		if (pearlType === "CC")
-			c = [1, 1, 0];
-		if (pearlType === "GW")
-			c = [0.5, 1, 0.5];
-		if (pearlType === "HI")
-			c = [0.5, 0.8, 1];
-		if (pearlType === "SH")
-			c = [1, 0.2, 0.6];
-		if (pearlType === "SI_top")
-			c = [0.1, 0.4, 0.6];
-		if (pearlType === "SI_west")
-			c = [0.1, 0.6, 0.4];
-		if (pearlType === "SL_bridge")
-			c = [1, 0.4, 1];
-		if (pearlType === "SB_ravine")
-			c = [0.6, 0.1, 0.4];
-		if (pearlType === "UW")
-			c = [1, 0.7, 1];
-		if (pearlType === "SL_chimney")
-			c = [0.8, 0.3, 1];
-		if (pearlType === "Red_stomach")
-			c = [1, 1, 1];
-		return c;
-	}
-
-	function ColorScreen(a, b) {
-		return [1 - (1 - a[0]) * (1 - b[0]), 1 - (1 - a[1]) * (1 - b[1]), 1 - (1 - a[2]) * (1 - b[2])];
-	}
-
-	function ColorLerp(a, b, t) {
-		return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-	}
-	function ColorQuickSaturation(hc, value) {
-		var a = QuickSaturation(hc) * value;
-		return [hc[0] * a, hc[1] * a, hc[2] * a];
-	}
-
-	function QuickSaturation(col) {
-		return InverseLerp(Math.max(...col), 0, Math.min(...col));
-	}
-
-	function InverseLerp(a, b, value) {
-		var result;
-		if (a != b)
-			result = Math.min(Math.max((value - a) / (b - a), 0), 1);
-		else
-			result = 0;
-		return result;
-	}
 }
