@@ -4,10 +4,10 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=600, initial-scale=0.7">
 	<title>Rain World Bingo Board Viewer</title>
-	<link rel="preload" as="image" href="bingoicons_mod.png" crossorigin="anonymous">
+	<link rel="preload" as="image" href="bingoicons.png" crossorigin="anonymous">
 	<link rel="preload" as="image" href="uiSprites.png" crossorigin="anonymous">
 	<link rel="preload" as="image" href="uispritesmsc.png" crossorigin="anonymous">
-	<link rel="preload" as="fetch" href="bingoicons_mod.txt" crossorigin="anonymous">
+	<link rel="preload" as="fetch" href="bingoicons.txt" crossorigin="anonymous">
 	<link rel="preload" as="fetch" href="uiSprites.txt" crossorigin="anonymous">
 	<link rel="preload" as="fetch" href="uispritesmsc.txt" crossorigin="anonymous">
 	<link rel="preload" as="script" href="bingovista.js">
@@ -233,6 +233,7 @@ textarea {
 	<p>&nbsp;</p>
 	<div style="display: none;"><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label> (flashbang warning)</div>
 	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
+	<div><label><input type="checkbox" id="transp" checked>Transpose Board</label> (matches < v1.25 visual arrangement)</div>
 	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
 	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text">&nbsp;&nbsp;&nbsp;<input type="button" id="copy" value="Copy Text"></div>
 	<p>Paste/edit above, or select file or drag-and-drop below:</p>
@@ -248,7 +249,7 @@ textarea {
 	<p>"Kibitzing" enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
 	<p>Metadata is... not terribly convenient to update right now. It's not used by the mod as of v1.1, so it doesn't matter beyond appearances here, anyway. That said: Title, Shelter and Perks are read from this page's HTML, when pressing Parse.  This doesn't help much, because only perks are selectable; Title and Shelter can be edited by choosing Inspect Element in your browser and modifying them manually.  Then pressing Parse to set the URL.  For a more comprehensive method, try the <span class="code">setMeta()</span> function in the debug console. Once encoded in the URL, the URL can be shared, and metadata will show as set.</p>
 	<h2>Tips and Guides</h2>
-	<p>Curious what all the notes are?  Enable Kibitzing and view <a href="https://t3sl4co1l.github.io/bingovista/bingovista.html?b=UndCaQEJBwcCHgAAAAAAHwAAAAAAVW50aXRsZWQAAAEAAQ4CABgIuQIDBAUGBwgJCgsMDQ4PEBESExQVFhcDAAEDBBADA7hLBQADC04_BgACAcUHAALSdAgABAc6VSoJAAECCgAACyABEgwQA49QBw0QAQQOAAEKDwAC2XIQEAARAAE6EgABFBMAAsAKFAACeAkVMAYEBlxzFCIWAAEOFwACpFIYAAI0ChkAABoAAQIbAAEEHBADbDgDHQAEug0CBB4AAoJAHwAAIAAAIQACCTgiAAMFJwcjAAENJAACYHElAALgciYAAxICBCcAAgYAKQABCCoAAgQIKwAALAABEC0QBgYt9lYRDy4AAgQw">a board with every goal on it</a>.  (This board won't work in-game, it's purely for Viewer illustration.)</p>
+	<p>Curious what all the notes are?  Enable Kibitzing and view <a href="https://t3sl4co1l.github.io/bingovista/bingovista.html?b=UndCaQEJBwcAHgAAAAAAHwAAAAAAVW50aXRsZWQAAAEAAQQCABgUVAIDBAUGBwgJCgsMDQ4PEBESExQVFhcEAAMaS1AFAAMGMC4GAAICrwcAAqtmCQABAwoAAAswARcMEANgJxEOAAEJDwACdwIQEAAREAFnEgAB4xQAAiVaFVAGLgfdMgkBFgABIhcAAg0qGAACd1sZAAAaAAEVGwABChwQA6MqAx0ABINMIg4eAAL_Kh8AACAAACEAArhiIgADBfdQIwABBCQAAsc2JQACHWwmAAMFBAInAAJTACkAAUkqAAINFCsQACwAAQwtEAYDHDM-CBwuAAIErQMQAQQwEAIN1DEAAgdiMgABKTMAAXY0AAECNRADqgcNNgABywAA">a board with every goal on it</a>.  (This board won't work in-game, it's purely for Viewer illustration.)</p>
 	<p>[Base expedition and v1.08+] Vista point locations can be found on these community maps from <a href="https://rainworld.miraheze.org/wiki/Regions">Regions - Official Rain World Wiki</a>:</p>
 	<ul>
 	  <li><a href="worldmaps/Base_World_Map_DownpourWith_Vistas.png">Full Downpour World Map</a></li>
@@ -273,6 +274,7 @@ textarea {
 	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, DrekiOrmur and shrubfromtomorrow for contributions, and alphappy and diedirl for tips and help.</p>
 	<h2>Changelog</h2>
 	<ul>
+	  <li>2025/08/26: Large update taking too long; updating to v1.25 support.</li>
 	  <li>2025/08/10: Testing experimental new feature; large update coming soon(!).</li>
 	  <li>2025/07/30: More commentary tweaks, and a "one of everything" board to easily show all commentary.</li>
 	  <li>2025/07/18: Improved commentary on item hoard, tame and transport goals.</li>
@@ -283,6 +285,6 @@ textarea {
 	  <li>2025/03/02: 0.90 mod support.</li>
 	  <li>2025/02/19: First release, 0.85 mod support.</li>
 	</ul>
-	<script src="bingovista.min.js"></script>
+	<script src="bingovista.js"></script>
   </body>
 </html>
