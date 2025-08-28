@@ -235,20 +235,19 @@ document.addEventListener("DOMContentLoaded", function() {
 		} else if (u.has("b")) {
 
 			//	Binary string, base64 encoded
+			var ar;
 			try {
-				//	Undo URL-safe escapes...
-				var ar = base64uToBin(u.get("b"));
-				try {
-					board = binToString(ar);
-				} catch (e) {
-					setError("Error decoding board: " + e.message);
-				}
-				setHeaderFromBoard(board);
-
+				ar = base64uToBin(u.get("b"));	//	Undo URL-safe escapes...
 			} catch (e) {
 				setError("Error parsing URL: " + e.message);
 			}
+			try {
+				board = binToString(ar);
+			} catch (e) {
+				setError("Error decoding board: " + e.message);
+			}
 			document.getElementById("textbox").value = board.text;
+			setHeaderFromBoard(board);
 			parseText();
 
 		} else if (u.has("q")) {
@@ -285,6 +284,7 @@ document.addEventListener("DOMContentLoaded", function() {
 					setError("Error decoding board: " + e.message);
 				}
 				document.getElementById("textbox").value = board.text;
+				setHeaderFromBoard(board);
 				parseText();
 			} );
 
