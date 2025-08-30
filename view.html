@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=600, initial-scale=0.7">
+	<title>View | Rain World Bingo Board Viewer/Creator</title>
+	<link rel="preload" as="image" href="bvicons.png" crossorigin="anonymous">
+	<link rel="preload" as="image" href="bingoicons.png" crossorigin="anonymous">
+	<link rel="preload" as="image" href="uiSprites.png" crossorigin="anonymous">
+	<link rel="preload" as="image" href="uispritesmsc.png" crossorigin="anonymous">
+	<link rel="preload" as="fetch" href="bvicons.txt" crossorigin="anonymous">
+	<link rel="preload" as="fetch" href="bingoicons.txt" crossorigin="anonymous">
+	<link rel="preload" as="fetch" href="uiSprites.txt" crossorigin="anonymous">
+	<link rel="preload" as="fetch" href="uispritesmsc.txt" crossorigin="anonymous">
+	<link rel="preload" as="script" href="bingovista2.js">
+	<link rel="icon" type="image/png" sizes="48x48" href="favicon.ico">
+	<link rel="StyleSheet" href="v.css" media="all">
+  </head>
+  <body>
+	<table style="margin-top: 1em; table-layout: fixed; width:456px;"><tr>
+	  <td class="navbt navbts"><a href="view.html"><div>VIEW</div></a></td><td class="navsp"></td>
+	  <td class="navbt"><a href="create.html"><div>CREATE</div></a></td><td class="navsp"></td>
+	  <td class="navbt"><a href="tips.html"><div>TIPS</div></a></td><td class="navsp"></td>
+	  <td class="navbt"><a href="about.html"><div>ABOUT</div></a></td>
+	</tr></table>
+	<h1>Rain World: Bingo Mod<br> Board Viewer/Creator</h1>
+	<table class="hdrtbl"><tbody id="header">
+	  <tr><td>Title</td><td id="hdrttl">Untitled</td></tr>
+	  <tr><td>Size</td><td id="hdrsize">1</td></tr>
+	  <tr><td>Character</td><td id="hdrchar">Any</td></tr>
+	  <tr><td>Shelter</td><td id="hdrshel">random</td></tr>
+	  <tr><td>Perks/flags</td><td>
+		<div style="margin-left: 1em; margin-bottom: 4px;"><div class="navbt" id="hdrshow" style="width: fit-content;" tabindex="0"><div>SHOW/HIDE</div></div></div>
+		<div style="margin-left: 0px; display: none;" id="hdrperks"></div>
+	  </td></tr>
+	  <tr><td>Mods</td><td id="hdrmods">none</td></tr>
+	</tbody></table>
+	<div id="boardcontainer" tabindex="0" style="position: relative; width: 456px; height: 456px;">
+	  <canvas width="454" height="454" id="board" style="position: absolute; top: 0px; left: 0px; z-index: 1;">Canvas support and scripting are required.</canvas>
+	  <div id="cursor" style="display: none; width: 39px; height: 39px; margin: 0; border: 3px solid #ff8090; border-radius: 5px; position: absolute; top: 1px; left: 1px; z-index: 2;"></div>
+	</div>
+	<table><tr><td style="vertical-align: top; padding-top: 6px;"><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
+	<p>&nbsp;</p>
+	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
+	<p>Status: <span id="errorbox">OK</span></p>
+	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
+
+	<table style="margin-top: 0.5em; table-layout: fixed; width: 482px;"><tr>
+	  <td class="navbt" id="copy"  tabindex="0"><div>COPY TEXT</div></td><td class="navsp"></td>
+	  <td class="navbt" id="short" tabindex="0"><div>SHORTEN LINK</div></td>
+	</tr></table>
+
+	<script src="bingovista2.js"></script>
+  </body>
+</html>

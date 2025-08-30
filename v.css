@@ -1,0 +1,252 @@
+@font-face {
+    font-family: "Rodondo";
+    src: url(Rodondo.otf) format("OpenType");
+}
+.desctxt {
+	text-align: left;
+	font: 16px "Segoe UI Semibold", Verdana, sans-serif;
+	padding-left: 0.6em;
+	vertical-align: top;
+	width: 24em;
+}
+.desctxt * {
+	text-align: inherit;
+	margin: 4px 0 0 0;
+}
+.desctxt br {
+	margin: 0 0 6px 0;
+}
+.descch {
+	font: 700 16px "Segoe UI Bold", Verdana, sans-serif;
+}
+.desclist {
+	border-collapse: collapse;
+}
+.desclist tbody tr td {
+	font: 14px "Segoe UI", sans-serif;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+}
+.desclist tbody tr :first-child {
+	text-align: right;
+}
+.desclist thead tr td {
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	text-align: center;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+	border-bottom-color: #a0a0a0;
+}
+.desccomm {
+	font: 14px "Segoe UI", sans-serif;
+}
+.drop {
+	border: 2px solid #a9a4b2;
+	border-radius: 8px;
+	text-align: center;
+}
+.droptbl {
+	min-width: 20em;
+	min-height: 8em;
+}
+.errorbox {
+	color: #e80000;
+	font-size: small;
+	margin-top: 4px;
+}
+.hdrtbl {
+	border-collapse: collapse;
+	max-width: 550px;
+}
+.hdrtbl tr td {
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+}
+.hdrtbl tr:first-child td {
+	font-weight: bold;
+	font-size: large;
+	text-align: center;
+}
+.hdrtbl tr td:first-child {
+	text-align: right;
+}
+.hdrtbl tr td:last-child {
+	text-align: left;
+	padding-right: 0.7em;
+}
+span.ui {
+	font-size: 16px;
+}
+.navbt {
+	border: 2px solid #080000;
+	border-radius: 8px;
+	color: #a9a4b2;
+	display: inline-block;
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	padding: 0px;
+	width: 100%;
+	margin: 0;
+	transition-duration: 0.3s;
+}
+.navsp {
+	width: 1px;
+}
+.navbts {
+	color: #a9a4b2;
+}
+.navbt div {
+	border: 2px solid #4a4552;
+	border-radius: 8px;
+	padding: 6px;
+	margin: 2px;
+	text-align: center;
+	transition-duration: 0.3s;
+	user-select: none;
+}
+.navbts div {
+	border-color: #a9a4b2;
+	color: #a9a4b2;
+}
+.navbt:hover, .navbt:focus {
+	border: 2px solid #ffffff;
+	color: #ffffff;
+}
+.navbt:hover div, .navbt:focus div {
+	border: 2px solid #ffffff;
+	color: #ffffff;
+}
+.navbt a:link, .navbt a:visited {
+	text-decoration: auto;
+	color: inherit;
+}
+a:link {
+	color: #90a0ff;
+}
+a:visited {
+	color: #ff90e8;
+}
+body {
+	font-family: Verdana, Arial, sans-serif;
+	color: #ffffff;
+	background-color: #020204;
+	line-height: 130%;
+	font-size: 100%;
+	text-size-adjust: none;
+	-webkit-text-size-adjust: none;
+}
+body div {
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+canvas {
+	border: 1px solid #b0b0b0;
+}
+div {
+	margin-top: 0.5em;
+}
+h1 {
+	font-family: "Rodondo";
+	font-weight: normal;
+	font-size: xxx-large;
+	margin-top: 4px;
+	margin-bottom: 0.5em;
+	line-height: 90%;
+	text-align: center;
+}
+h2 {
+	font-size: x-large;
+	margin-bottom: 0.25em;
+	margin-left: 3em;
+}
+input[type=button] {
+	background-color: #020204;
+	border: 2px solid #a9a4b2;
+	border-radius: 8px;
+	color: #a9a4b2;
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	padding: 5px 8px;
+}
+input[type=file] {
+	border: 1px solid #c0c0c0;
+	padding: 6px;
+}
+input[type=text] {
+	background-color: #020204;
+	border: 2px solid #a9a4b2;
+	border-radius: 8px;
+	color: #ffffff;
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	padding: 2px 3px;
+	margin-left: 2px;
+}
+label input {
+	vertical-align: 1px;
+}
+p {
+	padding-bottom: 0.5em;
+	margin-left: 1em;
+	margin-right: 2em;
+	max-width: 50em;
+}
+p.pimg {
+	margin-right: 3em;
+	max-width: 42em;
+	text-align: center;
+}
+p.pimg img {
+	padding: 4px;
+	border: 2px solid #4a4552;
+}
+span.code {
+    font-family: Courier New, monospace;
+    font-weight: bold;
+    font-size: 100%;
+    white-space: nowrap;
+    background-color: #584800;
+    color: #ffffff;
+}
+table {
+	margin: 6px auto 0 auto;
+}
+td div {
+	text-align: left;
+}
+td label {
+	display: inline-block;
+	padding: 0 3px;
+}
+td label input {
+	padding: 2px;
+}
+textarea {
+	width: 36em;
+	height: 20em;
+	padding: 0.2em 0.4em;
+	line-break: anywhere;
+	color: #ffffff;
+	background-color: #404040;
+}
+ul li {
+	margin: 0 2em 4px 1.5em;
+	max-width: 50em;
+}
+@media only screen and (min-width: 830px) {
+	body div {
+		text-align: left;
+		margin-left: 1em;
+		margin-right: initial;
+	}
+	h1 {
+		margin-left: 0.7em;
+		line-height: 90%;
+		text-align: left;
+	}
+	table {
+		margin: 6px auto 0 calc(1em - 2px);
+	}
+	p.pimg {
+		margin: 0.3em auto 0.3em 2.8em;
+	}
+}

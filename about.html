@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=600, initial-scale=0.7">
+	<title>About | Rain World Bingo Board Viewer/Creator</title>
+	<link rel="icon" type="image/png" sizes="48x48" href="favicon.ico">
+	<link rel="StyleSheet" href="v.css" media="all">
+  </head>
+  <body>
+	<table style="margin-top: 1em; table-layout: fixed; width:456px;"><tr>
+	  <td class="navbt"><a href="view.html"><div>VIEW</div></a></td><td class="navsp"></td>
+	  <td class="navbt"><a href="create.html"><div>CREATE</div></a></td><td class="navsp"></td>
+	  <td class="navbt"><a href="tips.html"><div>TIPS</div></a></td><td class="navsp"></td>
+	  <td class="navbt navbts"><a href="about.html"><div>ABOUT</div></a></td>
+	</tr></table>
+	<h1>Rain World: Bingo Mod<br> Board Viewer/Creator</h1>
+	<p>Bingo Board Viewer, by <a href="https://github.com/T3sl4co1l/bingovista/">T3sl4co1l</a>. Supports <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3441764924">Rain World Bingo Mod</a> up to version 1.23.</p>
+	<p>Usage: in-game, while configuring the board and selecting challenges, press the "Copy board" button:</p>
+	<p class="pimg"><img src="instruction1.png" width="345" height="157"></p>
+	<p>Switch to this browser window.  Click on the CREATE navigation button.  Scroll down to the large textbox.  Press CLEAR. Focus the large textbox, and Paste into it:
+	<p class="pimg"><img src="instruction2.png" width="396" height="370"></p>
+	
+	<p>Copied text can also pasted into chats, discussion boards, forums, etc. for easy sharing, or as a text file (*.TXT) for local storage.  Saved text can be loaded by clicking Choose File/Browse..., or drag-and-dropping a text file into the file-load widget.  Whatever the method, the text content is loaded into the textbox for visual confirmation (and manual editing as needed).</p>
+	<p>For convenience, pasting into an empty textbox also triggers parsing.  Parsing takes in any valid goals and renders them as goal squares, recreating the in-game view.  Squares can be clicked to view a detailed description.  The board can also be navigated by focusing it, then using arrow keys to move the cursor around.</p>
+	<p>The board view and current URL are updated together. The board is encoded in the URL, in a shorthand form; a typical board is around 3kB, a typical URL around 300 bytes. The URL can be copied, and shared anywhere that accepts URLs.  The encoded board can be read anywhere with an internet connection (or a local copy of the viewer).</p>
+	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, and all parameters and values used in it.</p>
+	<p>"Kibitzing" enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
+	<p><em>Review the board before sharing!</em>  Goals may not read properly (particularly likely with customized options, or after mod updates; take note of the current version, and currently supported version!), and error squares take up extra space in the URL.  Doesn't hurt to double-check the URL as well: simply refresh the page, to load it from the encoded data in the URL.  (If you find the URL is ponderously large for a given board size, there are probably errors in it!)  If any squares have changed, or become errors afterwards, a bug report is welcome!</p>
+	<p>Errors show up as a null symbol "<b>&empty;</b>"; read that square's description to see what parameter(s) failed.  If corrections are needed, or manual edits made, do them in the text box, then press PARSE TEXT.  Parsing also removes extraneous white space, so you can space things out for easier editing beforehand.</p>
+	<p>In lieu of a proper board editor (or customizer), using a featureful text editor like <a href="https://notepad-plus-plus.org/">Notepad++</a> is recommended.  First, find-and-replace "bChG" with "&nbsp;bChG\n".  That is, add a space before, and a newline after, these letters.  Use the "Extended" mode that supports escaped characters (like '\n').  Goals are much easier to see and move around this way.  Structure is regular: <span class="code">BingoChallengeName&sim;param1&gt;&lt;param2&gt;&lt;...</span>.  Parameters are (usually) verbose, including metadata related to the selection box (type, title, position on the in-game configure menu, list to choose from).</p>
+	<p>Customization note: several goals can be manually customized, using items or creatures outside of the normal lists those goals can select from.  These work in gameplay, but are <em>unsafe</em> to use during board creation: editing the offending square, causes the game UI to freeze.  For this reason (and for some technical aspects of the current-version encoded format), Bingo Vista reports such goals as error.  The error includes the original goal string (at least in part), so that the original goal can probably be reconstructed manually.</p>
+	<p>TODO: we're fixing this! Metadata is... not terribly convenient to update right now. It's not used by the mod as of v1.1, so it doesn't matter beyond appearances here, anyway. That said: Title, Shelter and Perks are read from this page's HTML, when pressing Parse.  This doesn't help much, because only perks are selectable; Title and Shelter can be edited by choosing Inspect Element in your browser and modifying them manually.  Then pressing Parse to set the URL.  For a more comprehensive method, try the <span class="code">setMeta()</span> function in the debug console. Once encoded in the URL, the URL can be shared, and metadata will show as set.</p>
+	<h2><a name="data">Data Use and Storage</a></h2>
+	<p>On the CREATE page, pressing LINK opens a tab to the viewer, using a long URL that encodes the board data.  The basic viewer <em>does not store</em> any data.  This link can be stored and accessed at any time (given one has access to the viewer page).</p>
+	<p>On the VIEW page, pressing SHORTEN <b>does transmit data</b> to a server.  <b>This service is offered voluntarily</b>; it may become unavailable at any time, due to congestion, outage, maintenance, abuse, or just not being able to support it.  DO NOT rely on shortened links for persistent storage! Keep backups (the long URL, or text) of anything you want to save.</p>
+	<h2>Thanks</h2>
+	<p>Videocult and co. for Rain World, Nacu for putting in the work on Bingo, and ICED37 for making it happen; shrubfromtomorrow for continuing the project; Gzethicus and DrekiOrmur for contributions; and alphappy and diedirl for help with assets and tips on inner workings.</p>
+	<h2>Changelog</h2>
+	<ul>
+	  <li>2025/08/xx: Major overhaul! Separating roles into View and Create; documentation moved to own pages; shorten-link feature; v1.2 mod support.</li>
+	  <li>2025/07/30: More commentary tweaks, and a "one of everything" board to easily show all commentary.</li>
+	  <li>2025/07/18: Improved commentary on item hoard, tame and transport goals.</li>
+	  <li>2025/07/01: 1.1 mod support.</li>
+	  <li>2025/06/27: 1.09 mod support.</li>
+	  <li>2025/06/17: 1.08 mod support.</li>
+	  <li>2025/03/13: 1.04 mod support.</li>
+	  <li>2025/03/02: 0.90 mod support.</li>
+	  <li>2025/02/19: First release, 0.85 mod support.</li>
+	</ul>
+  </body>
+</html>
