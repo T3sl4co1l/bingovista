@@ -147,7 +147,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		document.getElementById("textbox").value = "";
 		var u = new URL(document.URL);
 		u.search = "";
-		history.pushState(null, "", u.href);
+		window.history.pushState(null, "", u.href);
 	});
 	document.getElementById("parse").addEventListener("click", parseText);
 	document.getElementById("copy").addEventListener("click", copyText);
@@ -534,7 +534,7 @@ function parseText(e) {
 	s = binToBase64u(board.toBin);
 	var u = new URL(document.URL);
 	u.searchParams.set("b", s);
-	history.pushState(null, "", u.href);
+	window.history.pushState(null, "", u.href);
 
 	if (selected !== undefined)
 		selectSquare(selected.col, selected.row);
@@ -1307,7 +1307,7 @@ const CHALLENGES = {
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
 			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
-		var p;
+		var d, p;
 		if (speci[1] === "true") {
 			var r;
 			if (items[1] === "MS")
@@ -2322,7 +2322,7 @@ const CHALLENGES = {
 		var common = checkSettingbox(thisname, desc[0], ["System.Boolean", , "Common Pearls", , "NULL"], "common pearls flag");
 		var any = checkSettingbox(thisname, desc[1], ["System.Boolean", , "Any Shelter", , "NULL"], "any shelter flag");
 		var amounts = checkSettingbox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "pearl count");
-		desc[4] = desc[4].replace(/"regionsreal"/, "\"regions\"");	//	both acceptable (v0.85/0.90)
+		desc[4] = desc[4].replace(/regionsreal/, "regions");	//	both acceptable (v0.85/0.90)
 		desc[4] = desc[4].replace(/\|In Region\|/, "|Region|");	//	parameter name updated v1.25
 		var reg = checkSettingbox(thisname, desc[4], ["System.String", , "Region", , "regions"], "region selection");
 		if (common[1] !== "true" && common[1] !== "false")
@@ -2331,7 +2331,7 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": error, any shelter flag \"" + any[1] + "\" not 'true' or 'false'");
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
 		var r = ".";
 		if (reg[1] !== "Any Region") {
 			r = (regionCodeToDisplayName[reg[1]] || "") + " / " + (regionCodeToDisplayNameSaint[reg[1]] || "");
@@ -3106,7 +3106,7 @@ const CHALLENGES = {
 		var amt = parseInt(amounts[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = amt;
@@ -5399,7 +5399,7 @@ const BINARY_TO_STRING_DEFINITIONS = [
  *	value: old/external name
  *	[not present]: no change
  */
-ChallengeUpgrades = {
+const ChallengeUpgrades = {
 	//	< v0.80
 	"BingoVistaExChallenge":     "BingoVistaChallenge",
 	//	v1.092
@@ -5660,7 +5660,7 @@ function setMeta() {
 
 	if (board === undefined || document.getElementById("hdrttl") === null
 			|| document.getElementById("hdrchar") === null
-			|| getElementContent("hdrshel") === null) {
+			|| document.getElementById("hdrshel") === null) {
 		console.log("Need a board to set.");
 		return;
 	}
@@ -6007,7 +6007,7 @@ function generateRandomRandomGoals(n) {
  *	Generates one random example of each possible goal type.
  */
 function generateOneOfEverything() {
-	var s = "White;";
+	var s = "White;", goalNum;
 	for (var i = 0; i < BINARY_TO_STRING_DEFINITIONS.length - GENERATE_BLACKLIST.length; i++) {
 		goalNum = i;
 		for (var j = 0; j < GENERATE_BLACKLIST.length; j++) {
