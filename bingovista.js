@@ -884,7 +884,7 @@ function boardToBin(b) {
 		gLen += b.goals[i].toBin.length;
 	}
 	gLen += hdr.length + comm.length + shelter.length + mods.length;
-	gLen = Math.ceil(gLen / 3) * 3;	//	round up to pad with zeroes; no effect on board, removes base64 padding
+	//gLen = Math.ceil(gLen / 3) * 3;	//	round up to pad with zeroes; no effect on board, removes base64 padding
 	var r = new Uint8Array(gLen);
 	var offs = 0;
 	r.set(hdr, offs); offs += hdr.length;
@@ -3240,7 +3240,8 @@ const BingoEnum_Bannable = [
 	//	More foods added v1.2
 	"SSOracleSwarmer",
 	"KarmaFlower",
-	"FireEgg"
+	"FireEgg",
+	"DataPearl"
 ];
 
 /**
@@ -5420,8 +5421,8 @@ const ChallengeUpgrades = {
 function appendCHALLENGES() {
 	var exceptions = Object.keys(ChallengeUpgrades);
 	for (var g of BINARY_TO_STRING_DEFINITIONS) {
-		if (exceptions.indexOf(g) < 0)
-			BingoEnum_CHALLENGES.push(g.GoalName);
+		if (exceptions.indexOf(g.name) < 0)
+			BingoEnum_CHALLENGES.push(g.name);
 	}
 }
 
@@ -5430,11 +5431,11 @@ function appendCHALLENGES() {
  *	using these substitutions:
  *	'+' -> '-'
  *	'/' -> '_'
- *	'=' -> '*'
+ *	'=' -> ''
  */
 function binToBase64u(a) {
 	var s = btoa(String.fromCharCode.apply(null, a));
-	return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "*");
+	return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 /**
