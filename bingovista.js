@@ -733,8 +733,8 @@ function setCursor(row, col) {
 	var curSty = document.getElementById("cursor").style;
 	curSty.width  = String(square.width  + square.border - 4) + "px";
 	curSty.height = String(square.height + square.border - 4) + "px";
-	curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
-	curSty.top  = String(square.margin / 2 - 0 + row * (square.height + square.margin + square.border)) + "px";
+	curSty.left = String(square.margin / 2 - 1 + col * (square.width + square.margin + square.border)) + "px";
+	curSty.top  = String(square.margin / 2 - 1 + row * (square.height + square.margin + square.border)) + "px";
 	if (transpose) {
 		var t = curSty.top; curSty.top = curSty.left; curSty.left = t;
 	}
@@ -748,15 +748,7 @@ function drawSquare(ctx, goal, x, y, size) {
 	ctx.beginPath();
 	ctx.strokeStyle = size.color;
 	ctx.lineWidth = size.border;
-	ctx.lineCap = "butt";
-	ctx.moveTo(x, y);
-	ctx.lineTo(x + size.width, y);
-	ctx.moveTo(x + size.width, y);
-	ctx.lineTo(x + size.width, y + size.height);
-	ctx.moveTo(x + size.width, y + size.height);
-	ctx.lineTo(x, y + size.height);
-	ctx.moveTo(x, y + size.height);
-	ctx.lineTo(x, y);
+	ctx.roundRect(x, y, size.width, size.height, 4);
 	ctx.stroke();
 	ctx.imageSmoothingEnabled = "false";
 	var lines = [], thisLine = [];
@@ -979,7 +971,7 @@ function binToString(a) {
 		try {
 			goal = binGoalToText(sa);
 		} catch (er) {
-			goal = "BingoChallenge~Error: " + er.message + "><";
+			goal = "BingoChallenge~Error: " + er.message + ", len " + sa.length + ", bytes [" + sa.join(",") + "]><";
 		}
 		ptr += GOAL_LENGTH + a[ptr + 2];
 		//	could also, at this point, enumerate goals in the data structure; need a direct binary to JS codec
@@ -2894,9 +2886,7 @@ const CHALLENGES = {
 			comments: "",
 			paint: [
 				{ type: "text", value: items[1], color: colorFloatToString(RainWorldColors.Unity_white) },
-				{ type: "break" },
-				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.EnterFrom), rotation: 180 },
-				{ type: "break" },
+				{ type: "icon", value: "keyShiftA", scale: 1, color: colorFloatToString(RainWorldColors.EnterFrom), rotation: 90 },
 				{ type: "text", value: itemTo[1], color: colorFloatToString(RainWorldColors.Unity_white) }
 			],
 			toBin: new Uint8Array(b)

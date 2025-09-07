@@ -68,7 +68,7 @@ struct bingo_header_s {
 	uint16_t goals;       	//	Starting offset where challenges are stored
 	uint16_t mods;        	//	Starting offset where mods are listed; 0 = no mods
 	uint16_t reserved;    	//	Reserved for future use; set to 0
-	uint8_t[] comments;   	//	Variable length header contents; logging, comments, additional data, etc.
+	uint8_t comments[];   	//	Variable length header contents; logging, comments, additional data, etc.
 };	//	sizeof(bingo_header_s) == 21
 
 - Within a major version, files must be backwards compatible; minor versions may add optional features that can be ignored by lower versions without loss of data.
@@ -89,7 +89,7 @@ The `mods` section is a list of mod packs, in order added to the viewer context.
 struct bingo_mod_s {
 	uint32_t hash;
 	uint16_t length; 	//	Length of name[]
-	uint8_t[] name;
+	uint8_t name[];
 };
 
 These may be taken as filling the remaining space from `mods` to `goals`; or perhaps a few bytes at `mods` indicates number of entries; or the hash must be nonzero and a zero field indicates end of list.   TBD.
@@ -110,7 +110,7 @@ struct bingo_goal_s {
 	uint8_t type;   	//	BINGO_GOALS index
 	uint8_t flags;  	//	GOAL_FLAGS bit vector
 	uint8_t length; 	//	Length of data[]
-	uint8_t[] data; 	//	defined by the goal
+	uint8_t data[]; 	//	defined by the goal
 };
 
 Length is technically redundant, defined by the goal.  It is provided for three reasons:
@@ -159,7 +159,7 @@ Another example:
 struct goal_vista_s {
 	uint16_t x;
 	uint16_t y;
-	uint8_t[] room;	//	example, "CC_A10"
+	uint8_t room[];	//	example, "CC_A10"
 };
 
 Text format example: ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
