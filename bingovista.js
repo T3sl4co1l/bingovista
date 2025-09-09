@@ -3714,7 +3714,7 @@ const BingoEnum_BombableOutposts = [
 	"cl_b27",
 	"lc_c10",
 	"lc_longslum",
-	"LC_rooftophop",
+	"lc_rooftophop",
 	"lc_templetoll",
 	"lc_stripmallnew",
 	"lf_j01",
