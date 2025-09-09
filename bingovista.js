@@ -3709,7 +3709,17 @@ const BingoEnum_BombableOutposts = [
 	"gw_c05",
 	"gw_c11",
 	"lf_e03",
-	"ug_toll"
+	"ug_toll",
+	"cl_a34",	//	customization-proofing
+	"cl_b27",
+	"lc_c10",
+	"lc_longslum",
+	"LC_rooftophop",
+	"lc_templetoll",
+	"lc_stripmallnew",
+	"lf_j01",
+	"oe_tower04",
+	"sb_topside",
 ];
 
 /**
@@ -3730,6 +3740,7 @@ const BingoEnum_BombedDict = [
 	"CL_B27|false",
 	"LC_C10|false",
 	"LC_longslum|false",
+	"LC_rooftophop|false",
 	"LC_templetoll|false",
 	"LC_stripmallNEW|false",
 	"LF_J01|false",
@@ -3745,6 +3756,7 @@ const BingoEnum_BombedDict = [
 	"CL_B27|true",
 	"LC_C10|true",
 	"LC_longslum|true",
+	"LC_rooftophop|true",
 	"LC_templetoll|true",
 	"LC_stripmallNEW|true",
 	"LF_J01|true",
