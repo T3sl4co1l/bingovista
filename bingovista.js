@@ -733,7 +733,7 @@ function setCursor(row, col) {
 	var curSty = document.getElementById("cursor").style;
 	curSty.width  = String(square.width  + square.border - 4) + "px";
 	curSty.height = String(square.height + square.border - 4) + "px";
-	curSty.left = String(square.margin / 2 - 1 + col * (square.width + square.margin + square.border)) + "px";
+	curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
 	curSty.top  = String(square.margin / 2 - 1 + row * (square.height + square.margin + square.border)) + "px";
 	if (transpose) {
 		var t = curSty.top; curSty.top = curSty.left; curSty.left = t;
@@ -1421,7 +1421,7 @@ const CHALLENGES = {
 			items: [items[2], amounts[2], "Dictionary"],
 			values: [items[1], amounts[1], desc[3]],
 			description: "Transport " + creatureNameQuantify(1, creatureNameToDisplayTextMap[items[1]]) + " through " + String(amt) + " gate" + ((amt > 1) ? "s." : "."),
-			comments: "When a creature is taken through a gate, that gate room is added to a list. If a gate already appears in the list, taking that gate again will not advance the count. Thus, you can't grind progress by taking one gate back and forth. The list is stored per creature transported; thus, taking a new different creature does not advance the count, nor does piling creatures into one gate. When the gate count of any logged creature reaches the goal, credit is awarded.",
+			comments: "When a creature is taken through a gate, that creature is added to a list and the gate is logged. If a gate already appears in the creature's list, taking that gate again will not advance the count. Thus, you can't grind progress by taking one gate back and forth. The list is stored per creature transported; thus, taking a new different creature does not advance the count, nor does piling multiple creatures into one gate. When the total gate count of any logged creature reaches the goal, credit is awarded.",
 			paint: [
 				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1, color: creatureToColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "singlearrow", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 },
@@ -2111,7 +2111,7 @@ const CHALLENGES = {
 		if (v[5] === "true")
 			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: colorFloatToString(RainWorldColors.Unity_white), rotation: 0 } );
 		if (v[8] === "true")
-			p.push( { type: "icon", value: itemNameToIconAtlasMap["Mushroom"], scale: 1, color: itemNameToIconColorMap["Mushroom"], rotation: 0 } );
+			p.push( { type: "icon", value: itemNameToIconAtlasMap["Mushroom"], scale: 1, color: colorFloatToString(itemNameToIconColorMap["Mushroom"]), rotation: 0 } );
 		var b = Array(9); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyBool(b, 1, 4, v[5]);
@@ -3414,7 +3414,8 @@ const BingoEnum_FoodTypes = [
 	"SmallCentipede",
 	"SSOracleSwarmer",	//	added v1.2
 	"KarmaFlower",	//	and remaining possibilities why not (from IPlayerEdible references)
-	"FireEgg"
+	"FireEgg",
+	"SLOracleSwarmer"	//	guess I forgot one
 ];
 
 /**
@@ -4507,6 +4508,7 @@ const itemNameToIconColorMap = {
 	"WaterNut":               [0.05,     0.3,      0.7     ],
 	"EggBugEgg":              [0,        1,        0.470588],
 	"FlyLure":                [0.678431, 0.266667, 0.211765],
+	"SLOracleSwarmer":        [1,        1,        1       ],
 	"SSOracleSwarmer":        [1,        1,        1       ],
 	"NSHSwarmer":             [0,        1,        0.3     ],
 	"NeedleEgg":              [0.57647,  0.160784, 0.25098 ],
