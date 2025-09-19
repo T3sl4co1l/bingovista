@@ -730,14 +730,18 @@ function navSquares(e) {
  *	Position cursor
  */
 function setCursor(row, col) {
-	var curSty = document.getElementById("cursor").style;
-	curSty.width  = String(square.width  + square.border - 4) + "px";
-	curSty.height = String(square.height + square.border - 4) + "px";
-	curSty.left = String(square.margin / 2 - 0 + col * (square.width + square.margin + square.border)) + "px";
-	curSty.top  = String(square.margin / 2 - 1 + row * (square.height + square.margin + square.border)) + "px";
-	if (transpose) {
-		var t = curSty.top; curSty.top = curSty.left; curSty.left = t;
+	//	Firefox border offset bug
+	var fixX = 0, fixY = 1;
+	if (typeof mozInnerScreenX !== 'undefined' || typeof InstallTrigger !== 'undefined') {
+		fixY = 0;
 	}
+	var curSty = document.getElementById("cursor").style;
+	curSty.width  = String(square.width  + square.border - 5 - fixX) + "px";
+	curSty.height = String(square.height + square.border - 4 - fixY) + "px";
+	var x = square.margin / 2 - 1 + col * (square.width + square.margin + square.border);
+	var y = square.margin / 2 + 0 + row * (square.height + square.margin + square.border);
+	if (transpose) [x, y] = [y, x];
+	curSty.left = String(x + fixX) + "px"; curSty.top  = String(y + fixY) + "px";
 	curSty.display = "initial";
 }
 
