@@ -134,7 +134,8 @@ var transpose = true;
 
 document.addEventListener("DOMContentLoaded", function() {
 
-	//	Data structure cleanup that couldn't be statically initialized
+	//	Data structure cleanup and inits and checks, things that couldn't be statically initialized, etc.
+	expandAndValidateLists();
 	appendCHALLENGES();
 	initGenerateBlacklist();
 	square.color = RainWorldColors.Unity_white;
@@ -1141,7 +1142,7 @@ const CHALLENGES = {
 	BingoAchievementChallenge: function(desc) {
 		const thisname = "BingoAchievementChallenge";
 		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Passage", , "passage"], "goal selection");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1165,41 +1166,41 @@ const CHALLENGES = {
 	BingoAllRegionsExcept: function(desc) {
 		const thisname = "BingoAllRegionsExcept";
 		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "System.Int32|13|Amount|1|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		checkDescLen(thisname, desc.length, 6);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in AllRegionCodes[]");
-		var amt = parseInt(desc[2]);
-		if (isNaN(amt) || amt < 0 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + desc[2] + "\" not a number or out of range");
-		var amt2 = parseInt(desc[3]);
-		if (isNaN(amt2)) {
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
+		var current = parseInt(desc[2]);
+		if (isNaN(current) || current < 0 || current > INT_MAX)
+			throw new TypeError(thisname + ": current \"" + desc[2] + "\" not a number or out of range");
+		var required = parseInt(desc[3]);
+		if (isNaN(required)) {
 			//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
 			var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
-			amt2 = parseInt(amounts[1]); desc[3] = amounts[1];
+			required = parseInt(amounts[1]); desc[3] = amounts[1];
 		}
-		amt2 = Math.min(amt2, amt + CHAR_MAX);
-		if (isNaN(amt2) || amt2 < 1 || amt2 > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + desc[3] + "\" not a number or SettingBox, or out of range");
+		required = Math.min(required, current + CHAR_MAX);
+		if (isNaN(required) || required < 1 || required > INT_MAX)
+			throw new TypeError(thisname + ": required \"" + desc[3] + "\" not a number or SettingBox, or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "regionsreal");
-		b[4] = amt2 - amt;
+		b[4] = required - current;
 		desc[1].split("|").forEach(s => b.push(enumToValue(s, "regionsreal")) );
 		b[2] = b.length - GOAL_LENGTH;
 		return {
 			name: thisname,
 			category: "Entering regions while never visiting one",
 			items: [items[2], "To do", "Progress", "Total"],
-			values: [items[1], desc[1], String(amt), String(amt2)],
-			description: "Enter " + String(amt2 - amt) + " regions that are not " + regionToDisplayText(board.character, items[1], "Any Subregion") + ".",
+			values: [items[1], desc[1], String(current), String(required)],
+			description: "Enter " + String(required - current) + " regions that are not " + regionToDisplayText(board.character, items[1], "Any Subregion") + ".",
 			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)",
 			paint: [
 				{ type: "icon", value: "TravellerA", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: RainWorldColors.Unity_red, rotation: 0 },
 				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
 				{ type: "break" },
-				{ type: "text", value: "[" + String(amt) + "/" + String(amt2) + "]", color: RainWorldColors.Unity_white }
+				{ type: "text", value: "[" + String(current) + "/" + String(required) + "]", color: RainWorldColors.Unity_white }
 			],
 			toBin: new Uint8Array(b)
 		};
@@ -1212,7 +1213,7 @@ const CHALLENGES = {
 			desc.splice(2, 0, "0", "System.Int32|3|Amount|1|NULL", "empty");
 			desc.unshift("System.Boolean|true|Specific toll|0|NULL");
 		}
-		checkDescriptors(thisname, desc.length, 8, "parameter item count");
+		checkDescLen(thisname, desc.length, 8);
 		var v = [], i = [];
 		var items = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Specific toll", , "NULL"], "specific flag"); v.push(items[1]); i.push(items[2]);
 		items = checkSettingBox(thisname, desc[1], ["System.String", , "Scavenger Toll", , "tolls"], "toll selection"); v.push(items[1]); i.push(items[2]);
@@ -1220,24 +1221,24 @@ const CHALLENGES = {
 		items = checkSettingBox(thisname, desc[4], ["System.Int32", , "Amount", , "NULL"], "amount"); v.push(items[1]); i.push(items[2]);
 		v.push(desc[5]); i.push("bombed");
 		if (v[0] !== "true" && v[0] !== "false")
-			throw new TypeError(thisname + ": error, specific flag \"" + v[0] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": specific flag \"" + v[0] + "\" not 'true' or 'false'");
 		if (!BingoEnum_BombableOutposts.includes(v[1]))
-			throw new TypeError(thisname + ": error, item \"" + v[1] + "\" not found in BingoEnum_BombableOutposts[]");
+			throw new TypeError(thisname + ": \"" + v[1] + "\" not found in tolls");
 		if (v[2] !== "true" && v[2] !== "false")
-			throw new TypeError(thisname + ": error, pass toll flag \"" + v[2] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": pass flag \"" + v[2] + "\" not 'true' or 'false'");
 		var amt = parseInt(v[3]);
 		if (isNaN(amt) || amt < 1 || amt > CHAR_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + v[3] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + v[3] + "\" not a number or out of range");
 		var bombed = v[4].split("%");
 		for (var k = 0; k < bombed.length; k++) {
 			if (!BingoEnum_BombedDict.includes(bombed[k]))
-				throw new TypeError(thisname + ": error, bombed dict entry \"" + bombed[k] + "\" not found in BingoEnum_BombedDict[]");
+				throw new TypeError(thisname + ": dict entry \"" + bombed[k] + "\" not found in tolls_bombed");
 		}
 		var d;
 		if (v[0] === "true") {
 			var regi = regionOfRoom(v[1]).toUpperCase();
 			if (BingoEnum_AllRegionCodes.indexOf(regi) < 0)
-				throw new TypeError(thisname + ": error, region \"" + regi + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": region \"" + regi + "\" not found in AllRegionCodes[]");
 			var r = regionToDisplayText(board.character, regi, "Any Subregion");
 			if (r > "") r = ", in " + r;
 			if (v[1] === "gw_c11")
@@ -1253,7 +1254,7 @@ const CHALLENGES = {
 			d += ((v[2] === "true") ? ", then pass them." : ".");
 		}
 		var p = [
-			{ type: "icon", value: "Symbol_StunBomb", scale: 1, color: itemNameToIconColorMap["ScavengerBomb"], rotation: 0 },
+			{ type: "icon", value: "Symbol_StunBomb", scale: 1, color: entityIconColor("ScavengerBomb"), rotation: 0 },
 			{ type: "icon", value: "scavtoll", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 			{ type: "break" },
 			{ type: "text", value: (v[0] === "false") ? ("[0/" + String(amt) + "]") : v[1].toUpperCase(), color: RainWorldColors.Unity_white }
@@ -1296,20 +1297,20 @@ const CHALLENGES = {
 	BingoCollectPearlChallenge: function(desc) {
 		const thisname = "BingoCollectPearlChallenge";
 		//	desc of format ["System.Boolean|true|Specific Pearl|0|NULL", "System.String|LF_bottom|Pearl|1|pearls", "0", "System.Int32|1|Amount|3|NULL", "0", "0", ""]
-		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		checkDescLen(thisname, desc.length, 7);
 		var speci = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Specific Pearl", , "NULL"], "specific pearl flag");
 		if (speci[1] !== "true" && speci[1] !== "false")
-			throw new TypeError(thisname + ": error, starving flag \"" + speci[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": starving flag \"" + speci[1] + "\" not 'true' or 'false'");
 		var items = checkSettingBox(thisname, desc[1], ["System.String", , "Pearl", , "pearls"], "pearl selection");
 		if (!DataPearlList.includes(items[1])) {
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in DataPearlList[]");
+			throw new TypeError(thisname + ": item \"" + items[1] + "\" not found in DataPearlList[]");
 		}
 		if (dataPearlToDisplayTextMap[items[1]] === undefined)
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in dataPearlToDisplayTextMap[]");
+			throw new TypeError(thisname + ": item \"" + items[1] + "\" not found in dataPearlToDisplayTextMap[]");
 		var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount selection");
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var d, p;
 		if (speci[1] === "true") {
 			var r = "";
@@ -1318,7 +1319,7 @@ const CHALLENGES = {
 			else {
 				var regi = dataPearlToRegionMap[items[1]];
 				if (regi === undefined)
-					throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in dataPearlToRegionMap[]");
+					throw new TypeError(thisname + ": item \"" + items[1] + "\" not found in pearls");
 				if (items[1] === "DM") {
 					//	Special case: DM pearl is found in DM only for Spearmaster; it's MS any other time
 					if (Object.values(BingoEnum_CharToDisplayText).indexOf(board.character) < 0
@@ -1336,14 +1337,16 @@ const CHALLENGES = {
 			p = [
 				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
 				{ type: "break" },
-				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: dataPearlToColorMap[items[1]], rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } },
+				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: dataPearlToColorMap[items[1]], rotation: 0, background:
+					{ type: "icon", value: "radialgradient", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
+				},
 				{ type: "break" },
 				{ type: "text", value: "[0/1]", color: RainWorldColors.Unity_white }
 			];
 		} else {
 			d = "Collect " + entityNameQuantify(amt, "colored pearls") + ".";
 			p = [
-				{ type: "icon", value: "pearlhoard_color", scale: 1, color: itemNameToIconColorMap["Pearl"], rotation: 0 },
+				{ type: "icon", value: "pearlhoard_color", scale: 1, color: entityIconColor("Pearl"), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + String(amt) + "]", color: RainWorldColors.Unity_white }
 			];
@@ -1368,20 +1371,16 @@ const CHALLENGES = {
 	BingoCraftChallenge: function(desc) {
 		const thisname = "BingoCraftChallenge";
 		//	desc of format ["System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Item to Craft", , "craft"], "item selection");
 		if (!BingoEnum_CraftableItems.includes(items[1])) {
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in BingoEnum_CraftableItems[]");
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in craft");
 		}
 		var d = entityDisplayText(items[1]);
-		if (d === undefined)
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in creature- or itemNameToDisplayTextMap[]");
 		var amounts = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "amount selection");
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
-		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
-		var iconColor = entityIconColor(items[1]);
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var b = Array(6); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "craft");
@@ -1396,7 +1395,7 @@ const CHALLENGES = {
 			comments: "",
 			paint: [
 				{ type: "icon", value: "crafticon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
+				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + String(amt) + "]", color: RainWorldColors.Unity_white }
 			],
@@ -1406,14 +1405,14 @@ const CHALLENGES = {
 	BingoCreatureGateChallenge: function(desc) {
 		const thisname = "BingoCreatureGateChallenge";
 		//	desc of format ["System.String|CicadaA|Creature Type|1|transport", "0", "System.Int32|4|Amount|0|NULL", "empty", "0", "0"]
-		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		checkDescLen(thisname, desc.length, 6);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Creature Type", , "transport"], "creature selection");
 		if (creatureNameToDisplayTextMap[items[1]] === undefined)
-			throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not found in creatureNameToDisplayTextMap[]");
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in creatures");
 		var amounts = checkSettingBox(thisname, desc[2], ["System.Int32", , "Amount", , "NULL"], "amount selection");
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		if (BingoEnum_Transportable.includes(items[1]))
@@ -1430,7 +1429,7 @@ const CHALLENGES = {
 			description: "Transport " + entityNameQuantify(1, entityDisplayText(items[1])) + " through " + String(amt) + " gate" + ((amt > 1) ? "s." : "."),
 			comments: "When a creature is taken through a gate, that creature is added to a list and the gate is logged. If a gate already appears in the creature's list, taking that gate again will not advance the count. Thus, you can't grind progress by taking one gate back and forth. The list is stored per creature transported; thus, taking a new different creature does not advance the count, nor does piling multiple creatures into one gate. When the total gate count of any logged creature reaches the goal, credit is awarded.",
 			paint: [
-				{ type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1, color: entityIconColor(items[1]), rotation: 0 },
+				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "icon", value: "ShortcutGate", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "break" },
@@ -1442,11 +1441,11 @@ const CHALLENGES = {
 	BingoCycleScoreChallenge: function(desc) {
 		const thisname = "BingoCycleScoreChallenge";
 		//	desc of format ["System.Int32|126|Target Score|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.Int32", , "Target Score", , "NULL"], "score goal");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -1499,11 +1498,11 @@ const CHALLENGES = {
 		function DamageChallengePaint(p) {
 			var r = [];
 			if (p.weapon !== "Any Weapon") {
-				r.push( { type: "icon", value: itemNameToIconAtlasMap[p.weapon], scale: 1, color: entityIconColor(p.weapon), rotation: 0 } );
+				r.push( { type: "icon", value: entityIconAtlas(p.weapon), scale: 1, color: entityIconColor(p.weapon), rotation: 0 } );
 			}
 			r.push( { type: "icon", value: "bingoimpact", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 			if (p.victim !== "Any Creature") {
-				r.push( { type: "icon", value: creatureNameToIconAtlasMap[p.victim], scale: 1, color: entityIconColor(p.victim), rotation: 0 } );
+				r.push( { type: "icon", value: entityIconAtlas(p.victim), scale: 1, color: entityIconColor(p.victim), rotation: 0 } );
 			}
 			if (p.subregion === "Any Subregion") {
 				if (p.region !== "Any Region") {
@@ -1554,8 +1553,8 @@ const CHALLENGES = {
 		v.push(String(params.region));    i.push("region");
 		v.push(String(params.subregion)); i.push("subregion");
 		return {
-			params: params,
 			name: thisname,
+			params: params,
 			category: "Hitting creatures with items",
 			items: i,
 			values: v,
@@ -1569,14 +1568,11 @@ const CHALLENGES = {
 	BingoDepthsChallenge: function(desc) {
 		const thisname = "BingoDepthsChallenge";
 		//	desc of format ["System.String|VultureGrub|Creature Type|0|depths", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Creature Type", , "depths"], "creature selection");
-		var iconName = creatureNameToIconAtlasMap[items[1]];
-		var iconColor = entityIconColor(items[1]);
-		var d = creatureNameToDisplayTextMap[items[1]];
-		if (d === undefined || iconName === undefined || iconColor === undefined)
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in creatureNameToDisplayTextMap[]");
-		d = entityNameQuantify(1, d);
+		if (BingoEnum_Depthable[items[1]] === undefined && creatureNameToDisplayTextMap[items[1]] === undefined)
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in creatures");
+		d = entityNameQuantify(1, items[1]);
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		if (BingoEnum_Transportable.includes(items[1]))
@@ -1592,7 +1588,7 @@ const CHALLENGES = {
 			description: "Drop " + d + " into the Depths drop room (SB_D06).",
 			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06"),
 			paint: [
-				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
+				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "deathpiticon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "SB_D06", color: RainWorldColors.Unity_white }
@@ -1603,7 +1599,7 @@ const CHALLENGES = {
 	BingoDodgeLeviathanChallenge: function(desc) {
 		const thisname = "BingoDodgeLeviathanChallenge";
 		//	desc of format ["0", "0"]
-		checkDescriptors(thisname, desc.length, 2, "parameter item count");
+		checkDescLen(thisname, desc.length, 2);
 		var b = Array(3); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[2] = b.length - GOAL_LENGTH;
@@ -1623,15 +1619,11 @@ const CHALLENGES = {
 	BingoDontUseItemChallenge: function(desc) {
 		const thisname = "BingoDontUseItemChallenge";
 		//	desc of format ["System.String|BubbleGrass|Item type|0|banitem", "0", "0", "0", "0"]
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Item type", , "banitem"], "item selection");
-		if (!ALL_ENUMS["banitem"].includes(items[1])) {
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in BingoEnum_banitem[]");
+		if (!ALL_ENUMS.banitem.includes(items[1])) {
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in banitem");
 		}
-		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
-		var iconColor = entityIconColor(items[1]);
-		if ((creatureNameToDisplayTextMap[items[1]] || itemNameToDisplayTextMap[items[1]]) === undefined)
-			throw new TypeError(thisname + ": error, item \"" + items[1] + "\" not found in creature- or itemNameToDisplayTextMap[]");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyBool(b, 1, 4, String(desc[1] === "1"));
@@ -1647,7 +1639,7 @@ const CHALLENGES = {
 			comments: "\"Using\" an item involves throwing a throwable item, eating a food item, or holding any other type of item for 5 seconds. (When sheltering with insufficient food pips (currently eaten), food items in the shelter are consumed automatically. Auto-eating on shelter <em>will not</em> count against this goal!)",
 			paint: [
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: RainWorldColors.Unity_red, rotation: 0 },
-				{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 }
+				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 }
 			],
 			toBin: new Uint8Array(b)
 		};
@@ -1659,26 +1651,24 @@ const CHALLENGES = {
 		if (desc.length == 6) {
 			desc.splice(4, 0, "System.Boolean|false|While Starving|2|NULL");
 		}
-		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		checkDescLen(thisname, desc.length, 7);
 		var amounts = checkSettingBox(thisname, desc[0], ["System.Int32", , "Amount", , "NULL"], "eat amount");
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var isCrit = parseInt(desc[2]);
 		if (isNaN(isCrit) || isCrit < 0 || isCrit > 1)
-			throw new TypeError(thisname + ": error, isCreature \"" + desc[2] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": isCreature \"" + desc[2] + "\" not a number or out of range");
 		isCrit = (isCrit == 1) ? "true" : "false";
 		var items = checkSettingBox(thisname, desc[3], ["System.String", , "Food type", , "food"], "eat type");
 		if (!BingoEnum_FoodTypes.includes(items[1]))
-			throw new TypeError(thisname + ": error, item selection \"" + items[1] + "\" not found in BingoEnum_FoodTypes[]");
-		var iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
-		var iconColor = entityIconColor(items[1]);
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in food");
 		var starv = checkSettingBox(thisname, desc[4], ["System.Boolean", , "While Starving", , "NULL"], "starving flag");
 		if (starv[1] !== "true" && starv[1] !== "false")
-			throw new TypeError(thisname + ": error, starving flag \"" + starv[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": flag \"" + starv[1] + "\" not 'true' or 'false'");
 		var p = [
 			{ type: "icon", value: "foodSymbol", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-			{ type: "icon", value: iconName, scale: 1, color: iconColor, rotation: 0 },
+			{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 			{ type: "break" },
 			{ type: "text", value: "[0/" + String(amt) + "]", color: RainWorldColors.Unity_white }
 		];
@@ -1711,26 +1701,28 @@ const CHALLENGES = {
 			desc.splice(3, 0, "0", "System.Int32|1|Amount|2|NULL");
 			desc.push("");
 		}
-		checkDescriptors(thisname, desc.length, 8, "parameter item count");
+		checkDescLen(thisname, desc.length, 8);
 		var speci = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Specific Echo", , "NULL"], "specific flag");
+		if (speci[1] !== "true" && speci[1] !== "false")
+			throw new TypeError(thisname + ": specific flag \"" + speci[1] + "\" not 'true' or 'false'");
 		var echor = checkSettingBox(thisname, desc[1], ["System.String", , "Region", , "echoes"], "echo region");
 		if (BingoEnum_AllRegionCodes.indexOf(echor[1]) < 0)
-			throw new TypeError(thisname + ": error, region \"" + echor[1] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": \"" + echor[1] + "\" not found in regions");
 		var r = regionToDisplayText(board.character, echor[1], "Any Subregion");
 		var starv = checkSettingBox(thisname, desc[2], ["System.Boolean", , "While Starving", , "NULL"], "starving flag");
 		if (starv[1] !== "true" && starv[1] !== "false")
-			throw new TypeError(thisname + ": error, starving flag \"" + starv[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": starving flag \"" + starv[1] + "\" not 'true' or 'false'");
 		var amount = checkSettingBox(thisname, desc[4], ["System.Int32", , "Amount", , "NULL"], "echo amount");
 		var amt = parseInt(amount[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + amount[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amount[1] + "\" not a number or out of range");
 		var visited = [];
 		if (desc[7] > "") {
 			desc[7].split("|");
 			for (var k = 0; k < visited.length; k++) {
 				if (BingoEnum_AllRegionCodes[visited[k]] === undefined)
-					throw new TypeError(thisname + ": error, visited region \"" + visited[k] + "\" not found in BingoEnum_AllRegionCodes[]");
+					throw new TypeError(thisname + ": visited \"" + visited[k] + "\" not found in regions");
 			}
 		}
 		var p = [
@@ -1766,10 +1758,10 @@ const CHALLENGES = {
 	BingoEnterRegionChallenge: function(desc) {
 		const thisname = "BingoEnterRegionChallenge";
 		//	desc of format ["System.String|CC|Region|0|regionsreal", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "enter region");
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": region \"" + items[1] + "\" not found in regions");
 		var r = regionToDisplayText(board.character, items[1], "Any Subregion");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -1792,11 +1784,11 @@ const CHALLENGES = {
 	BingoGlobalScoreChallenge: function(desc) {
 		const thisname = "BingoGlobalScoreChallenge";
 		//	desc of format ["0", "System.Int32|271|Target Score|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Target Score", , "NULL"], "score goal");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -1819,10 +1811,10 @@ const CHALLENGES = {
 	BingoGreenNeuronChallenge: function(desc) {
 		const thisname = "BingoGreenNeuronChallenge";
 		//	desc of format ["System.Boolean|true|Looks to the Moon|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Looks to the Moon", , "NULL"], "iterator choice flag");
 		if (items[1] !== "true" && items[1] !== "false")
-			throw new TypeError(thisname + ": error, iterator choice flag \"" + items[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": flag \"" + items[1] + "\" not 'true' or 'false'");
 		var d = "Deliver the green neuron to ";
 		if (items[1] === "true") d = "Reactivate ";
 		d += iteratorNameToDisplayTextMap[items[1]] + ".";
@@ -1849,18 +1841,18 @@ const CHALLENGES = {
 	BingoHatchNoodleChallenge: function(desc) {
 		const thisname = "BingoHatchNoodleChallenge";
 		//	desc of format ["0", "System.Int32|3|Amount|1|NULL", "System.Boolean|true|At Once|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var amounts = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "egg count");
 		var amt = parseInt(amounts[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var items = checkSettingBox(thisname, desc[2], ["System.Boolean", , "At Once", , "NULL"], "one-cycle flag");
 		if (items[1] !== "true" && items[1] !== "false")
-			throw new TypeError(thisname + ": error, one-cycle flag \"" + items[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": flag \"" + items[1] + "\" not 'true' or 'false'");
 		var p = [
-			{ type: "icon", value: itemNameToIconAtlasMap["NeedleEgg"], scale: 1, color: itemNameToIconColorMap["NeedleEgg"], rotation: 0 },
-			{ type: "icon", value: creatureNameToIconAtlasMap["SmallNeedleWorm"], scale: 1, color: entityIconColor("SmallNeedleWorm"), rotation: 0 },
+			{ type: "icon", value: entityIconAtlas("NeedleEgg"), scale: 1, color: entityIconColor("NeedleEgg"), rotation: 0 },
+			{ type: "icon", value: entityIconAtlas("SmallNeedleWorm"), scale: 1, color: entityIconColor("SmallNeedleWorm"), rotation: 0 },
 			{ type: "break" },
 			{ type: "text", value: "[0/" + amt + "]", color: RainWorldColors.Unity_white },
 		];
@@ -1885,12 +1877,12 @@ const CHALLENGES = {
 	BingoHellChallenge: function(desc) {
 		const thisname = "BingoHellChallenge";
 		//	desc of format ["0", "System.Int32|2|Amount|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "goal count");
 		var amt = parseInt(items[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = amt;
@@ -1927,30 +1919,29 @@ const CHALLENGES = {
 			//	1.2 hack: allow 4, 7 or 8 parameters
 			desc.splice(4, 0, "System.String|Any Region|Region|4|regions");
 		}
-		checkDescriptors(thisname, desc.length, 8, "parameter item count");
+		checkDescLen(thisname, desc.length, 8);
 		var any = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Any Shelter", , "NULL"], "any shelter flag");
 		var amounts = checkSettingBox(thisname, desc[2], ["System.Int32", , "Amount", , "NULL"], "item count");
 		var items = checkSettingBox(thisname, desc[3], ["System.String", , "Item", , "expobject"], "item selection");
 		var reg = checkSettingBox(thisname, desc[4], ["System.String", , "Region", , "regions"], "region");
 		if (!BingoEnum_expobject.includes(items[1]))
-			throw new TypeError(thisname + ": error, item selection \"" + items[1] + "\" not found in BingoEnum_expobject[]");
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in expobject");
 		var amt = parseInt(amounts[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		if (any[1] !== "true" && any[1] !== "false")
-			throw new TypeError(thisname + ": error, any shelter flag \"" + any[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": shelter flag \"" + any[1] + "\" not 'true' or 'false'");
 		if (reg[1] !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(reg[1]) < 0)
-				throw new TypeError(thisname + ": error, region selection \"" + reg[1] + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": \"" + reg[1] + "\" not found in regions");
 		}
 		var r = regionToDisplayText(board.character, reg[1], "Any Subregion") + ".";
 		if (r.length > 1) r = ", in " + r;
 		var d = "";
-		if (any[1] === "true")
-			d += "Bring " + entityNameQuantify(amt, entityDisplayText(items[1])) + " to ";
-		else
-			d += "Hoard " + entityNameQuantify(amt, entityDisplayText(items[1])) + " in ";
+		d += (any[1] === "true") ? "Bring " : "Hoard ";
+		d += entityNameQuantify(amt, entityDisplayText(items[1]));
+		d += (any[1] === "true") ? " to " : " in ";
 		if (amt == 1)
 			d += "a shelter";
 		else if (any[1] === "true")
@@ -1958,7 +1949,7 @@ const CHALLENGES = {
 		else
 			d += "the same shelter";
 		d += r;
-		var p = [ { type: "icon", value: itemNameToIconAtlasMap[items[1]], scale: 1, color: entityIconColor(items[1]), rotation: 0 } ];
+		var p = [ { type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 } ];
 		if (any[1] === "true") {
 			p.push( { type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 					{ type: "icon", value: "doubleshelter", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
@@ -1995,11 +1986,11 @@ const CHALLENGES = {
 	BingoKarmaFlowerChallenge: function(desc) {
 		const thisname = "BingoKarmaFlowerChallenge";
 		//	assert: desc of format ["0", "System.Int32|5|Amount|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "item count");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2032,7 +2023,7 @@ const CHALLENGES = {
 			desc.splice(5, 0, "System.String|Any Subregion|Subregion|4|subregions");
 		}
 		//	now is superset: contains subregion *and* mushroom; length 12
-		checkDescriptors(thisname, desc.length, 12, "parameter item count");
+		checkDescLen(thisname, desc.length, 12);
 		var v = [], i = [];
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Creature Type", , "creatures"], "target selection"); v.push(items[1]); i.push(items[2]);
 		items = checkSettingBox(thisname, desc[1], ["System.String", , "Weapon Used", , "weaponsnojelly"], "weapon selection"); v.push(items[1]); i.push(items[2]);
@@ -2046,27 +2037,27 @@ const CHALLENGES = {
 		var r = "";
 		var amt = parseInt(v[2]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + v[2] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + v[2] + "\" not a number or out of range");
 		var c = entityNameQuantify(amt, "creatures");
 		if (v[0] !== "Any Creature") {
 			if (creatureNameToDisplayTextMap[v[0]] === undefined)
-				throw new TypeError(thisname + ": error, creature type \"" + v[0] + "\" not found in creatureNameToDisplayTextMap[]");
+				throw new TypeError(thisname + ": \"" + v[0] + "\" not found in creatures");
 			c = entityNameQuantify(amt, entityDisplayText(v[0]));
 		}
 		if (v[3] !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(v[3]) < 0)
-				throw new TypeError(thisname + ": error, region selection \"" + v[3] + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": \"" + v[3] + "\" not found in regions");
 		}
 		if (v[4] !== "Any Subregion") {
 			if (v[4] === "Journey\\'s End") v[4] = "Journey\'s End";
 			if (BingoEnum_AllSubregions.indexOf(v[4]) == -1)
-				throw new TypeError(thisname + ": error, subregion selection \"" + v[4] + "\" not found in BingoEnum_AllSubregions[]");
+				throw new TypeError(thisname + ": \"" + v[4] + "\" not found in subregions");
 		}
 		var r = regionToDisplayText(board.character, v[3], v[4]);
 		if (r > "") r = " in " + r;
 		var w = ", with a death pit";
 		if (!BingoEnum_Weapons.includes(v[1]))
-			throw new TypeError(thisname + ": error, weapon selection \"" + v[1] + "\" not found in BingoEnum_Weapons[]");
+			throw new TypeError(thisname + ": \"" + v[1] + "\" not found in weapons");
 		if (v[6] === "false") {
 			if (v[1] !== "Any Weapon") {
 				w = " with " + entityDisplayText(v[1]);
@@ -2079,20 +2070,19 @@ const CHALLENGES = {
 			if (v[6] === "true")
 				p.push( { type: "icon", value: "deathpiticon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 			else
-				p.push( { type: "icon", value: itemNameToIconAtlasMap[v[1]], scale: 1, color: entityIconColor(v[1]), rotation: 0 } );
+				p.push( { type: "icon", value: entityIconAtlas(v[1]), scale: 1, color: entityIconColor(v[1]), rotation: 0 } );
 		}
 		if (v[5] !== "true" && v[5] !== "false")
-			throw new TypeError(thisname + ": error, one-cycle flag \"" + v[5] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": one-cycle flag \"" + v[5] + "\" not 'true' or 'false'");
 		if (v[6] !== "true" && v[6] !== "false")
-			throw new TypeError(thisname + ": error, death pit flag \"" + v[6] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": death pit flag \"" + v[6] + "\" not 'true' or 'false'");
 		if (v[7] !== "true" && v[7] !== "false")
-			throw new TypeError(thisname + ": error, starving flag \"" + v[7] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": starving flag \"" + v[7] + "\" not 'true' or 'false'");
 		if (v[8] !== "true" && v[8] !== "false")
-			throw new TypeError(thisname + ": error, mushroom flag \"" + v[8] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": mushroom flag \"" + v[8] + "\" not 'true' or 'false'");
 		p.push( { type: "icon", value: "Multiplayer_Bones", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 		if (v[0] !== "Any Creature") {
-			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[0]], scale: 1,
-					color: entityIconColor(v[0]), rotation: 0 } );
+			p.push( { type: "icon", value: entityIconAtlas(v[0]), scale: 1, color: entityIconColor(v[0]), rotation: 0 } );
 		}
 		p.push( { type: "break" } );
 		if (v[4] === "Any Subregion") {
@@ -2110,7 +2100,7 @@ const CHALLENGES = {
 		if (v[5] === "true")
 			p.push( { type: "icon", value: "cycle_limit", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 		if (v[8] === "true")
-			p.push( { type: "icon", value: itemNameToIconAtlasMap["Mushroom"], scale: 1, color: itemNameToIconColorMap["Mushroom"], rotation: 0 } );
+			p.push( { type: "icon", value: entityIconAtlas("Mushroom"), scale: 1, color: entityIconColor("Mushroom"), rotation: 0 } );
 		var b = Array(9); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyBool(b, 1, 4, v[5]);
@@ -2143,11 +2133,11 @@ const CHALLENGES = {
 	BingoMaulTypesChallenge: function(desc) {
 		const thisname = "BingoMaulTypesChallenge";
 		//	desc of format "0", "System.Int32|4|Amount|0|NULL", "0", "0", ""
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "maul amount");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > ALL_ENUMS["creatures"].length)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = amt;
@@ -2170,11 +2160,11 @@ const CHALLENGES = {
 	BingoMaulXChallenge: function(desc) {
 		const thisname = "BingoMaulXChallenge";
 		//	desc of format ["0", "System.Int32|13|Amount|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "maul amount");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2197,11 +2187,11 @@ const CHALLENGES = {
 	BingoNeuronDeliveryChallenge: function(desc) {
 		const thisname = "BingoNeuronDeliveryChallenge";
 		//	desc of format ["System.Int32|2|Amount of Neurons|0|NULL", "0", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[0], ["System.Int32", , "Amount of Neurons", , "NULL"], "neuron amount");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var oracle = "moon";
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2227,7 +2217,7 @@ const CHALLENGES = {
 	BingoNoNeedleTradingChallenge: function(desc) {
 		const thisname = "BingoNoNeedleTradingChallenge";
 		//	desc of format ["0", "0"]
-		checkDescriptors(thisname, desc.length, 2, "parameter item count");
+		checkDescLen(thisname, desc.length, 2);
 		var b = Array(3); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[2] = b.length - GOAL_LENGTH;
@@ -2251,10 +2241,10 @@ const CHALLENGES = {
 	BingoNoRegionChallenge: function(desc) {
 		const thisname = "BingoNoRegionChallenge";
 		//	desc of format ["System.String|SI|Region|0|regionsreal", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "avoid region");
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "regionsreal");
@@ -2276,10 +2266,10 @@ const CHALLENGES = {
 	BingoPearlDeliveryChallenge: function(desc) {
 		const thisname = "BingoPearlDeliveryChallenge";
 		//	desc of format ["System.String|LF|Pearl from Region|0|regions", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Pearl from Region", , "regions"], "pearl region");
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": error, region \"" + items[1] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
 		var oracle = "moon";
 		if (board.character === "Artificer")
 			oracle = "pebbles";
@@ -2296,7 +2286,7 @@ const CHALLENGES = {
 			comments: "",
 			paint: [
 				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
-				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: itemNameToIconColorMap.Pearl, rotation: 0 },
+				{ type: "icon", value: "Symbol_Pearl", scale: 1, color: entityIconColor("Pearl"), rotation: 0 },
 				{ type: "break" },
 				{ type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 90 },
 				{ type: "break" },
@@ -2314,7 +2304,7 @@ const CHALLENGES = {
 			desc.splice(1, 0, "System.Boolean|false|Any Shelter|2|NULL", "0");
 			desc.push("");
 		}
-		checkDescriptors(thisname, desc.length, 8, "parameter item count");
+		checkDescLen(thisname, desc.length, 8);
 		var common = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Common Pearls", , "NULL"], "common pearls flag");
 		var any = checkSettingBox(thisname, desc[1], ["System.Boolean", , "Any Shelter", , "NULL"], "any shelter flag");
 		var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "pearl count");
@@ -2322,16 +2312,16 @@ const CHALLENGES = {
 		desc[4] = desc[4].replace(/\|In Region\|/, "|Region|");	//	parameter name updated v1.25
 		var reg = checkSettingBox(thisname, desc[4], ["System.String", , "Region", , "regions"], "region selection");
 		if (common[1] !== "true" && common[1] !== "false")
-			throw new TypeError(thisname + ": error, common pearls flag \"" + common[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": pearl flag \"" + common[1] + "\" not 'true' or 'false'");
 		if (any[1] !== "true" && any[1] !== "false")
-			throw new TypeError(thisname + ": error, any shelter flag \"" + any[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": shelter flag \"" + any[1] + "\" not 'true' or 'false'");
 		var amt = parseInt(amounts[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var r = "";
 		if (reg[1] !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(reg[1]) < 0)
-				throw new TypeError(thisname + ": error, region selection \"" + reg[1] + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": \"" + reg[1] + "\" not found in regions");
 			r = ", in " + r;
 		}
 		var r = regionToDisplayText(board.character, reg[1], "Any Subregion");
@@ -2342,7 +2332,7 @@ const CHALLENGES = {
 		if (any[1] === "true") d = "Bring " + d + ", to "; else d = "Hoard " + d + ", in ";
 		if (amt == 1) d += "a shelter"; else if (any[1] === "true") d += "any shelters"; else d += "the same shelter";
 		d += r + ".";
-		var p = [ { type: "icon", value: ((common[1] === "true") ? "pearlhoard_normal" : "pearlhoard_color"), scale: 1, color: itemNameToIconColorMap.Pearl, rotation: 0 } ];
+		var p = [ { type: "icon", value: ((common[1] === "true") ? "pearlhoard_normal" : "pearlhoard_color"), scale: 1, color: entityIconColor("Pearl"), rotation: 0 } ];
 		if (any[1] === "true") {
 			p.push( { type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 					{ type: "icon", value: "doubleshelter", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
@@ -2377,28 +2367,28 @@ const CHALLENGES = {
 	BingoPinChallenge: function(desc) {
 		const thisname = "BingoPinChallenge";
 		//	desc of format ["0", "System.Int32|5|Amount|0|NULL", "System.String|PinkLizard|Creature Type|1|creatures", "", "System.String|SU|Region|2|regions", "0", "0"]
-		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		checkDescLen(thisname, desc.length, 7);
 		var v = [], i = [];
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pin amount"); v.push(items[1]); i.push(items[2]);
 		var items = checkSettingBox(thisname, desc[2], ["System.String", , "Creature Type", , "creatures"], "creature type"); v.push(items[1]); i.push(items[2]);
 		var items = checkSettingBox(thisname, desc[4], ["System.String", , "Region", , "regions"], "region selection"); v.push(items[1]); i.push(items[2]);
 		var amt = parseInt(v[0]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + v[0] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + v[0] + "\" not a number or out of range");
 		if (v[1] !== "Any Creature" && creatureNameToDisplayTextMap[v[1]] === undefined)
-			throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
+			throw new TypeError(thisname + ": \"" + v[1] + "\" not found in creatures");
 		var c = entityNameQuantify(amt, entityDisplayText(v[1]));
 		var r = v[2];
 		if (r !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(v[2]) < 0)
-				throw new TypeError(thisname + ": error, region \"" + v[2] + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": region \"" + v[2] + "\" not found in regions");
 			r = regionToDisplayText(board.character, v[2], "Any Subregion");
 		} else {
 			r = "different regions";
 		}
 		var p = [ { type: "icon", value: "pin_creature", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } ];
 		if (v[1] !== "Any Creature") {
-			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: entityIconColor(v[1]), rotation: 0 } );
+			p.push( { type: "icon", value: entityIconAtlas(v[1]), scale: 1, color: entityIconColor(v[1]), rotation: 0 } );
 		}
 		if (v[2] === "Any Region") {
 			p.push( { type: "icon", value: "TravellerA", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
@@ -2427,11 +2417,11 @@ const CHALLENGES = {
 	BingoPopcornChallenge: function(desc) {
 		const thisname = "BingoPopcornChallenge";
 		//	desc of format ["0", "System.Int32|6|Amount|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "pop amount");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2455,7 +2445,7 @@ const CHALLENGES = {
 	BingoRivCellChallenge: function(desc) {
 		const thisname = "BingoRivCellChallenge";
 		//	desc of format ["0", "0"]
-		checkDescriptors(thisname, desc.length, 2, "parameter item count");
+		checkDescLen(thisname, desc.length, 2);
 		var b = Array(3); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[2] = b.length - GOAL_LENGTH;
@@ -2465,10 +2455,10 @@ const CHALLENGES = {
 			items: [],
 			values: [],
 			description: "Feed the Rarefaction Cell to a Leviathan (completes if you die).",
-			comments: "Truly, the Rarefaction Cell's explosion transcends time and space; hence, this goal is awarded even if the player dies in the process. Godspeed, little Water Dancer.",
+			comments: "The Rarefaction Cell's immense power disturbs time itself; hence, this goal is awarded even if the player dies in the process. May our cycles meet again, little Water Dancer...",
 			paint: [
 				{ type: "icon", value: "Symbol_EnergyCell", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: "Kill_BigEel", scale: 1, color: creatureNameToIconColorMap.BigEel, rotation: 0 }
+				{ type: "icon", value: "Kill_BigEel", scale: 1, color: entityIconColor("BigEel"), rotation: 0 }
 			],
 			toBin: new Uint8Array(b)
 		};
@@ -2476,7 +2466,7 @@ const CHALLENGES = {
 	BingoSaintDeliveryChallenge: function(desc) {
 		const thisname = "BingoSaintDeliveryChallenge";
 		//	desc of format ["0", "0"]
-		checkDescriptors(thisname, desc.length, 2, "parameter item count");
+		checkDescLen(thisname, desc.length, 2);
 		var oracle = "pebbles";
 		var b = Array(3); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2499,11 +2489,11 @@ const CHALLENGES = {
 	BingoSaintPopcornChallenge: function(desc) {
 		const thisname = "BingoSaintPopcornChallenge";
 		//	desc of format ["0", "System.Int32|7|Amount|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "seed amount");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2517,7 +2507,7 @@ const CHALLENGES = {
 			comments: "",
 			paint: [
 				{ type: "icon", value: "foodSymbol", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: "Symbol_Seed", scale: 1, color: itemNameToIconColorMap.Default, rotation: 0 },
+				{ type: "icon", value: "Symbol_Seed", scale: 1, color: entityIconColor("Default"), rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + String(amt) + "]", color: RainWorldColors.Unity_white }
 			],
@@ -2529,31 +2519,30 @@ const CHALLENGES = {
 		//	assert: desc of format ["System.String|Rock|Item|1|theft",
 		//	"System.Boolean|false|From Scavenger Toll|0|NULL",
 		//	"0", "System.Int32|3|Amount|2|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		checkDescLen(thisname, desc.length, 6);
 		var v = [], i = [];
 		var p = [ { type: "icon", value: "steal_item", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } ];
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Item", , "theft"], "item selection"); v.push(items[1]); i.push(items[2]);
 		if (!BingoEnum_theft.includes(v[0]))
-			throw new TypeError(thisname + ": error, item \"" + v[0] + "\" not found in BingoEnum_theft[]");
+			throw new TypeError(thisname + ": item \"" + v[0] + "\" not in theft");
 		items = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "item count"); v.push(items[1]); i.push(items[2]);
 		items = checkSettingBox(thisname, desc[1], ["System.Boolean", , "From Scavenger Toll", , "NULL"], "venue flag"); v.push(items[1]); i.push(items[2]);
 		if (itemNameToDisplayTextMap[v[0]] === undefined)
-			throw new TypeError(thisname + ": error, item selection \"" + v[2] + "\" not found in itemNameToDisplayTextMap[]");
+			throw new TypeError(thisname + ": \"" + v[2] + "\" not found in items");
 		var amt = parseInt(v[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + v[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + v[1] + "\" not a number or out of range");
 		var d = "Steal " + entityNameQuantify(amt, entityDisplayText(v[0])) + " from ";
-		p.push( { type: "icon", value: itemNameToIconAtlasMap[v[0]], scale: 1,
-				color: entityIconColor(v[0]), rotation: 0 } );
+		p.push( { type: "icon", value: entityIconAtlas(v[0]), scale: 1, color: entityIconColor(v[0]), rotation: 0 } );
 		if (v[2] === "true") {
 			p.push( { type: "icon", value: "scavtoll", scale: 0.8, color: RainWorldColors.Unity_white, rotation: 0 } );
 			d += "a Scavenger Toll.";
 		} else if (v[2] === "false") {
-			p.push( { type: "icon", value: creatureNameToIconAtlasMap["Scavenger"], scale: 1,
+			p.push( { type: "icon", value: entityIconAtlas("Scavenger"), scale: 1,
 					color: entityIconColor("Scavenger"), rotation: 0 } );
 			d += "Scavengers.";
 		} else {
-			throw new TypeError(thisname + ": error, venue flag \"" + v[2] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": flag \"" + v[2] + "\" not 'true' or 'false'");
 		}
 		p.push( { type: "break" } );
 		p.push( { type: "text", value: "[0/" + v[1] + "]", color: RainWorldColors.Unity_white } );
@@ -2584,7 +2573,7 @@ const CHALLENGES = {
 			desc.splice(2, 0, "0", "System.Int32|1|Amount|3|NULL");
 			desc.push("");
 		}
-		checkDescriptors(thisname, desc.length, 7, "parameter item count");
+		checkDescLen(thisname, desc.length, 7);
 		var v = [], i = [];
 		var items = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Specific Creature Type", , "NULL"], "creature type flag"); v.push(items[1]); i.push(items[2]);
 		items = checkSettingBox(thisname, desc[1], ["System.String", , "Creature Type", , "friend"], "friend selection"); v.push(items[1]); i.push(items[2]);
@@ -2592,20 +2581,20 @@ const CHALLENGES = {
 		var amt = parseInt(v[2]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + v[2] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + v[2] + "\" not a number or out of range");
 		if (v[1] !== "Any Creature" && creatureNameToDisplayTextMap[v[1]] === undefined)
-			throw new TypeError(thisname + ": error, creature type \"" + v[1] + "\" not found in creatureNameToDisplayTextMap[]");
+			throw new TypeError(thisname + ": \"" + v[1] + "\" not found in creatures");
 		var c = entityNameQuantify(1, entityDisplayText(v[1]));
 		var p = [
 			{ type: "icon", value: "FriendB", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
 		];
 		if (v[0] === "true") {
-			p.push( { type: "icon", value: creatureNameToIconAtlasMap[v[1]], scale: 1, color: entityIconColor(v[1]), rotation: 0 } );
+			p.push( { type: "icon", value: entityIconAtlas(v[1]), scale: 1, color: entityIconColor(v[1]), rotation: 0 } );
 		} else if (v[0] === "false") {
 			p.push( { type: "break" } );
 			p.push( { type: "text", value: "[0/" + String(amt) + "]", color: RainWorldColors.Unity_white } );
 		} else {
-			throw new TypeError(thisname + ": error, specific creature flag \"" + v[0] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": flag \"" + v[0] + "\" not 'true' or 'false'");
 		}
 		var b = Array(4); b.fill(0);
 		//	start with classic version...
@@ -2632,11 +2621,11 @@ const CHALLENGES = {
 	BingoTradeChallenge: function(desc) {
 		const thisname = "BingoTradeChallenge";
 		//	desc of format ["0", "System.Int32|15|Value|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Value", , "NULL"], "points value");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2659,11 +2648,11 @@ const CHALLENGES = {
 	BingoTradeTradedChallenge: function(desc) {
 		const thisname = "BingoTradeTradedChallenge";
 		//	desc of format ["0", "System.Int32|3|Amount of Items|0|NULL", "empty", "0", "0"]
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount of Items", , "NULL"], "amount of items");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2688,7 +2677,7 @@ const CHALLENGES = {
 	BingoTransportChallenge: function(desc) {
 		const thisname = "BingoTransportChallenge";
 		//	desc of format ["System.String|Any Region|From Region|0|regions", "System.String|DS|To Region|1|regions", "System.String|CicadaA|Creature Type|2|transport", "", "0", "0"]
-		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		checkDescLen(thisname, desc.length, 6);
 		var v = [], i = [];
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "From Region", , "regions"], "from region"); v.push(items[1]); i.push(items[2]);
 		var items = checkSettingBox(thisname, desc[1], ["System.String", , "To Region", , "regions"], "to region"); v.push(items[1]); i.push(items[2]);
@@ -2696,22 +2685,20 @@ const CHALLENGES = {
 		var r1 = v[0], r2 = v[1];
 		if (r1 !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(r1) < 0)
-				throw new TypeError(thisname + ": error, region \"" + v[0] + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": \"" + v[0] + "\" not found in regions");
 			r1 = regionToDisplayText(board.character, v[0], "Any Subregion");
 		}
 		if (r2 !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(r2) < 0)
-				throw new TypeError(thisname + ": error, region \"" + v[1] + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": \"" + v[1] + "\" not found in regions");
 			r2 = regionToDisplayText(board.character, v[1], "Any Subregion");
 		}
 		if (creatureNameToDisplayTextMap[v[2]] === undefined)
-			throw new TypeError(thisname + ": error, creature type \"" + v[2] + "\" not found in creatureNameToDisplayTextMap[]");
+			throw new TypeError(thisname + ": \"" + v[2] + "\" not found in creatures");
 		var p = [
-			{ type: "icon", value: creatureNameToIconAtlasMap[v[2]], scale: 1, color: entityIconColor(v[2]), rotation: 0 },
+			{ type: "icon", value: entityIconAtlas(v[2]), scale: 1, color: entityIconColor(v[2]), rotation: 0 },
 			{ type: "break" }
 		];
-		if (p[0].value === undefined || p[0].color === undefined)
-			throw new TypeError(thisname + ": error, token \"" + v[2] + "\" not found in itemNameToIconAtlasMap[] or Color");
 		if (v[0] !== "Any Region") p.push( { type: "text", value: v[0], color: RainWorldColors.Unity_white } );
 		p.push( { type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 		if (v[1] !== "Any Region") p.push( { type: "text", value: v[1], color: RainWorldColors.Unity_white } );
@@ -2738,9 +2725,9 @@ const CHALLENGES = {
 	BingoUnlockChallenge: function(desc) {
 		const thisname = "BingoUnlockChallenge";
 		//	desc of format ["System.String|SingularityBomb|Unlock|0|unlocks", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Unlock", , "unlocks"], "unlock selection");
-		var iconName = "", iconColor = [];
+		var iconName = "", iconColor = RainWorldColors.Unity_white;
 		var p = [
 			{ type: "icon", value: "arenaunlock", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 			{ type: "break" }
@@ -2748,31 +2735,31 @@ const CHALLENGES = {
 		var d;
 		if (BingoEnum_ArenaUnlocksBlue.includes(items[1])) {
 			p[0].color = RainWorldColors.AntiGold;
-			iconName = creatureNameToIconAtlasMap[items[1]] || itemNameToIconAtlasMap[items[1]];
-			iconColor = creatureNameToIconColorMap[items[1]] || itemNameToIconColorMap[items[1]] || creatureNameToIconColorMap["Default"];
-			if (iconName === undefined)
-				throw new TypeError(thisname + ": error, token \"" + items[1] + "\" not found in itemNameToIconAtlasMap[] (or creature-, or Color or DisplayText)");
+			iconName = entityIconAtlas(items[1]);
+			iconColor = entityIconColor(items[1]);
+			if (creatureNameToIconAtlasMap[items[1]] === undefined && itemNameToIconAtlasMap[items[1]] === undefined)
+				throw new TypeError(thisname + ": \"" + items[1] + "\" not found in items or creatures");
 			d = entityDisplayText(items[1]);
 		} else if (BingoEnum_ArenaUnlocksGold.includes(items[1])) {
 			p[0].color = RainWorldColors.TokenDefault;
 			if (!(regionCodeToDisplayName[items[1]] || regionCodeToDisplayNameSaint[items[1]] || arenaUnlocksGoldToDisplayName[items[1]]))
-				throw new TypeError(thisname + ": error, arena \"" + items[1] + "\" not found in regions[] or arenaUnlocksGoldToDisplayName[]");
+				throw new TypeError(thisname + ": arena \"" + items[1] + "\" not found in regions or arenaUnlocksGold");
 			d = (arenaUnlocksGoldToDisplayName[items[1]] || regionToDisplayText(board.character, items[1], "Any Subregion")) + " Arenas";
 		} else if (BingoEnum_ArenaUnlocksGreen.includes(items[1])) {
 			p[0].color = RainWorldColors.GreenColor;
 			iconName = "Kill_Slugcat";
 			iconColor = RainWorldColors["Slugcat_" + items[1]];
 			if (iconColor === undefined)
-				throw new TypeError(thisname + ": error, token \"Slugcat_" + items[1] + "\" not found in RainWorldColors[]");
+				throw new TypeError(thisname + ": \"Slugcat_" + items[1] + "\" not found in characters");
 			d = items[1] + " character"
 		} else if (BingoEnum_ArenaUnlocksRed.includes(items[1])) {
 			p[0].color = RainWorldColors.RedColor;
 			var s = items[1].substring(0, items[1].search("-"));
 			if (BingoEnum_AllRegionCodes.indexOf(s) < 0)
-				throw new TypeError(thisname + ": error, region \"" + s + "\" not found in AllRegionCodes[]");
+				throw new TypeError(thisname + ": \"" + s + "\" not found in regions");
 			d = regionToDisplayText(board.character, s, "Any Subregion") + " Safari";
 		} else {
-			throw new TypeError(thisname + ": error, token \"" + items[1] + "\" not found in BingoEnum_ArenaUnlocks[]");
+			throw new TypeError(thisname + ": \"" + items[1] + "\" not a recognized arena unlock");
 		}
 		if (iconName === "")
 			p.push( { type: "text", value: items[1], color: RainWorldColors.Unity_white } );
@@ -2796,20 +2783,20 @@ const CHALLENGES = {
 	BingoVistaChallenge: function(desc) {
 		const thisname = "BingoVistaChallenge";
 		//	desc of format ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
-		checkDescriptors(thisname, desc.length, 6, "parameter item count");
+		checkDescLen(thisname, desc.length, 6);
 		var items = checkSettingBox(thisname, desc[1], ["System.String", , "Room", , "vista"], "item selection");
 		//	desc[0] is region code
 		if (desc[0] != regionOfRoom(items[1]))
-			throw new TypeError(thisname + ": error, region \"" + desc[0] + "\" does not match room \"" + items[1] + "\"'s region");
+			throw new TypeError(thisname + ": \"" + desc[0] + "\" does not match room \"" + items[1] + "\"'s region prefix");
 		if (BingoEnum_AllRegionCodes.indexOf(desc[0]) < 0)
-			throw new TypeError(thisname + ": error, region \"" + desc[0] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": \"" + desc[0] + "\" not found in regions");
 		var v = regionToDisplayText(board.character, desc[0], "Any Subregion");
 		var roomX = parseInt(desc[2]);
 		if (isNaN(roomX) || roomX < 0 || roomX > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + desc[2] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + desc[2] + "\" not a number or out of range");
 		var roomY = parseInt(desc[3]);
 		if (isNaN(roomY) || roomY < 0 || roomY > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + desc[3] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + desc[3] + "\" not a number or out of range");
 		var idx = BingoEnum_VistaPoints.findIndex(o => o.room == items[1] && o.x == roomX && o.y == roomY);
 		if (idx < 0) {
 			//	Can't find in list, customize it
@@ -2850,13 +2837,13 @@ const CHALLENGES = {
 	BingoEnterRegionFromChallenge: function(desc) {
 		const thisname = "BingoEnterRegionFromChallenge";
 		//	desc of format ["System.String|GW|From|0|regionsreal", "System.String|SH|To|0|regionsreal", "0", "0"]
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "From", , "regionsreal"], "from region");
 		var itemTo = checkSettingBox(thisname, desc[1], ["System.String", , "To", , "regionsreal"], "to region");
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": error, from-region \"" + items[1] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": from \"" + items[1] + "\" not found in regions");
 		if (BingoEnum_AllRegionCodes.indexOf(itemTo[1]) < 0)
-			throw new TypeError(thisname + ": error, to-region \"" + itemTo[1] + "\" not found in AllRegionCodes[]");
+			throw new TypeError(thisname + ": to \"" + itemTo[1] + "\" not found in regions");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "regionsreal");
@@ -2880,10 +2867,10 @@ const CHALLENGES = {
 	BingoMoonCloakChallenge: function(desc) {
 		const thisname = "BingoMoonCloakChallenge";
 		//	desc of format ["System.Boolean|false|Deliver|0|NULL", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Deliver", , "NULL"], "delivery flag");
 		if (items[1] !== "true" && items[1] !== "false")
-			throw new TypeError(thisname + ": error, delivery flag \"" + items[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": delivery flag \"" + items[1] + "\" not 'true' or 'false'");
 		var p = [ { type: "icon", value: "Symbol_MoonCloak", scale: 1, color: entityIconColor("MoonCloak"), rotation: 0 } ];
 		if (items[1] === "true") {
 			p.push( { type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
@@ -2907,15 +2894,14 @@ const CHALLENGES = {
 	BingoBroadcastChallenge: function(desc) {
 		const thisname = "BingoBroadcastChallenge";
 		//	desc of format ["System.String|Chatlog_SI3|Broadcast|0|chatlogs", "0", "0"]
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Broadcast", , "chatlogs"], "broadcast selection");
-		var iconName = "", iconColor = [];
 		var r = items[1].substring(items[1].search("_") + 1);
 		if (r.search(/[0-9]/) >= 0) r = r.substring(0, r.search(/[0-9]/));
 		r = (regionCodeToDisplayName[r] || "");
 		if (r > "") r = " in " + r;
 		if (enumToValue(items[1], "chatlogs") <= 0)
-			throw new TypeError(thisname + ": error, chatlog \"" + items[1] + "\" not found in BingoEnum_Chatlogs[]");
+			throw new TypeError(thisname + ": item \"" + items[1] + "\" not found in chatlogs");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "chatlogs");
@@ -2953,11 +2939,11 @@ const CHALLENGES = {
 		const thisname = "BingoDodgeNootChallenge";
 		//	desc of format ["System.Int32|6|Amount|0|NULL", "0", "0", "0"]
 		//	amount, current, completed, revealed
-		checkDescriptors(thisname, desc.length, 4, "parameter item count");
+		checkDescLen(thisname, desc.length, 4);
 		var items = checkSettingBox(thisname, desc[0], ["System.Int32", , "Amount", , "NULL"], "amount");
 		var amt = parseInt(items[1]);
 		if (isNaN(amt) || amt < 1 || amt > INT_MAX)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(5); b.fill(0);
 		b[0] = challengeValue(thisname);
 		applyShort(b, 3, amt);
@@ -2970,7 +2956,7 @@ const CHALLENGES = {
 			description: "Dodge [0/" + String(amt) + "] Noodlefly attacks.",
 			comments: "",
 			paint: [
-				{ type: "icon", value: creatureNameToIconAtlasMap["BigNeedleWorm"], scale: 1, color: creatureNameToIconColorMap.BigNeedleWorm, rotation: 0 },
+				{ type: "icon", value: entityIconAtlas("BigNeedleWorm"), scale: 1, color: entityIconColor("BigNeedleWorm"), rotation: 0 },
 				{ type: "icon", value: "slugtarget", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: "[0/" + String(amt) + "]", color: RainWorldColors.Unity_white }
@@ -2982,18 +2968,18 @@ const CHALLENGES = {
 		const thisname = "BingoDontKillChallenge";
 		//	desc of format ["System.String|DaddyLongLegs|Creature Type|0|creatures", "0", "0"]
 		//	victim, completed, revealed
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Creature Type", , "creatures"], "creature type");
 		if (items[1] !== "Any Creature") {
 			if (creatureNameToDisplayTextMap[items[1]] === undefined)
-				throw new TypeError(thisname + ": error, creature type \"" + items[1] + "\" not found in creatureNameToDisplayTextMap[]");
+				throw new TypeError(thisname + ": \"" + items[1] + "\" not found in creatures");
 		}
 		var p = [
 			{ type: "icon", value: "buttonCrossA", scale: 1, color: RainWorldColors.Unity_red, rotation: 0 },
 			{ type: "icon", value: "Multiplayer_Bones", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
 		];
 		if (items[1] !== "Any Creature")
-			p.push( { type: "icon", value: creatureNameToIconAtlasMap[items[1]], scale: 1, color: entityIconColor(items[1]), rotation: 0 } );
+			p.push( { type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 } );
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "creatures");
@@ -3016,12 +3002,12 @@ const CHALLENGES = {
 		const thisname = "BingoGourmandCrushChallenge";
 		//	desc of format ["0", "System.Int32|9|Amount|0|NULL", "0", "0", ""]
 		//	current, amount, completed, revealed, crushed
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var items = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "amount");
 		var amt = parseInt(items[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + items[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + items[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = amt;
@@ -3048,10 +3034,10 @@ const CHALLENGES = {
 		const thisname = "BingoIteratorChallenge";
 		//	desc of format ["System.Boolean|false|Looks to the Moon|0|NULL", "0", "0"]
 		//	oracle, completed, revealed
-		checkDescriptors(thisname, desc.length, 3, "parameter item count");
+		checkDescLen(thisname, desc.length, 3);
 		var oracle = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Looks to the Moon", , "NULL"], "Moon flag");
 		if (iteratorNameToDisplayTextMap[oracle[1]] === undefined)
-			throw new TypeError(thisname + ": error, Moon flag \"" + oracle[1] + "\" not 'true' or 'false'");
+			throw new TypeError(thisname + ": flag \"" + oracle[1] + "\" not 'true' or 'false'");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(oracle[1], "iterators");
@@ -3074,12 +3060,12 @@ const CHALLENGES = {
 		const thisname = "BingoLickChallenge";
 		//	desc of format ["0", "System.Int32|{0}|Amount|0|NULL", "0", "0", ""]
 		//	current, amount, completed, revealed, lickers
-		checkDescriptors(thisname, desc.length, 5, "parameter item count");
+		checkDescLen(thisname, desc.length, 5);
 		var amounts = checkSettingBox(thisname, desc[1], ["System.Int32", , "Amount", , "NULL"], "amount");
 		var amt = parseInt(amounts[1]);
 		amt = Math.min(amt, CHAR_MAX);
 		if (isNaN(amt) || amt < 1)
-			throw new TypeError(thisname + ": error, amount \"" + amounts[1] + "\" not a number or out of range");
+			throw new TypeError(thisname + ": amount \"" + amounts[1] + "\" not a number or out of range");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = amt;
@@ -5422,6 +5408,22 @@ const ChallengeUpgrades = {
 /* * * Utility Functions * * */
 
 /**
+ *	Called on startup.  Expands lists with common values/structure into
+ *	full lists, to save on static storage.
+ *	Validates enums/lists/dictionaries with common keys, that at least
+ *	keys map to a real value.
+ *	Emits console messages on failure.
+ */
+function expandAndValidateLists() {
+	var a = 0; DataPearlList.forEach(s => { if (dataPearlToRegionMap[s] === undefined) a++; } );
+	if (a > 0) console.log("expandAndValidateLists(): dataPearlToRegionMap[] lacking element(s) from DataPearlList[]");
+	a = 0; DataPearlList.forEach(s => { if (dataPearlToColorMap[s] === undefined) a++; } );
+	if (a > 0) console.log("expandAndValidateLists(): dataPearlToColorMap[] lacking element(s) from DataPearlList[]");
+	a = 0; DataPearlList.forEach(s => { if (dataPearlToDisplayTextMap[s] === undefined) a++; } );
+	if (a > 0) console.log("expandAndValidateLists(): dataPearlToDisplayTextMap[] lacking element(s) from DataPearlList[]");
+}
+
+/**
  *	Called on startup.  Appends goals to BingoEnum_CHALLENGES[].
  */
 function appendCHALLENGES() {
@@ -5523,6 +5525,17 @@ function readShort(a, offs) {
  */
 function readLong(a, offs) {
 	return (a[offs] << 0) + (a[offs + 1] << 8) + (a[offs + 2] << 16) + (a[offs + 3] * (1 << 24));
+}
+
+/**
+ *	Checks descriptor length against given value.  CHALLENGES helper function.
+ *	@param t  (String) name of calling challenge
+ *	@param d  (Number) desc.length
+ *	@param g  (Number) expected length
+ *	@throws TypeError on mismatch
+ */
+function checkDescLen(t, d, g) {
+	if (d != g) throw new TypeError(t + ": found " + String(d) + " parameters, expected " + String(g));
 }
 
 /**
@@ -5628,22 +5641,6 @@ function checkSettingBoxEx(s, template) {
 	if (ar[0] !== "System.String" && ar[4] !== "NULL")
 		rr.error.push("list mismatch \"" + ar[4] + "\"");
 	return rr;
-}
-
-/**
- *	Check if the specified challenge descriptor matches the asserted value.
- *	Helper function for CHALLENGES functions.
- *	@param t    string, name of calling object/function
- *	@param d    value to check equality of
- *	@param g    value comparing to
- *	@param err  string, text to include in the error
- *	@throws TypeError on mismatch
- */
-function checkDescriptors(t, d, g, err) {
-	var s = String(d), h = String(g);
-	if (typeof(d) === "string") s = "\"" + s + "\"";
-	if (typeof(g) === "string") h = "\"" + h + "\"";
-	if (d != g) throw new TypeError(t + ": error, " + err + " " + s + ", expected: " + h);
 }
 
 /**
