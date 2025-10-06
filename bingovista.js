@@ -1240,7 +1240,6 @@ const CHALLENGES = {
 			if (BingoEnum_AllRegionCodes.indexOf(regi) < 0)
 				throw new TypeError(thisname + ": region \"" + regi + "\" not found in AllRegionCodes[]");
 			var r = regionToDisplayText(board.character, regi, "Any Subregion");
-			if (r > "") r = ", in " + r;
 			if (v[1] === "gw_c11")
 				r += " underground";
 			if (v[1] === "gw_c05")
@@ -3584,7 +3583,7 @@ const BingoEnum_BombableOutposts = [
 	"lc_stripmallnew",
 	"lf_j01",
 	"oe_tower04",
-	"sb_topside",
+	"sb_topside"
 ];
 
 /**
@@ -4106,7 +4105,8 @@ const itemNameToDisplayTextMap = {
 	"JokeRifle":        "Joke Rifles",
 	"Seed":             "Popcorn Seeds",
 	"Default":          "Unknown Items",
-	"SeedCob":          "Popcorn Plants"	//	(Watcher 1.5) not exactly an item, but it goes in the unlocks all the same
+	"SeedCob":          "Popcorn Plants",	//	(Watcher 1.5) not exactly an item, but it goes in the unlocks all the same
+	"ExplosiveSpear":   "Explosive Spears"	//	for redundancy
 };
 
 /**
@@ -4164,7 +4164,8 @@ const itemNameToIconAtlasMap = {
 	"ElectricSpear":    "Symbol_ElectricSpear",
 	"Pearl":            "Symbol_Pearl",
 	"KarmaFlower":      "FlowerMarker",
-	"SeedCob":          "popcorn_plant"
+	"SeedCob":          "popcorn_plant",
+	"ExplosiveSpear":   "Symbol_FireSpear"
 };
 
 /**
@@ -4397,6 +4398,7 @@ const itemNameToIconColorMap = {
 	"FireSpear":              "#e60e0e",
 	"Pearl":                  "#b3b3b3",
 	"SeedCob":                RainWorldColors.popcorn_plant,
+	"ExplosiveSpear":         "#ff7878",
 	//	dataPearlToColorMap incorporated here, add "Pearl_" prefix
 	"Pearl_Misc":             "#bebebe",
 	"Pearl_Misc2":            "#bebebe",
