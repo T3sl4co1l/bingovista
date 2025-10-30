@@ -1142,67 +1142,118 @@ const CHALLENGES = {
 	BingoAchievementChallenge: function(desc) {
 		const thisname = "BingoAchievementChallenge";
 		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
-		checkDescLen(thisname, desc.length, 3);
-		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Passage", , "passage"], "goal selection");
-		var b = Array(4); b.fill(0);
-		b[0] = challengeValue(thisname);
-		b[3] = enumToValue(items[1], "passage");
-		b[2] = b.length - GOAL_LENGTH;
+		const upgrades = {};
+		desc = upgradeDescriptor(desc, upgrades);
+		const template = [
+			{ param: "passage",  type: "string", formatter: "passage", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Passage", position: "0", formatter: "passage", altformatter: "", altthreshold: 0, defaultval: "Traveller" } },
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+		];
+		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
+		function AchievementChallengePaint(p) {
+			return [
+				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
+				{ type: "icon", value: p.passage + "A", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
+				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
+			];
+		}
+		function AchievementChallengeDescription(p) {
+			return "Earn " + (passageToDisplayNameMap[p.passage] || "unknown") + " passage.";
+		}
+		function AchievementChallengeComment(p) {
+			return "";
+		}
+		function AchievementChallengeToBinary(p) {
+			var b = Array(4); b.fill(0);
+			b[0] = challengeValue(p._name);
+			b[3] = enumToValue(p.passage, "passage");
+			b[2] = b.length - GOAL_LENGTH;
+			return new Uint8Array(b);
+		}
 		return {
 			name: thisname,
+			params: params,
 			category: "Obtaining Passages",
-			items: ["Passage"],
-			values: [items[1]],
-			description: "Earn " + (passageToDisplayNameMap[items[1]] || "unknown") + " passage.",
-			comments: "",
-			paint: [
-				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: items[1] + "A", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
-			],
-			toBin: new Uint8Array(b)
+			items: ["passage"],
+			values: [params.passage],
+			description: AchievementChallengeDescription(params),
+			comments: AchievementChallengeComment(params),
+			paint: AchievementChallengePaint(params),
+			toBin: AchievementChallengeToBinary(params)
 		};
 	},
 	BingoAllRegionsExcept: function(desc) {
 		const thisname = "BingoAllRegionsExcept";
 		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "System.Int32|13|Amount|1|NULL", "0", "0"]
-		checkDescLen(thisname, desc.length, 6);
-		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
-		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
-		var current = parseInt(desc[2]);
-		if (isNaN(current) || current < 0 || current > INT_MAX)
-			throw new TypeError(thisname + ": current \"" + desc[2] + "\" not a number or out of range");
-		var required = parseInt(desc[3]);
-		if (isNaN(required)) {
-			//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
-			var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
-			required = parseInt(amounts[1]); desc[3] = amounts[1];
-		}
-		required = Math.min(required, current + CHAR_MAX);
-		if (isNaN(required) || required < 1 || required > INT_MAX)
-			throw new TypeError(thisname + ": required \"" + desc[3] + "\" not a number or SettingBox, or out of range");
-		var b = Array(5); b.fill(0);
-		b[0] = challengeValue(thisname);
-		b[3] = enumToValue(items[1], "regionsreal");
-		b[4] = required - current;
-		desc[1].split("|").forEach(s => b.push(enumToValue(s, "regionsreal")) );
-		b[2] = b.length - GOAL_LENGTH;
-		return {
-			name: thisname,
-			category: "Entering regions while never visiting one",
-			items: [items[2], "To do", "Progress", "Total"],
-			values: [items[1], desc[1], String(current), String(required)],
-			description: "Enter " + String(required - current) + " regions that are not " + regionToDisplayText(board.character, items[1], "Any Subregion") + ".",
-			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)",
-			paint: [
+		const upgrades = {
+			6: [ { op: "intFormat", offs: 3, before: "System.Int32|", after: "|Amount|1|NULL" } ]
+		};
+		const template = [
+			{ param: "region",  type: "string", formatter: "regions", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Region", position: "0", formatter: "regionsreal", defaultval: "SU" } },
+			{ param: "remaining", type: "array", formatter: "regionsreal", parse: "list", separator: "|", defaultval: [] },
+			{ param: "current", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
+			{ param: "amount",  type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "1", formatter: "NULL", maxval: INT_MAX, defaultval: 1 } },
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+		];
+		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
+		//checkDescLen(thisname, desc.length, 6);
+		//var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
+		//if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
+		//	throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
+		//var current = parseInt(desc[2]);
+		//if (isNaN(current) || current < 0 || current > INT_MAX)
+		//	throw new TypeError(thisname + ": current \"" + desc[2] + "\" not a number or out of range");
+		//var required = parseInt(desc[3]);
+		//if (isNaN(required)) {
+		//	//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
+		//	var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
+		//	required = parseInt(amounts[1]); desc[3] = amounts[1];
+		//}
+		//required = Math.min(required, current + CHAR_MAX);
+		//if (isNaN(required) || required < 1 || required > INT_MAX)
+		//	throw new TypeError(thisname + ": required \"" + desc[3] + "\" not a number or SettingBox, or out of range");
+		function AllRegionsExceptToPaint(p) {
+			return [
 				{ type: "icon", value: "TravellerA", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: RainWorldColors.Unity_red, rotation: 0 },
-				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
+				{ type: "text", value: p.region, color: RainWorldColors.Unity_white },
 				{ type: "break" },
-				{ type: "text", value: "[" + String(current) + "/" + String(required) + "]", color: RainWorldColors.Unity_white }
-			],
-			toBin: new Uint8Array(b)
+				{ type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: RainWorldColors.Unity_white }
+			];
+		}
+		function AllRegionsExceptToDescription(p) {
+			return "Enter " + (((p.amount - p.current) > 1) ? String(p.amount - p.current) + " more regions" : (((p.amount - p.current) > 0) ? "one more region" : "no more regions") ) + " without entering " + regionToDisplayText(board.character, p.region, "Any Subregion") + ".";
+		}
+		function AllRegionsExceptToComment(p) {
+			return "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)";
+		}
+		function AllRegionsExceptToBinary(p) {
+			var b = Array(5); b.fill(0);
+			b[0] = challengeValue(p._name);
+			b[3] = enumToValue(p.region, "regionsreal");
+			b[4] = Math.max(0, Math.min(p.required - p.current, CHAR_MAX));
+			p.remaining.forEach(s => b.push(enumToValue(s, "regionsreal")) );
+			b[2] = b.length - GOAL_LENGTH;
+			return new Uint8Array(b);
+		}
+		var v = [], i = [];
+		v.push(String(params.region));    i.push("region");
+		v.push(params.remaining.join(params._templates.remaining.separator); i.push("remaining");
+		v.push(String(params.current));   i.push("current");
+		v.push(String(params.amount));    i.push("amount");
+		return {
+			name: thisname,
+			params: params,
+			category: "Entering regions while never visiting one",
+			items: i,
+			values: v,
+			description: AllRegionsExceptToDescription(params),
+			comments: AllRegionsExceptToComment(params),
+			paint: AllRegionsExceptToPaint(params),
+			toBin: AllRegionsExceptToBinary(params)
 		};
 	},
 	BingoBombTollChallenge: function(desc) {
@@ -1494,6 +1545,7 @@ const CHALLENGES = {
 			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
 		];
 		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
 		function DamageChallengePaint(p) {
 			var r = [];
 			if (p.weapon !== "Any Weapon") {
@@ -1513,7 +1565,7 @@ const CHALLENGES = {
 				r.push( { type: "text", value: p.subregion, color: RainWorldColors.Unity_white } );
 			}
 			r.push( { type: "break" } );
-			r.push( { type: "text", value: "[0/" + String(p.amount) + "]", color: RainWorldColors.Unity_white } );
+			r.push( { type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: RainWorldColors.Unity_white } );
 			if (p.onecycle)
 				r.push( { type: "icon", value: "cycle_limit", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 			return r;
@@ -5727,6 +5779,10 @@ function upgradeDescriptor(d, upg) {
 					d.unshift(step.data);
 				} else if (step.op === "replace") {
 					d[step.offs] = d[step.offs].replace(step.find, step.replace);
+				} else if (step.op === "intFormat") {
+					//	used by BingoAllRegionsExcept v0.85
+					if (!isNaN(parseInt(d[step.offs])))
+						d[step.offs] = step.before + String(parseInt(d[step.offs])) + step.after;
 				} else {
 					console.log(thisname + ": unsupported upgrade operation: " + upg[l][i].op);
 				}
@@ -5761,7 +5817,8 @@ function upgradeDescriptor(d, upg) {
  *		          	(and similarly in ._error and ._templates)
  *		type      	string, primitive type assigned to [param]; one of "bool",
  *		          	"number", "string", "array"; used to read/format parameters
- *		          	after creation
+ *		          	after creation ("array" type is only used for an array of
+ *		          	string elements, keyed from formatter)
  *		formatter 	string, name of enum list (in ALL_ENUMS) to select from
  *		          	(string type)
  *		parse     	parser used to extract the value; one of "parseInt",
@@ -5787,7 +5844,7 @@ function upgradeDescriptor(d, upg) {
 //function challengeTextToAbstract(s, template) {
 //	var desc = s.split("><");
 function challengeTextToAbstract(desc, template) {
-	if (desc.length != template.length) throw new TypeError(thisname + ": found " + desc.length + " parameters, expected: " + template.length);
+	if (desc.length != template.length) throw new TypeError("found " + desc.length + " parameters, expected " + template.length);
 	var params = { _error: {}, _templates: {} };
 	for (var i = 0; i < template.length; i++) {
 		params[template[i].param] = template[i].defaultval;
@@ -5813,9 +5870,16 @@ function challengeTextToAbstract(desc, template) {
 			params[template[i].param] = tmp.value;
 			params._error[template[i].param].splice(-1, 0, ...tmp.error);
 		} else if (template[i].parse === "list") {
-			params[template[i].param] = desc[i].split(template[i].separator);
+			var tmp = desc[i].split(template[i].separator);
+			params[template[i].param] = [];
+			tmp.forEach(s => {
+				if (enumToValue(s, template[i].formatter) == 0)
+					params._error[template[i].param].push(s + " not found in enum, ignoring");
+				else
+					params[template[i].param].push(s);
+			});
 		} else {
-			console.log(thisname + ": unsupported parse operation: " + template[i].parse);
+			console.log("unsupported parse operation: " + template[i].parse);
 		}
 	}
 	return params;
