@@ -151,6 +151,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		window.history.pushState(null, "", u.href);
 	});
 	document.getElementById("parse").addEventListener("click", parseText);
+	document.getElementById("parse").addEventListener("click", redrawBoard);
 	document.getElementById("copy").addEventListener("click", copyText);
 	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
 	document.getElementById("textbox").addEventListener("paste", pasteText);
@@ -232,6 +233,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			//	very inefficient, unlikely to be used, but provided for completeness
 			document.getElementById("textbox").value = u.get("a");
 			parseText();
+			redrawBoard();
 
 		} else if (u.has("b")) {
 
@@ -250,6 +252,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			document.getElementById("textbox").value = board.text;
 			setHeaderFromBoard(board);
 			parseText();
+			redrawBoard();
 
 		} else if (u.has("q")) {
 
@@ -287,6 +290,7 @@ document.addEventListener("DOMContentLoaded", function() {
 				document.getElementById("textbox").value = board.text;
 				setHeaderFromBoard(board);
 				parseText();
+				redrawBoard();
 			} );
 
 			function validateQuery(s) {
@@ -367,6 +371,7 @@ function dragDrop(e) {
 				d.items[i].getAsString(function(s) {
 					document.getElementById("textbox").value = s;
 					parseText();
+					redrawBoard();
 				});
 				return;
 			}
@@ -391,6 +396,7 @@ function doLoadFile(files) {
 			fr.onload = function() {
 				document.getElementById("textbox").value = this.result;
 				parseText();
+				redrawBoard();
 			};
 			fr.onerror = function(e) {
 				setError("File read error: " + e.message);
@@ -525,8 +531,6 @@ function parseText(e) {
 	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
 	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
 
-	redrawBoard();
-
 	//	Fill meta table with board info
 	setHeaderFromBoard(board);
 
@@ -547,7 +551,7 @@ function parseText(e) {
  */
 function pasteText(e) {
 	//	Let default happen, but trigger a parse in case no edits are required by the user
-	setTimeout(parseText, 10);
+	setTimeout((e) => {parseText(e); redrawBoard();}, 10);
 }
 
 /**
@@ -594,10 +598,10 @@ function clickBoard(e) {
 }
 
 /**
- *	Redraws the board canvas, based on current `board` data.
+ *	Redraws a given board canvas by ID, based on current `board` data.
  */
-function redrawBoard() {
-	var ctx = document.getElementById("board").getContext("2d");
+function redrawBoard(canvas = "board") {
+	var ctx = document.getElementById(canvas).getContext("2d");
 	ctx.fillStyle = square.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 	for (var i = 0; i < board.goals.length; i++) {
@@ -5993,6 +5997,7 @@ function setMeta() {
 			|| shelter !== undefined || perks !== undefined) {
 		console.log("Updated.");
 		parseText();
+		redrawBoard();
 		return;
 	}
 	console.log("setMeta(comm, character, shelter, perks)\n"
@@ -6323,4 +6328,5 @@ function generateOneOfEverything() {
 	s = s.substring(0, s.length - 4);
 	document.getElementById("textbox").value = s;
 	parseText();
+	redrawBoard();
 }
