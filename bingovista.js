@@ -484,7 +484,7 @@ function parseText(e) {
 			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
 			if (CHALLENGES[type] !== undefined) {
 				try {
-					board.goals.push(CHALLENGES[type](desc));
+					board.goals.push(CHALLENGES[type](desc, board.character));
 				} catch (er) {
 					board.goals.push(CHALLENGES["BingoChallenge"]( [
 						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
@@ -1102,9 +1102,6 @@ function binGoalToText(c) {
  *	From Bingomod decomp/source, with some customization (particularly across
  *	versions).
  *
- *	Assumption: global `board` variable's header properties have been set, and can
- *	be read at this point.
- *
  *	Adding new challenges:
  *	Append at the bottom. Yeah, they're not going to be alphabetical order anymore.
  *	Order is used by challengeValue, and thus translate names to binary identifier;
@@ -1120,7 +1117,7 @@ function binGoalToText(c) {
  *	BingoEnum_CHALLENGES.
  */
 const CHALLENGES = {
-	BingoChallenge: function(desc) {
+	BingoChallenge: function(desc, character = "Any") {
 		const thisname = "BingoChallenge";
 		//	Keep as template and default; behavior is as a zero-terminated string container
 		desc[0] = desc[0].substring(0, 255);
@@ -1143,7 +1140,7 @@ const CHALLENGES = {
 			toBin: b.subarray(0, enc.length + GOAL_LENGTH)
 		};
 	},
-	BingoAchievementChallenge: function(desc) {
+	BingoAchievementChallenge: function(desc, character = "Any") {
 		const thisname = "BingoAchievementChallenge";
 		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1167,7 +1164,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoAllRegionsExcept: function(desc) {
+	BingoAllRegionsExcept: function(desc, character = "Any") {
 		const thisname = "BingoAllRegionsExcept";
 		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "System.Int32|13|Amount|1|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -1197,7 +1194,7 @@ const CHALLENGES = {
 			category: "Entering regions while never visiting one",
 			items: [items[2], "To do", "Progress", "Total"],
 			values: [items[1], desc[1], String(current), String(required)],
-			description: "Enter " + String(required - current) + " regions that are not " + regionToDisplayText(board.character, items[1], "Any Subregion") + ".",
+			description: "Enter " + String(required - current) + " regions that are not " + regionToDisplayText(character, items[1], "Any Subregion") + ".",
 			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)",
 			paint: [
 				{ type: "icon", value: "TravellerA", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -1209,7 +1206,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoBombTollChallenge: function(desc) {
+	BingoBombTollChallenge: function(desc, character = "Any") {
 		const thisname = "BingoBombTollChallenge";
 		//	desc of format (< v1.2) ["System.String|gw_c05|Scavenger Toll|1|tolls", "System.Boolean|false|Pass the Toll|0|NULL", "0", "0"]
 		//	or (>= 1.2) ["System.Boolean|true|Specific toll|0|NULL", "System.String|gw_c05|Scavenger Toll|3|tolls", "System.Boolean|false|Pass the Toll|2|NULL", "0", "System.Int32|3|Amount|1|NULL", "empty", "0", "0"]
@@ -1243,7 +1240,7 @@ const CHALLENGES = {
 			var regi = regionOfRoom(v[1]).toUpperCase();
 			if (BingoEnum_AllRegionCodes.indexOf(regi) < 0)
 				throw new TypeError(thisname + ": region \"" + regi + "\" not found in AllRegionCodes[]");
-			var r = regionToDisplayText(board.character, regi, "Any Subregion");
+			var r = regionToDisplayText(character, regi, "Any Subregion");
 			if (v[1] === "gw_c11")
 				r += " underground";
 			if (v[1] === "gw_c05")
@@ -1292,12 +1289,12 @@ const CHALLENGES = {
 			description: d,
 			comments: "A hit is registered within a 500-unit radius of the toll. Bomb and pass can be done in either order within a cycle; or even bombed in a previous cycle, then passed later.<br>" +
 			"When the <span class=\"code\">specific</span> flag is set, <span class=\"code\">amount</span> and <span class=\"code\">current</span> are unused; when cleared, <span class=\"code\">Scavenger Toll</span> is unused.<br>" +
-			"The <span class=\"code\">bombed</span> list records the state of the multi-toll version. It's a dictionary of the form: <span class=\"code\">{room name}|{false/true}[%...]</span>, where the braces are replaced with the respective values, and <span class=\"code\">|</span> and <span class=\"code\">%</span> are literal, and (\"...\") indicates subsequent key-value pairs; or <span class=\"code\">empty</span> when empty. (Room names are case-sensitive, matching the game-internal naming.)  A room is added to the list when bombed, with a Boolean value of <span class=\"code\">false</span> before passing, or <span class=\"code\">true</span> after. By preloading this list, a customized \"all but these tolls\" challenge could be crafted (but, do note the list does not show in-game!)." + getMapLink(v[1].toUpperCase()),
+			"The <span class=\"code\">bombed</span> list records the state of the multi-toll version. It's a dictionary of the form: <span class=\"code\">{room name}|{false/true}[%...]</span>, where the braces are replaced with the respective values, and <span class=\"code\">|</span> and <span class=\"code\">%</span> are literal, and (\"...\") indicates subsequent key-value pairs; or <span class=\"code\">empty</span> when empty. (Room names are case-sensitive, matching the game-internal naming.)  A room is added to the list when bombed, with a Boolean value of <span class=\"code\">false</span> before passing, or <span class=\"code\">true</span> after. By preloading this list, a customized \"all but these tolls\" challenge could be crafted (but, do note the list does not show in-game!)." + getMapLink(v[1].toUpperCase(), character),
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCollectPearlChallenge: function(desc) {
+	BingoCollectPearlChallenge: function(desc, character = "Any") {
 		const thisname = "BingoCollectPearlChallenge";
 		//	desc of format ["System.Boolean|true|Specific Pearl|0|NULL", "System.String|LF_bottom|Pearl|1|pearls", "0", "System.Int32|1|Amount|3|NULL", "0", "0", ""]
 		checkDescLen(thisname, desc.length, 7);
@@ -1325,15 +1322,15 @@ const CHALLENGES = {
 					throw new TypeError(thisname + ": item \"" + items[1] + "\" not found in pearls");
 				if (items[1] === "DM") {
 					//	Special case: DM pearl is found in DM only for Spearmaster; it's MS any other time
-					if (Object.values(BingoEnum_CharToDisplayText).indexOf(board.character) < 0
-							|| board.character === "Nightcat" || board.character === "Any")
+					if (Object.values(BingoEnum_CharToDisplayText).indexOf(character) < 0
+							|| character === "Nightcat" || character === "Any")
 						r = regionCodeToDisplayName["DM"] + " / " + regionCodeToDisplayName["MS"];
-					else if (board.character === "Spearmaster")
+					else if (character === "Spearmaster")
 						r = regionCodeToDisplayName["DM"];
 					else
 						r = regionCodeToDisplayName["MS"];
 				} else {
-					r = regionToDisplayText(board.character, regi, "Any Subregion");
+					r = regionToDisplayText(character, regi, "Any Subregion");
 				}
 			}
 			d = "Collect the " + dataPearlToDisplayTextMap[items[1]] + " pearl from " + r + ".";
@@ -1371,7 +1368,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCraftChallenge: function(desc) {
+	BingoCraftChallenge: function(desc, character = "Any") {
 		const thisname = "BingoCraftChallenge";
 		//	desc of format ["System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -1405,7 +1402,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCreatureGateChallenge: function(desc) {
+	BingoCreatureGateChallenge: function(desc, character = "Any") {
 		const thisname = "BingoCreatureGateChallenge";
 		//	desc of format ["System.String|CicadaA|Creature Type|1|transport", "0", "System.Int32|4|Amount|0|NULL", "empty", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -1441,7 +1438,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCycleScoreChallenge: function(desc) {
+	BingoCycleScoreChallenge: function(desc, character = "Any") {
 		const thisname = "BingoCycleScoreChallenge";
 		//	desc of format ["System.Int32|126|Target Score|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1469,7 +1466,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDamageChallenge: function(desc) {
+	BingoDamageChallenge: function(desc, character = "Any") {
 		const thisname = "BingoDamageChallenge";
 		//	desc of format (< v1.091) ["System.String|JellyFish|Weapon|0|weapons", "System.String|WhiteLizard|Creature Type|1|creatures", "0", "System.Int32|6|Amount|2|NULL", "0", "0"]
 		//	or (>= v1.091) ["System.String|JellyFish|Weapon|0|weapons", "System.String|AquaCenti|Creature Type|1|creatures", "0", "System.Int32|5|Amount|2|NULL", "System.Boolean|false|In One Cycle|0|NULL", "System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions", "0", "0"]
@@ -1523,7 +1520,7 @@ const CHALLENGES = {
 			return r;
 		}
 		function DamageChallengeDescription(p) {
-			var r = regionToDisplayText(board.character, p.region, p.subregion);
+			var r = regionToDisplayText(character, p.region, p.subregion);
 			if (r > "") r = ", in " + r;
 			var d = "Hit " + entityDisplayText(p.victim) + " with " + entityDisplayText(p.weapon);
 			d += " " + String(p.amount) + ((p.amount > 1) ? " times" : " time") + r;
@@ -1568,7 +1565,7 @@ const CHALLENGES = {
 			toBin: DamageChallengeToBinary(params)
 		};
 	},
-	BingoDepthsChallenge: function(desc) {
+	BingoDepthsChallenge: function(desc, character = "Any") {
 		const thisname = "BingoDepthsChallenge";
 		//	desc of format ["System.String|VultureGrub|Creature Type|0|depths", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1589,7 +1586,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [items[1]],
 			description: "Drop " + d + " into the Depths drop room (SB_D06).",
-			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06"),
+			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06", character),
 			paint: [
 				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "deathpiticon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -1599,7 +1596,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDodgeLeviathanChallenge: function(desc) {
+	BingoDodgeLeviathanChallenge: function(desc, character = "Any") {
 		const thisname = "BingoDodgeLeviathanChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -1619,7 +1616,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDontUseItemChallenge: function(desc) {
+	BingoDontUseItemChallenge: function(desc, character = "Any") {
 		const thisname = "BingoDontUseItemChallenge";
 		//	desc of format ["System.String|BubbleGrass|Item type|0|banitem", "0", "0", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -1647,7 +1644,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEatChallenge: function(desc) {
+	BingoEatChallenge: function(desc, character = "Any") {
 		const thisname = "BingoEatChallenge";
 		//	desc of format (< v1.2) ["System.Int32|6|Amount|1|NULL", "0", "0", "System.String|DangleFruit|Food type|0|food", "0", "0"]
 		//	or (>= v1.2) ["System.Int32|4|Amount|3|NULL", "0", "0", "System.String|SlimeMold|Food type|0|food", "System.Boolean|false|While Starving|2|NULL", "0", "0"]
@@ -1695,7 +1692,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEchoChallenge: function(desc) {
+	BingoEchoChallenge: function(desc, character = "Any") {
 		const thisname = "BingoEchoChallenge";
 		//	desc of format (< v1.2) ["System.String|SB|Region|0|echoes", "System.Boolean|false|While Starving|1|NULL", "0", "0"]
 		//	or (>= v1.2) ["System.Boolean|false|Specific Echo|0|NULL", "System.String|SB|Region|1|echoes", "System.Boolean|true|While Starving|3|NULL", "0", "System.Int32|2|Amount|2|NULL", "0", "0", ""]
@@ -1711,7 +1708,7 @@ const CHALLENGES = {
 		var echor = checkSettingBox(thisname, desc[1], ["System.String", , "Region", , "echoes"], "echo region");
 		if (BingoEnum_AllRegionCodes.indexOf(echor[1]) < 0)
 			throw new TypeError(thisname + ": \"" + echor[1] + "\" not found in regions");
-		var r = regionToDisplayText(board.character, echor[1], "Any Subregion");
+		var r = regionToDisplayText(character, echor[1], "Any Subregion");
 		var starv = checkSettingBox(thisname, desc[2], ["System.Boolean", , "While Starving", , "NULL"], "starving flag");
 		if (starv[1] !== "true" && starv[1] !== "false")
 			throw new TypeError(thisname + ": starving flag \"" + starv[1] + "\" not 'true' or 'false'");
@@ -1758,14 +1755,14 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEnterRegionChallenge: function(desc) {
+	BingoEnterRegionChallenge: function(desc, character = "Any") {
 		const thisname = "BingoEnterRegionChallenge";
 		//	desc of format ["System.String|CC|Region|0|regionsreal", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "enter region");
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
 			throw new TypeError(thisname + ": region \"" + items[1] + "\" not found in regions");
-		var r = regionToDisplayText(board.character, items[1], "Any Subregion");
+		var r = regionToDisplayText(character, items[1], "Any Subregion");
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		b[3] = enumToValue(items[1], "regionsreal");
@@ -1784,7 +1781,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoGlobalScoreChallenge: function(desc) {
+	BingoGlobalScoreChallenge: function(desc, character = "Any") {
 		const thisname = "BingoGlobalScoreChallenge";
 		//	desc of format ["0", "System.Int32|271|Target Score|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -1811,7 +1808,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoGreenNeuronChallenge: function(desc) {
+	BingoGreenNeuronChallenge: function(desc, character = "Any") {
 		const thisname = "BingoGreenNeuronChallenge";
 		//	desc of format ["System.Boolean|true|Looks to the Moon|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1841,7 +1838,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoHatchNoodleChallenge: function(desc) {
+	BingoHatchNoodleChallenge: function(desc, character = "Any") {
 		const thisname = "BingoHatchNoodleChallenge";
 		//	desc of format ["0", "System.Int32|3|Amount|1|NULL", "System.Boolean|true|At Once|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -1877,7 +1874,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoHellChallenge: function(desc) {
+	BingoHellChallenge: function(desc, character = "Any") {
 		const thisname = "BingoHellChallenge";
 		//	desc of format ["0", "System.Int32|2|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -1907,7 +1904,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoItemHoardChallenge: function(desc) {
+	BingoItemHoardChallenge: function(desc, character = "Any") {
 		const thisname = "BingoItemHoardChallenge";
 		//	desc of format (< v1.092) ["System.Int32|5|Amount|1|NULL", "System.String|PuffBall|Item|0|expobject", "0", "0"]
 		//	or (>= 1.092) ["System.Boolean|true|Any Shelter|2|NULL", "0", "System.Int32|4|Amount|0|NULL", "System.String|DangleFruit|Item|1|expobject", "0", "0", ""]
@@ -1939,7 +1936,7 @@ const CHALLENGES = {
 			if (BingoEnum_AllRegionCodes.indexOf(reg[1]) < 0)
 				throw new TypeError(thisname + ": \"" + reg[1] + "\" not found in regions");
 		}
-		var r = regionToDisplayText(board.character, reg[1], "Any Subregion") + ".";
+		var r = regionToDisplayText(character, reg[1], "Any Subregion") + ".";
 		if (r.length > 1) r = ", in " + r;
 		var d = "";
 		d += (any[1] === "true") ? "Bring " : "Hoard ";
@@ -1986,7 +1983,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoKarmaFlowerChallenge: function(desc) {
+	BingoKarmaFlowerChallenge: function(desc, character = "Any") {
 		const thisname = "BingoKarmaFlowerChallenge";
 		//	assert: desc of format ["0", "System.Int32|5|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2014,7 +2011,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoKillChallenge: function(desc) {
+	BingoKillChallenge: function(desc, character = "Any") {
 		const thisname = "BingoKillChallenge";
 		//	assert: desc of format (< v1.2) ["System.String|Scavenger|Creature Type|0|creatures", "System.String|Any Weapon|Weapon Used|6|weaponsnojelly", "System.Int32|5|Amount|1|NULL", "0", "System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions", "System.Boolean|false|In one Cycle|3|NULL", "System.Boolean|false|Via a Death Pit|7|NULL", "System.Boolean|false|While Starving|2|NULL", "0", "0"]
 		//	or (>= v1.2) [System.String|TentaclePlant|Creature Type|0|creatures", "System.String|Any Weapon|Weapon Used|6|weaponsnojelly", "System.Int32|4|Amount|1|NULL", "0", "System.String|Any Region|Region|5|regions", "System.Boolean|false|In one Cycle|3|NULL", "System.Boolean|false|Via a Death Pit|7|NULL", "System.Boolean|false|While Starving|2|NULL", "System.Boolean|false|While under mushroom effect|8|NULL", "0", "0"]
@@ -2056,7 +2053,7 @@ const CHALLENGES = {
 			if (BingoEnum_AllSubregions.indexOf(v[4]) == -1)
 				throw new TypeError(thisname + ": \"" + v[4] + "\" not found in subregions");
 		}
-		var r = regionToDisplayText(board.character, v[3], v[4]);
+		var r = regionToDisplayText(character, v[3], v[4]);
 		if (r > "") r = " in " + r;
 		var w = ", with a death pit";
 		if (!BingoEnum_Weapons.includes(v[1]))
@@ -2133,7 +2130,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoMaulTypesChallenge: function(desc) {
+	BingoMaulTypesChallenge: function(desc, character = "Any") {
 		const thisname = "BingoMaulTypesChallenge";
 		//	desc of format "0", "System.Int32|4|Amount|0|NULL", "0", "0", ""
 		checkDescLen(thisname, desc.length, 5);
@@ -2160,7 +2157,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoMaulXChallenge: function(desc) {
+	BingoMaulXChallenge: function(desc, character = "Any") {
 		const thisname = "BingoMaulXChallenge";
 		//	desc of format ["0", "System.Int32|13|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2187,7 +2184,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoNeuronDeliveryChallenge: function(desc) {
+	BingoNeuronDeliveryChallenge: function(desc, character = "Any") {
 		const thisname = "BingoNeuronDeliveryChallenge";
 		//	desc of format ["System.Int32|2|Amount of Neurons|0|NULL", "0", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2217,7 +2214,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoNoNeedleTradingChallenge: function(desc) {
+	BingoNoNeedleTradingChallenge: function(desc, character = "Any") {
 		const thisname = "BingoNoNeedleTradingChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -2241,7 +2238,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoNoRegionChallenge: function(desc) {
+	BingoNoRegionChallenge: function(desc, character = "Any") {
 		const thisname = "BingoNoRegionChallenge";
 		//	desc of format ["System.String|SI|Region|0|regionsreal", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2257,7 +2254,7 @@ const CHALLENGES = {
 			category: "Avoiding a region",
 			items: [items[2]],
 			values: [items[1]],
-			description: "Do not enter " + regionToDisplayText(board.character, items[1], "Any Subregion") + ".",
+			description: "Do not enter " + regionToDisplayText(character, items[1], "Any Subregion") + ".",
 			comments: "",
 			paint: [
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: RainWorldColors.Unity_red, rotation: 0 },
@@ -2266,7 +2263,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPearlDeliveryChallenge: function(desc) {
+	BingoPearlDeliveryChallenge: function(desc, character = "Any") {
 		const thisname = "BingoPearlDeliveryChallenge";
 		//	desc of format ["System.String|LF|Pearl from Region|0|regions", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2274,7 +2271,7 @@ const CHALLENGES = {
 		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
 			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
 		var oracle = "moon";
-		if (board.character === "Artificer")
+		if (character === "Artificer")
 			oracle = "pebbles";
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
@@ -2285,7 +2282,7 @@ const CHALLENGES = {
 			category: "Delivering colored pearls to an Iterator",
 			items: [items[2]],
 			values: [items[1]],
-			description: "Deliver " + regionToDisplayText(board.character, items[1], "Any Subregion") + " colored pearl to " + iteratorNameToDisplayTextMap[oracle] + ".",
+			description: "Deliver " + regionToDisplayText(character, items[1], "Any Subregion") + " colored pearl to " + iteratorNameToDisplayTextMap[oracle] + ".",
 			comments: "",
 			paint: [
 				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
@@ -2298,7 +2295,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPearlHoardChallenge: function(desc) {
+	BingoPearlHoardChallenge: function(desc, character = "Any") {
 		const thisname = "BingoPearlHoardChallenge";
 		//	desc of format (< v1.2) ["System.Boolean|false|Common Pearls|0|NULL", "System.Int32|2|Amount|1|NULL", "System.String|SL|In Region|2|regions", "0", "0"]
 		//	or (>= v1.2) ["System.Boolean|true|Common Pearls|0|NULL", "System.Boolean|false|Any Shelter|2|NULL", "0", "System.Int32|2|Amount|1|NULL", "System.String|LF|Region|3|regions", "0", "0", ""]
@@ -2327,7 +2324,7 @@ const CHALLENGES = {
 				throw new TypeError(thisname + ": \"" + reg[1] + "\" not found in regions");
 			r = ", in " + r;
 		}
-		var r = regionToDisplayText(board.character, reg[1], "Any Subregion");
+		var r = regionToDisplayText(character, reg[1], "Any Subregion");
 		if (r > "") r = ", in " + r;
 		var d = " common pearl";
 		if (common[1] === "false") d = " colored pearl";
@@ -2367,7 +2364,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPinChallenge: function(desc) {
+	BingoPinChallenge: function(desc, character = "Any") {
 		const thisname = "BingoPinChallenge";
 		//	desc of format ["0", "System.Int32|5|Amount|0|NULL", "System.String|PinkLizard|Creature Type|1|creatures", "", "System.String|SU|Region|2|regions", "0", "0"]
 		checkDescLen(thisname, desc.length, 7);
@@ -2385,7 +2382,7 @@ const CHALLENGES = {
 		if (r !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(v[2]) < 0)
 				throw new TypeError(thisname + ": region \"" + v[2] + "\" not found in regions");
-			r = regionToDisplayText(board.character, v[2], "Any Subregion");
+			r = regionToDisplayText(character, v[2], "Any Subregion");
 		} else {
 			r = "different regions";
 		}
@@ -2417,7 +2414,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPopcornChallenge: function(desc) {
+	BingoPopcornChallenge: function(desc, character = "Any") {
 		const thisname = "BingoPopcornChallenge";
 		//	desc of format ["0", "System.Int32|6|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2445,7 +2442,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoRivCellChallenge: function(desc) {
+	BingoRivCellChallenge: function(desc, character = "Any") {
 		const thisname = "BingoRivCellChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -2466,7 +2463,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoSaintDeliveryChallenge: function(desc) {
+	BingoSaintDeliveryChallenge: function(desc, character = "Any") {
 		const thisname = "BingoSaintDeliveryChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -2489,7 +2486,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoSaintPopcornChallenge: function(desc) {
+	BingoSaintPopcornChallenge: function(desc, character = "Any") {
 		const thisname = "BingoSaintPopcornChallenge";
 		//	desc of format ["0", "System.Int32|7|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2517,7 +2514,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoStealChallenge: function(desc) {
+	BingoStealChallenge: function(desc, character = "Any") {
 		const thisname = "BingoStealChallenge";
 		//	assert: desc of format ["System.String|Rock|Item|1|theft",
 		//	"System.Boolean|false|From Scavenger Toll|0|NULL",
@@ -2566,7 +2563,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTameChallenge: function(desc) {
+	BingoTameChallenge: function(desc, character = "Any") {
 		const thisname = "BingoTameChallenge";
 		//	assert: desc of format ["System.String|EelLizard|Creature Type|0|friend", "0", "0"]
 		//	or ["System.Boolean|true|Specific Creature Type|0|NULL", "System.String|BlueLizard|Creature Type|0|friend", "0", "System.Int32|3|Amount|3|NULL", "0", "0", ""]
@@ -2621,7 +2618,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTradeChallenge: function(desc) {
+	BingoTradeChallenge: function(desc, character = "Any") {
 		const thisname = "BingoTradeChallenge";
 		//	desc of format ["0", "System.Int32|15|Value|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2648,7 +2645,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTradeTradedChallenge: function(desc) {
+	BingoTradeTradedChallenge: function(desc, character = "Any") {
 		const thisname = "BingoTradeTradedChallenge";
 		//	desc of format ["0", "System.Int32|3|Amount of Items|0|NULL", "empty", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -2677,7 +2674,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTransportChallenge: function(desc) {
+	BingoTransportChallenge: function(desc, character = "Any") {
 		const thisname = "BingoTransportChallenge";
 		//	desc of format ["System.String|Any Region|From Region|0|regions", "System.String|DS|To Region|1|regions", "System.String|CicadaA|Creature Type|2|transport", "", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -2689,12 +2686,12 @@ const CHALLENGES = {
 		if (r1 !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(r1) < 0)
 				throw new TypeError(thisname + ": \"" + v[0] + "\" not found in regions");
-			r1 = regionToDisplayText(board.character, v[0], "Any Subregion");
+			r1 = regionToDisplayText(character, v[0], "Any Subregion");
 		}
 		if (r2 !== "Any Region") {
 			if (BingoEnum_AllRegionCodes.indexOf(r2) < 0)
 				throw new TypeError(thisname + ": \"" + v[1] + "\" not found in regions");
-			r2 = regionToDisplayText(board.character, v[1], "Any Subregion");
+			r2 = regionToDisplayText(character, v[1], "Any Subregion");
 		}
 		if (creatureNameToDisplayTextMap[v[2]] === undefined)
 			throw new TypeError(thisname + ": \"" + v[2] + "\" not found in creatures");
@@ -2725,7 +2722,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoUnlockChallenge: function(desc) {
+	BingoUnlockChallenge: function(desc, character = "Any") {
 		const thisname = "BingoUnlockChallenge";
 		//	desc of format ["System.String|SingularityBomb|Unlock|0|unlocks", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2747,7 +2744,7 @@ const CHALLENGES = {
 			p[0].color = RainWorldColors.TokenDefault;
 			if (!(regionCodeToDisplayName[items[1]] || regionCodeToDisplayNameSaint[items[1]] || arenaUnlocksGoldToDisplayName[items[1]]))
 				throw new TypeError(thisname + ": arena \"" + items[1] + "\" not found in regions or arenaUnlocksGold");
-			d = (arenaUnlocksGoldToDisplayName[items[1]] || regionToDisplayText(board.character, items[1], "Any Subregion")) + " Arenas";
+			d = (arenaUnlocksGoldToDisplayName[items[1]] || regionToDisplayText(character, items[1], "Any Subregion")) + " Arenas";
 		} else if (BingoEnum_ArenaUnlocksGreen.includes(items[1])) {
 			p[0].color = RainWorldColors.GreenColor;
 			iconName = "Kill_Slugcat";
@@ -2760,7 +2757,7 @@ const CHALLENGES = {
 			var s = items[1].substring(0, items[1].search("-"));
 			if (BingoEnum_AllRegionCodes.indexOf(s) < 0)
 				throw new TypeError(thisname + ": \"" + s + "\" not found in regions");
-			d = regionToDisplayText(board.character, s, "Any Subregion") + " Safari";
+			d = regionToDisplayText(character, s, "Any Subregion") + " Safari";
 		} else {
 			throw new TypeError(thisname + ": \"" + items[1] + "\" not a recognized arena unlock");
 		}
@@ -2783,7 +2780,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoVistaChallenge: function(desc) {
+	BingoVistaChallenge: function(desc, character = "Any") {
 		const thisname = "BingoVistaChallenge";
 		//	desc of format ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -2793,7 +2790,7 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": \"" + desc[0] + "\" does not match room \"" + items[1] + "\"'s region prefix");
 		if (BingoEnum_AllRegionCodes.indexOf(desc[0]) < 0)
 			throw new TypeError(thisname + ": \"" + desc[0] + "\" not found in regions");
-		var v = regionToDisplayText(board.character, desc[0], "Any Subregion");
+		var v = regionToDisplayText(character, desc[0], "Any Subregion");
 		var roomX = parseInt(desc[2]);
 		if (isNaN(roomX) || roomX < 0 || roomX > INT_MAX)
 			throw new TypeError(thisname + ": amount \"" + desc[2] + "\" not a number or out of range");
@@ -2823,7 +2820,7 @@ const CHALLENGES = {
 			items: ["Region"],
 			values: [desc[0]],
 			description: "Reach the vista point in " + v + ".",
-			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1]) + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
+			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1], character) + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "break" },
@@ -2832,12 +2829,12 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoVistaExChallenge: function(desc) {
-		return CHALLENGES.BingoVistaChallenge(desc);
+	BingoVistaExChallenge: function(desc, character = "Any") {
+		return CHALLENGES.BingoVistaChallenge(desc, character);
 	},
 	//	Challenges are alphabetical up to here (initial version); new challenges/variants added chronologically below
 	//	added 0.86 (in 0.90 update cycle)
-	BingoEnterRegionFromChallenge: function(desc) {
+	BingoEnterRegionFromChallenge: function(desc, character = "Any") {
 		const thisname = "BingoEnterRegionFromChallenge";
 		//	desc of format ["System.String|GW|From|0|regionsreal", "System.String|SH|To|0|regionsreal", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2857,7 +2854,7 @@ const CHALLENGES = {
 			category: "Entering a region from another region",
 			items: [items[2], itemTo[2]],
 			values: [items[1], itemTo[1]],
-			description: "First time entering " + regionToDisplayText(board.character, itemTo[1], "Any Subregion") + " must be from " + regionToDisplayText(board.character, items[1], "Any Subregion") + ".",
+			description: "First time entering " + regionToDisplayText(character, itemTo[1], "Any Subregion") + " must be from " + regionToDisplayText(character, items[1], "Any Subregion") + ".",
 			comments: "",
 			paint: [
 				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
@@ -2867,7 +2864,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoMoonCloakChallenge: function(desc) {
+	BingoMoonCloakChallenge: function(desc, character = "Any") {
 		const thisname = "BingoMoonCloakChallenge";
 		//	desc of format ["System.Boolean|false|Deliver|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2894,7 +2891,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoBroadcastChallenge: function(desc) {
+	BingoBroadcastChallenge: function(desc, character = "Any") {
 		const thisname = "BingoBroadcastChallenge";
 		//	desc of format ["System.String|Chatlog_SI3|Broadcast|0|chatlogs", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2928,17 +2925,17 @@ const CHALLENGES = {
 	 *	Stubs to maintain extended BINARY_TO_STRING_DEFINITIONS entries.
 	 *	See binGoalToText() and ChallengeUpgrades[]; these names are
 	 *	replaced with their originals to maintain compatibility.  */
-	BingoDamageExChallenge: function(desc) {
-		return CHALLENGES.BingoDamageChallenge(desc);
+	BingoDamageExChallenge: function(desc, character = "Any") {
+		return CHALLENGES.BingoDamageChallenge(desc, character);
 	},
-	BingoTameExChallenge: function(desc) {
-		return CHALLENGES.BingoTameChallenge(desc);
+	BingoTameExChallenge: function(desc, character = "Any") {
+		return CHALLENGES.BingoTameChallenge(desc, character);
 	},
 	/*	added 1.2 */
-	BingoBombTollExChallenge: function(desc) {
-		return CHALLENGES.BingoBombTollChallenge(desc);
+	BingoBombTollExChallenge: function(desc, character = "Any") {
+		return CHALLENGES.BingoBombTollChallenge(desc, character);
 	},
-	BingoDodgeNootChallenge: function(desc) {
+	BingoDodgeNootChallenge: function(desc, character = "Any") {
 		const thisname = "BingoDodgeNootChallenge";
 		//	desc of format ["System.Int32|6|Amount|0|NULL", "0", "0", "0"]
 		//	amount, current, completed, revealed
@@ -2967,7 +2964,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDontKillChallenge: function(desc) {
+	BingoDontKillChallenge: function(desc, character = "Any") {
 		const thisname = "BingoDontKillChallenge";
 		//	desc of format ["System.String|DaddyLongLegs|Creature Type|0|creatures", "0", "0"]
 		//	victim, completed, revealed
@@ -2998,10 +2995,10 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEchoExChallenge: function(desc) {
-		return CHALLENGES.BingoEchoChallenge(desc);
+	BingoEchoExChallenge: function(desc, character = "Any") {
+		return CHALLENGES.BingoEchoChallenge(desc, character);
 	},
-	BingoGourmandCrushChallenge: function(desc) {
+	BingoGourmandCrushChallenge: function(desc, character = "Any") {
 		const thisname = "BingoGourmandCrushChallenge";
 		//	desc of format ["0", "System.Int32|9|Amount|0|NULL", "0", "0", ""]
 		//	current, amount, completed, revealed, crushed
@@ -3030,10 +3027,10 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoItemHoardExChallenge: function(desc) {
-		return CHALLENGES.BingoItemHoardChallenge(desc);
+	BingoItemHoardExChallenge: function(desc, character = "Any") {
+		return CHALLENGES.BingoItemHoardChallenge(desc, character);
 	},
-	BingoIteratorChallenge: function(desc) {
+	BingoIteratorChallenge: function(desc, character = "Any") {
 		const thisname = "BingoIteratorChallenge";
 		//	desc of format ["System.Boolean|false|Looks to the Moon|0|NULL", "0", "0"]
 		//	oracle, completed, revealed
@@ -3059,7 +3056,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoLickChallenge: function(desc) {
+	BingoLickChallenge: function(desc, character = "Any") {
 		const thisname = "BingoLickChallenge";
 		//	desc of format ["0", "System.Int32|{0}|Amount|0|NULL", "0", "0", ""]
 		//	current, amount, completed, revealed, lickers
@@ -5650,15 +5647,15 @@ function checkSettingBoxEx(s, template) {
 }
 
 /**
- *	Generate a valid? link to the RW map viewer, of the specified room,
- *	and current global state (board.character, map_link_base).
+ *	Generate a valid? link to the RW map viewer, of the specified room and character,
+ *	and current global state (map_link_base).
  */
-function getMapLink(room) {
+function getMapLink(room, character = "Any") {
 	if (map_link_base === "")
 		return "";
 	var reg = regionOfRoom(room);
 	var ch = Object.keys(BingoEnum_CharToDisplayText)[
-			Object.values(BingoEnum_CharToDisplayText).indexOf(board.character)] || "White";
+			Object.values(BingoEnum_CharToDisplayText).indexOf(character)] || "White";
 	ch = ch.toLowerCase();
 	return "<br><a href=\"" + map_link_base + "?slugcat=" + ch + "&region=" + reg + "&room=" + room
 			+ "\" target=\"_blank\">" + room + " on Rain World Downpour Map" + "</a>";
