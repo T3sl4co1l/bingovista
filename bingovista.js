@@ -39,7 +39,7 @@ const atlases = [
 
 /**
  *	Bingo square graphics, dimensions (in px) and other properties.
- *	Adjusted by parseText() to fit to canvas; see also: drawSquare calls 
+ *	See also: drawSquare calls 
  */
 const square = {
 	width: 85,
@@ -287,7 +287,7 @@ document.addEventListener("DOMContentLoaded", function() {
 function setHeaderFromBoard(b) {
 	var el = document.getElementById("hdrttl");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(b.comments));
+	el.appendChild(document.createTextNode(b.comments || "Untitled"));
 	el = document.getElementById("hdrsize");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(String(b.width) + " x " + String(b.height)));
@@ -400,31 +400,19 @@ function parseText(e) {
 	var s = document.getElementById("textbox").value;
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
 	document.getElementById("textbox").value = s;
-	var goals = s.split(/bChG/);
-	var size = Math.ceil(Math.sqrt(goals.length));
-	if (board === undefined) {
-		board = {
-			comments: "Untitled",
-			character: "Any",
-			perks: 0,
-			shelter: "",
-			mods: [],
-			size: size,
-			width: size,
-			height: size,
-			goals: [],
-			toBin: undefined
-		};
-	} else {
-		//	Board already exists, parse meta from the document
-		if (document.getElementById("hdrttl") !== null)
-			board.comments = document.getElementById("hdrttl").innerText || "Untitled";
-		if (document.getElementById("hdrchar") !== null)
-			board.character = document.getElementById("hdrchar").innerText;
-		if (document.getElementById("hdrshel") !== null) {
-			board.shelter = document.getElementById("hdrshel").innerText;
-			if (board.shelter === "random") board.shelter = "";
-		}
+
+	board = parseBoard(document.getElementById("textbox").value);
+	//	Parse meta from the document if not set by `parseBoard()`
+	if (document.getElementById("hdrttl") !== null && board.comments === undefined)
+		board.comments = document.getElementById("hdrttl").innerText;
+	if (document.getElementById("hdrchar") !== null && board.character === undefined)
+		board.character = document.getElementById("hdrchar").innerText || "Any";
+	if (document.getElementById("hdrshel") !== null && board.shelter === undefined) {
+		board.shelter = document.getElementById("hdrshel").innerText;
+		if (board.shelter === "random") board.shelter = "";
+	}
+	if (board.perks === undefined) {
+		board.perks = 0;
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
 			el = document.getElementById("perkscheck" + String(i));
 			if (el !== null) {
@@ -435,10 +423,55 @@ function parseText(e) {
 			} else
 				break;
 		}
-		board.goals = [];
-		board.size = size; board.width = size; board.height = size;
 	}
 
+	if (selected !== undefined) {
+		//	See if we can re-select the same square (position) in the new board
+		if (selected.row < board.height && selected.col < board.width) {
+			selectSquare(selected.col, selected.row);
+		} else {
+			selected = undefined;
+		}
+	}
+	if (selected === undefined)
+		selectSquare(-1, -1);
+
+	//	Fill meta table with board info
+	setHeaderFromBoard(board);
+
+	//	prepare board binary encoding
+	board.toBin = boardToBin(board);
+	s = binToBase64u(board.toBin);
+	var u = new URL(document.URL);
+	u.searchParams.set("b", s);
+	window.history.pushState(null, "", u.href);
+
+	if (selected !== undefined)
+		selectSquare(selected.col, selected.row);
+
+}
+
+/**
+ * Parse a string into a board object representation.
+ * @param {string} text string to parse into board
+ */
+function parseBoard(text) {
+	text = text.trim().replace(/\s*bChG\s*/g, "bChG");
+	var goals = text.split(/bChG/);
+	var size = Math.ceil(Math.sqrt(goals.length));
+	var board = {
+		comments: undefined,
+		character: undefined,
+		perks: undefined,
+		shelter: undefined,
+		mods: [],
+		size: size,
+		width: size,
+		height: size,
+		goals: [],
+		toBin: undefined
+	};
+	
 	//	Detect board version:
 	//	assertion: no challenge names are shorter than 14 chars (true as of 1.25)
 	//	assertion: no character names are longer than 10 chars (true of base game + Downpour)
@@ -484,51 +517,9 @@ function parseText(e) {
 	if (goals.length == 0)
 		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
 
-	function defaultGoal(t, d) {
-		return {
-			name: "BingoChallenge",
-			category: t,
-			items: [],
-			values: [],
-			description: "Unknown goal. Descriptor: " + d.join("><"),
-			comments: "",
-			paint: [
-				{ type: "text", value: "∅", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
-			],
-			toBin: new Uint8Array([challengeValue("BingoChallenge"), 0, 0])
-		};
-	}
-
-	if (selected !== undefined) {
-		//	See if we can re-select the same square (position) in the new board
-		if (selected.row < board.height && selected.col < board.width) {
-			selectSquare(selected.col, selected.row);
-		} else {
-			selected = undefined;
-		}
-	}
-	if (selected === undefined)
-		selectSquare(-1, -1);
-
-	//	Adjust graphical dimensions based on canvas and board sizes
-	var canv = document.getElementById("board");
-	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
-	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
-	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
-
-	//	Fill meta table with board info
-	setHeaderFromBoard(board);
-
-	//	prepare board binary encoding
 	board.toBin = boardToBin(board);
-	s = binToBase64u(board.toBin);
-	var u = new URL(document.URL);
-	u.searchParams.set("b", s);
-	window.history.pushState(null, "", u.href);
 
-	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
-
+	return board
 }
 
 /**
@@ -573,50 +564,67 @@ function clickShowPerks(e) {
  */
 function clickBoard(e) {
 	if (board !== undefined) {
-		var rect = document.getElementById("boardcontainer").getBoundingClientRect();
-		var x = Math.floor(e.clientX - Math.round(rect.left)) - (square.border + square.margin) / 2;
-		var y = Math.floor(e.clientY - Math.round(rect.top )) - (square.border + square.margin) / 2;
+		const canvas = e.target;
+		var goalSquare = {}; Object.assign(goalSquare, square)
+		goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((parseInt(canvas.dataset.width) + parseInt(canvas.dataset.height)) * 91)) * 2, 2);
+		goalSquare.width = Math.round((canvas.width / parseInt(canvas.dataset.width)) - goalSquare.margin - goalSquare.border);
+		goalSquare.height = Math.round((canvas.height / parseInt(canvas.dataset.height)) - goalSquare.margin - goalSquare.border);
+
+		var rect = canvas.getBoundingClientRect();
+		var x = Math.floor(e.clientX - Math.round(rect.left)) - (goalSquare.border + goalSquare.margin) / 2;
+		var y = Math.floor(e.clientY - Math.round(rect.top )) - (goalSquare.border + goalSquare.margin) / 2;
 		if (transpose) {
 			var t = y; y = x; x = t;
 		}
-		var sqWidth = square.width + square.margin + square.border;
-		var sqHeight = square.height + square.margin + square.border;
+		var sqWidth = goalSquare.width + goalSquare.margin + goalSquare.border;
+		var sqHeight = goalSquare.height + goalSquare.margin + goalSquare.border;
 		var col = Math.floor(x / sqWidth);
 		var row = Math.floor(y / sqHeight);
-		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - square.margin)
-				&& (y % sqHeight) < (sqHeight - square.margin)) {
-			selectSquare(col, row);
+		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - goalSquare.margin)
+				&& (y % sqHeight) < (sqHeight - goalSquare.margin)) {
+			selectSquare(col, row, canvas.id);
 		} else {
-			selectSquare(-1, -1);
+			selectSquare(-1, -1, canvas.id);
 		}
 	}
 }
 
 /**
- *	Redraws a given board canvas by ID, based on current `board` data.
+ *	Redraws a board on a canvas.
+ *	@param {string} [canvas="board"] The `id` of the canvas to draw on.
+ *	@param {*} [p_board=board] board structure (see global `board`).
  */
-function redrawBoard(canvas = "board") {
-	var ctx = document.getElementById(canvas).getContext("2d");
-	ctx.fillStyle = square.background;
+function redrawBoard(canvasId = "board", p_board = board) {
+	const canvas = document.getElementById(canvasId);
+	canvas.dataset.width = p_board.width;
+	canvas.dataset.height = p_board.height;
+
+	var goalSquare = {}; Object.assign(goalSquare, square)
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((p_board.width + p_board.height) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / p_board.width) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / p_board.height) - goalSquare.margin - goalSquare.border);
+
+	var ctx = canvas.getContext("2d");
+	ctx.fillStyle = goalSquare.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-	for (var i = 0; i < board.goals.length; i++) {
+	for (var i = 0; i < p_board.goals.length; i++) {
 		var x, y, t;
-		x = Math.floor(i / board.height) * (square.width + square.margin + square.border)
-				+ (square.border + square.margin) / 2;
-		y = (i % board.height) * (square.height + square.margin + square.border)
-				+ (square.border + square.margin) / 2;
+		x = Math.floor(i / p_board.height) * (goalSquare.width + goalSquare.margin + goalSquare.border)
+				+ (goalSquare.border + goalSquare.margin) / 2;
+		y = (i % p_board.height) * (goalSquare.height + goalSquare.margin + goalSquare.border)
+				+ (goalSquare.border + goalSquare.margin) / 2;
 		if (transpose) {
 			t = y; y = x; x = t;
 		}
-		drawSquare(ctx, board.goals[i], x, y, square);
+		drawSquare(ctx, p_board.goals[i], x, y, goalSquare);
 	}
 }
 
 /**
- *	Select the square at (col, row) to show details of.
+ *	Select the square at (col, row) on canvas canvasId to show details of.
  *	If either argument is out of range, clears the selection instead.
  */
-function selectSquare(col, row) {
+function selectSquare(col, row, canvasId = "board") {
 	var el = document.getElementById("desctxt");
 	var ctx = document.getElementById("square").getContext("2d");
 	if (row < 0 || col < 0 || row >= board.height || col >= board.width) {
@@ -675,7 +683,7 @@ function selectSquare(col, row) {
 		el.appendChild(el2);
 	}
 
-	setCursor(row, col);
+	setCursor(row, col, canvasId);
 
 	return;
 
@@ -721,7 +729,7 @@ function navSquares(e) {
 			if (row >= board.height) row -= board.height;
 			if (col < 0) col += board.width;
 			if (col >= board.width) col -= board.width;
-			selectSquare(col, row);
+			selectSquare(col, row, e.target.id);
 		}
 	}
 }
@@ -729,17 +737,23 @@ function navSquares(e) {
 /**
  *	Position cursor
  */
-function setCursor(row, col) {
+function setCursor(row, col, canvasId) {
+	const canvas = document.getElementById(canvasId);
+	var goalSquare = {}; Object.assign(goalSquare, square)
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((parseInt(canvas.dataset.width) + parseInt(canvas.dataset.height)) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / parseInt(canvas.dataset.width)) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / parseInt(canvas.dataset.height)) - goalSquare.margin - goalSquare.border);
+
 	//	Firefox border offset bug
 	var fixX = 0, fixY = 1;
 	if (typeof mozInnerScreenX !== 'undefined' || typeof InstallTrigger !== 'undefined') {
 		fixY = 0;
 	}
 	var curSty = document.getElementById("cursor").style;
-	curSty.width  = String(square.width  + square.border - 5 - fixX) + "px";
-	curSty.height = String(square.height + square.border - 4 - fixY) + "px";
-	var x = square.margin / 2 - 1 + col * (square.width + square.margin + square.border);
-	var y = square.margin / 2 + 0 + row * (square.height + square.margin + square.border);
+	curSty.width  = String(goalSquare.width  + goalSquare.border - 5 - fixX) + "px";
+	curSty.height = String(goalSquare.height + goalSquare.border - 4 - fixY) + "px";
+	var x = goalSquare.margin / 2 - 1 + col * (goalSquare.width + goalSquare.margin + goalSquare.border);
+	var y = goalSquare.margin / 2 + 0 + row * (goalSquare.height + goalSquare.margin + goalSquare.border);
 	if (transpose) [x, y] = [y, x];
 	curSty.left = String(x + fixX) + "px"; curSty.top  = String(y + fixY) + "px";
 	curSty.display = "initial";
@@ -6291,7 +6305,7 @@ function generateRandomRandomGoals(n) {
 		for (retries = 0; retries < 100; retries++) {
 			goalTxt = binGoalToText(goalFromNumber(goalNum, Math.random()));
 			try {
-				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></));
+				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></), s);
 			} catch (e) {
 				goalTxt = "";
 			}
