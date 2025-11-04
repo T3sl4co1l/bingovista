@@ -220,24 +220,33 @@ textarea {
 	  <tr><td>Character</td><td id="hdrchar"></td></tr>
 	  <tr><td>Shelter</td><td id="hdrshel"></td></tr>
 	  <tr><td>Perks/flags</td><td>
-		<div style="margin-left: 6px; margin-bottom: 4px;"><input type="button" value="Show / Hide" id="hdrshow" tabindex="1"></div>
+		<div style="margin-left: 6px; margin-bottom: 4px;"><input type="button" value="Show / Hide" id="hdrshow" tabindex="1" onclick="clickShowPerks(event)"></div>
 		<div style="margin-left: 0px; display: none;" id="hdrperks"></div>
 	  </td></tr>
 	  <tr><td>Mods</td><td id="hdrmods">none</td></tr>
 	</tbody></table>
-	<div id="boardcontainer" tabindex="2" style="position: relative; width: 456px; height: 456px;">
+	<div id="boardcontainer" tabindex="2" style="position: relative; width: 456px; height: 456px;" onclick="clickBoard(event)" onkeydown="navSquares(event)">
 	  <canvas width="454" height="454" id="board" style="position: absolute; top: 0px; left: 0px; z-index: 1;">Canvas support and scripting are required.</canvas>
 	  <div id="cursor" style="display: none; width: 39px; height: 39px; margin: 0; border: 4px solid #ff8090; border-radius: 6px; position: absolute; top: 0px; left: 0px; z-index: 2;"></div>
 	</div>
 	<table><tr><td style="vertical-align: top; padding-top: 6px;"><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
 	<p>&nbsp;</p>
 	<div style="display: none;"><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label> (flashbang warning)</div>
-	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
-	<div><label><input type="checkbox" id="transp" checked>Transpose Board</label> (matches < v1.25 visual arrangement)</div>
-	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
-	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text">&nbsp;&nbsp;&nbsp;<input type="button" id="copy" value="Copy Text"></div>
+	<div><label><input type="checkbox" id="kibitzing" oninput="toggleKibs(event)">Kibitzing</label> (additional hints / full data)</div>
+	<div><label><input type="checkbox" id="transp" oninput="toggleTransp(event)" checked>Transpose Board</label> (matches < v1.25 visual arrangement)</div>
+	<div><textarea id="textbox" spellcheck="false" autocomplete="off" onpaste="pasteText(event)"></textarea></div>
+	<div>
+		<input type="button" id="clear" value="Clear" onclick="clearText(event)">&nbsp;&nbsp;&nbsp;
+		<input type="button" id="parse" value="Parse Text" onclick="parseText(event);redrawBoard('board', board);">&nbsp;&nbsp;&nbsp;
+		<input type="button" id="copy" value="Copy Text" onclick="copyText(event)"></div>
 	<p>Paste/edit above, or select file or drag-and-drop below:</p>
-	<table class="droptbl"><tr><td class="drop" id="droptarget"><input type="file" id="fileload" accept=".txt,text/plain"></td></tr></table>
+	<table class="droptbl">
+		<tr>
+			<td class="drop" id="droptarget" ondragenter="dragEnterOver(event)" ondragover="dragEnterOver(event)" ondragleave="dragLeave(event)" ondrop="dragDrop(event)">
+				<input type="file" id="fileload" accept=".txt,text/plain" onchange="doLoadFile(event.target.files)">
+			</td>
+		</tr>
+	</table>
 	<p class="errorbox" id="errorbox"></p>
 	<p>&nbsp;</p>
 	<h2>About</h2>

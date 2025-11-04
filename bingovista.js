@@ -140,41 +140,6 @@ document.addEventListener("DOMContentLoaded", function() {
 	initGenerateBlacklist();
 	square.color = RainWorldColors.Unity_white;
 
-	//	Set up DOM elements and listeners
-
-	//	Nav, header and file handling buttons
-	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
-	document.getElementById("clear").addEventListener("click", function(e) {
-		document.getElementById("textbox").value = "";
-		var u = new URL(document.URL);
-		u.search = "";
-		window.history.pushState(null, "", u.href);
-	});
-	document.getElementById("parse").addEventListener("click", parseText);
-	document.getElementById("parse").addEventListener("click", redrawBoard);
-	document.getElementById("copy").addEventListener("click", copyText);
-	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
-	document.getElementById("textbox").addEventListener("paste", pasteText);
-	document.getElementById("boardcontainer").addEventListener("click", clickBoard);
-	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
-	document.getElementById("fileload").addEventListener("change", function() { doLoadFile(this.files) } );
-	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
-	document.getElementById("transp").addEventListener("input", toggleTransp);
-
-	var d = document.getElementById("droptarget");
-	d.addEventListener("dragenter", dragEnterOver);
-	d.addEventListener("dragover", dragEnterOver);
-	d.addEventListener("dragleave", function(e) { this.style.backgroundColor = ""; } );
-	d.addEventListener("drop", dragDrop);
-
-	function dragEnterOver(e) {
-		if (e.dataTransfer.types.includes("text/plain")
-				|| e.dataTransfer.types.includes("Files")) {
-			e.preventDefault();
-			this.style.backgroundColor = "#686868";
-		}
-	}
-
 	//	Prepare atlases
 
 	function loadImage(src, dest) {
@@ -309,9 +274,10 @@ document.addEventListener("DOMContentLoaded", function() {
 	});
 
 	//	Other housekeeping
-
-	kibitzing = !!document.getElementById("kibitzing").checked;
-	transpose = !!document.getElementById("transp").checked;
+	if (document.getElementById("kibitzing") !== null)
+		kibitzing = document.getElementById("kibitzing").checked;
+	if (document.getElementById("transp") !== null)
+		transpose = document.getElementById("transp").checked;
 
 });
 
@@ -339,7 +305,7 @@ function setHeaderFromBoard(b) {
  *	Kibitzing check toggled.
  */
 function toggleKibs(e) {
-	kibitzing = !!document.getElementById("kibitzing").checked;
+	kibitzing = e.target.checked;
 	if (selected !== undefined)
 		selectSquare(selected.col, selected.row);
 }
@@ -348,10 +314,29 @@ function toggleKibs(e) {
  *	Transpose check toggled.
  */
 function toggleTransp(e) {
-	transpose = !!document.getElementById("transp").checked;
+	transpose = e.target.checked;
 	redrawBoard();
 	if (selected !== undefined)
 		selectSquare(selected.col, selected.row);
+}
+
+/**
+ * Element dragged over drop target.
+ */
+function dragEnterOver(e) {
+	if (e.dataTransfer.types.includes("text/plain")
+			|| e.dataTransfer.types.includes("Files")) {
+		e.preventDefault();
+		e.target.style.backgroundColor = "#686868";
+	}
+}
+
+/**
+ * Element dragged away from drop target.
+ */
+function dragLeave(e) {
+	// maybe :-moz-drag-over css pseudoclass will one day be standard. that'd be handy in this situation.
+	e.target.style.backgroundColor = "";
 }
 
 /**
@@ -359,7 +344,7 @@ function toggleTransp(e) {
  */
 function dragDrop(e) {
 	e.preventDefault();
-	this.style.backgroundColor = "";
+	e.target.style.backgroundColor = "";
 	var d = e.dataTransfer;
 	setError("");
 	if (d.types.includes("Files")) {
@@ -552,6 +537,16 @@ function parseText(e) {
 function pasteText(e) {
 	//	Let default happen, but trigger a parse in case no edits are required by the user
 	setTimeout((e) => {parseText(e); redrawBoard();}, 10);
+}
+
+/**
+ * Clicked on Clear.
+ */
+function clearText(e) {
+	document.getElementById("textbox").value = "";
+	var u = new URL(document.URL);
+	u.search = "";
+	window.history.pushState(null, "", u.href);
 }
 
 /**
