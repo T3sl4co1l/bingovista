@@ -39,7 +39,8 @@ const atlases = [
 
 /**
  *	Bingo square graphics, dimensions (in px) and other properties.
- *	See also: drawSquare calls 
+ *	Read by clickBoard, redrawBoard, selectSquare and setCursor.
+ *	set by parseButton to fit to canvas.
  */
 const square = {
 	width: 85,
@@ -136,9 +137,42 @@ document.addEventListener("DOMContentLoaded", function() {
 
 	//	Data structure cleanup and inits and checks, things that couldn't be statically initialized, etc.
 	expandAndValidateLists();
-	appendCHALLENGES();
 	initGenerateBlacklist();
 	square.color = RainWorldColors.Unity_white;
+
+	//	Set up DOM elements and listeners
+
+	//	Nav, header and file handling buttons
+	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
+	document.getElementById("clear").addEventListener("click", function(e) {
+		document.getElementById("textbox").value = "";
+		var u = new URL(document.URL);
+		u.search = "";
+		window.history.pushState(null, "", u.href);
+	});
+	document.getElementById("parse").addEventListener("click", parseButton);
+	document.getElementById("copy").addEventListener("click", copyText);
+	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
+	document.getElementById("textbox").addEventListener("paste", pasteText);
+	document.getElementById("boardcontainer").addEventListener("click", clickBoard);
+	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
+	document.getElementById("fileload").addEventListener("change", function() { doLoadFile(this.files) } );
+	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
+	document.getElementById("transp").addEventListener("input", toggleTransp);
+
+	var d = document.getElementById("droptarget");
+	d.addEventListener("dragenter", dragEnterOver);
+	d.addEventListener("dragover", dragEnterOver);
+	d.addEventListener("dragleave", function(e) { this.style.backgroundColor = ""; } );
+	d.addEventListener("drop", dragDrop);
+
+	function dragEnterOver(e) {
+		if (e.dataTransfer.types.includes("text/plain")
+				|| e.dataTransfer.types.includes("Files")) {
+			e.preventDefault();
+			this.style.backgroundColor = "#686868";
+		}
+	}
 
 	//	Prepare atlases
 
@@ -197,8 +231,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			//	Plain text / ASCII string
 			//	very inefficient, unlikely to be used, but provided for completeness
 			document.getElementById("textbox").value = u.get("a");
-			parseText();
-			redrawBoard();
+			parseButton();
 
 		} else if (u.has("b")) {
 
@@ -216,8 +249,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			}
 			document.getElementById("textbox").value = board.text;
 			setHeaderFromBoard(board);
-			parseText();
-			redrawBoard();
+			parseButton();
 
 		} else if (u.has("q")) {
 
@@ -254,8 +286,7 @@ document.addEventListener("DOMContentLoaded", function() {
 				}
 				document.getElementById("textbox").value = board.text;
 				setHeaderFromBoard(board);
-				parseText();
-				redrawBoard();
+				parseButton();
 			} );
 
 			function validateQuery(s) {
@@ -355,8 +386,7 @@ function dragDrop(e) {
 			if (d.items[i].type.match("^text/plain")) {
 				d.items[i].getAsString(function(s) {
 					document.getElementById("textbox").value = s;
-					parseText();
-					redrawBoard();
+					parseButton();
 				});
 				return;
 			}
@@ -380,8 +410,7 @@ function doLoadFile(files) {
 			var fr = new FileReader();
 			fr.onload = function() {
 				document.getElementById("textbox").value = this.result;
-				parseText();
-				redrawBoard();
+				parseButton();
 			};
 			fr.onerror = function(e) {
 				setError("File read error: " + e.message);
@@ -396,34 +425,39 @@ function doLoadFile(files) {
 /**
  *	Parse Text button pressed.
  */
-function parseText(e) {
+function parseButton(e) {
+
 	var s = document.getElementById("textbox").value;
+	s = s.replace(/;\n+/, ";");
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
+	board = parseText(s);
 	document.getElementById("textbox").value = s;
 
-	board = parseBoard(document.getElementById("textbox").value);
-	//	Parse meta from the document if not set by `parseBoard()`
-	if (document.getElementById("hdrttl") !== null && board.comments === undefined)
-		board.comments = document.getElementById("hdrttl").innerText;
-	if (document.getElementById("hdrchar") !== null && board.character === undefined)
-		board.character = document.getElementById("hdrchar").innerText || "Any";
-	if (document.getElementById("hdrshel") !== null && board.shelter === undefined) {
+	//	Parse meta from the document
+	if (document.getElementById("hdrttl") !== null)
+		board.comments = document.getElementById("hdrttl").innerText || "Untitled";
+	if (document.getElementById("hdrchar") !== null)
+		board.character = document.getElementById("hdrchar").innerText;
+	if (document.getElementById("hdrshel") !== null) {
 		board.shelter = document.getElementById("hdrshel").innerText;
 		if (board.shelter === "random") board.shelter = "";
 	}
-	if (board.perks === undefined) {
-		board.perks = 0;
-		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-			el = document.getElementById("perkscheck" + String(i));
-			if (el !== null) {
-				if (el.checked)
-					board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
-				else
-					board.perks &= ~Object.values(BingoEnum_EXPFLAGS)[i];
-			} else
-				break;
-		}
+	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+		el = document.getElementById("perkscheck" + String(i));
+		if (el !== null) {
+			if (el.checked)
+				board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
+			else
+				board.perks &= ~Object.values(BingoEnum_EXPFLAGS)[i];
+		} else
+			break;
 	}
+
+	//	Adjust graphical dimensions based on canvas and board sizes
+	var canv = document.getElementById("board");
+	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
+	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
+	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
 
 	if (selected !== undefined) {
 		//	See if we can re-select the same square (position) in the new board
@@ -436,90 +470,15 @@ function parseText(e) {
 	if (selected === undefined)
 		selectSquare(-1, -1);
 
+	redrawBoard();
+
 	//	Fill meta table with board info
 	setHeaderFromBoard(board);
 
-	//	prepare board binary encoding
-	board.toBin = boardToBin(board);
-	s = binToBase64u(board.toBin);
 	var u = new URL(document.URL);
-	u.searchParams.set("b", s);
+	u.searchParams.set("b", binToBase64u(board.toBin));
 	window.history.pushState(null, "", u.href);
 
-	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
-
-}
-
-/**
- * Parse a string into a board object representation.
- * @param {string} text string to parse into board
- */
-function parseBoard(text) {
-	text = text.trim().replace(/\s*bChG\s*/g, "bChG");
-	var goals = text.split(/bChG/);
-	var size = Math.ceil(Math.sqrt(goals.length));
-	var board = {
-		comments: undefined,
-		character: undefined,
-		perks: undefined,
-		shelter: undefined,
-		mods: [],
-		size: size,
-		width: size,
-		height: size,
-		goals: [],
-		toBin: undefined
-	};
-	
-	//	Detect board version:
-	//	assertion: no challenge names are shorter than 14 chars (true as of 1.25)
-	//	assertion: no character names are longer than 10 chars (true of base game + Downpour)
-	//	0.90+: character prefix, ";" delimited --> check within first 12 chars
-	//	0.86: character prefix, "_" delimited --> check within first 12 chars
-	//	0.85: no prefix, gonzo right into the goal list --> first token (to "~") is valid goal name or error
-	if (goals[0].search(/[A-Za-z]{1,12}[_;]/) == 0) {
-		//	Seems 0.86 or 0.90, find which
-		if (goals[0].indexOf(";") > 0) {
-			board.version = "0.90";
-			board.character = goals[0].substring(0, goals[0].indexOf(";"));
-			goals[0] = goals[0].substring(goals[0].indexOf(";") + 1);
-		} else if (goals[0].indexOf("_") > 0) {
-			board.version = "0.86";
-			board.character = goals[0].substring(0, goals[0].indexOf("_"));
-			goals[0] = goals[0].substring(goals[0].indexOf("_") + 1);
-		}
-		board.character = BingoEnum_CharToDisplayText[board.character] || "Any";
-	} else {
-		board.version = "0.85";
-	}
-
-	for (var i = 0; i < goals.length; i++) {
-		var type, desc;
-		if (goals[i].search("~") > 0 && goals[i].search("><") > 0) {
-			[type, desc] = goals[i].split("~");
-			desc = desc.split(/></);
-			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
-			if (CHALLENGES[type] !== undefined) {
-				try {
-					board.goals.push(CHALLENGES[type](desc, board.character));
-				} catch (er) {
-					board.goals.push(CHALLENGES["BingoChallenge"]( [
-						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
-				}
-			} else {
-				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
-			}
-		} else {
-			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
-		}
-	}
-	if (goals.length == 0)
-		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
-
-	board.toBin = boardToBin(board);
-
-	return board
 }
 
 /**
@@ -527,7 +486,7 @@ function parseBoard(text) {
  */
 function pasteText(e) {
 	//	Let default happen, but trigger a parse in case no edits are required by the user
-	setTimeout((e) => {parseText(e); redrawBoard();}, 10);
+	setTimeout((e) => { parseButton(e); }, 10);
 }
 
 /**
@@ -857,6 +816,90 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 }
 
 /**
+ *	Parse a board in text format.
+ *	Returns an abstract board object.
+ */
+function parseText(s) {
+	var goals = s.split(/bChG/);
+	goals.forEach((s, i) => goals[i] = s.trim());
+	var size = Math.ceil(Math.sqrt(goals.length));
+	var board = {
+		comments: "Untitled",
+		character: "Any",
+		perks: 0,
+		shelter: "",
+		mods: [],
+		size: size,
+		width: size,
+		height: size,
+		goals: [],
+		toBin: undefined
+	};
+
+	//	Detect board version:
+	//	assertion: no challenge names are shorter than 14 chars (true as of 1.25)
+	//	assertion: no character names are longer than 10 chars (true of base game + Downpour + Watcher)
+	//	1.27+: character prefix, ";" delimited --> check within first 12 chars
+	//	0.90: character prefix, ";" delimited --> check within first 12 chars
+	//	0.86: character prefix, "_" delimited --> check within first 12 chars
+	//	0.85: no prefix, gonzo right into the goal list --> first token (to "~") is valid goal name or error
+	var semicolon = goals[0].indexOf(";"), underscore = goals[0].indexOf("_");
+	if (goals[0].search(/[A-Za-z]{1,12}[_;]/) == 0) {
+		//	Seems 0.86 or later, find which
+		if (semicolon > 0) {
+			var secondcolon = goals[0].indexOf(";", semicolon + 1);
+			if (secondcolon > 0) {
+				board.version = "1.3";
+				var header = goals[0].split(";");
+				board.character = header[0];
+				board.shelter = header[1];
+				goals[0] = header[header.length - 1];
+				// future up-version checks here: perks, etc.
+			} else {
+				board.version = "0.90";
+				board.character = goals[0].substring(0, semicolon);
+				goals[0] = goals[0].substring(semicolon + 1);
+			}
+		} else if (underscore > 0) {
+			board.version = "0.86";
+			board.character = goals[0].substring(0, underscore);
+			goals[0] = goals[0].substring(underscore + 1);
+		}
+		board.character = BingoEnum_CharToDisplayText[board.character] || "Any";
+	} else {
+		board.version = "0.85";
+	}
+
+	for (var i = 0; i < goals.length; i++) {
+		var type, desc;
+		if (goals[i].search("~") > 0 && goals[i].search("><") > 0) {
+			[type, desc] = goals[i].split("~");
+			desc = desc.split(/></);
+			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
+			if (CHALLENGES[type] !== undefined) {
+				try {
+					board.goals.push(CHALLENGES[type](desc));
+				} catch (er) {
+					board.goals.push(CHALLENGES["BingoChallenge"]( [
+						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
+				}
+			} else {
+				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
+			}
+		} else {
+			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
+		}
+	}
+	if (goals.length == 0)
+		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
+
+	//	collect or re-set the binary format and we're done
+	board.toBin = boardToBin(board);
+
+	return board;
+}
+
+/**
  *	Converts a validated board in text, to binary format.
  *	The validated board contains toBin snippets; these are
  *	concatenated, and a header is added.
@@ -1152,67 +1195,118 @@ const CHALLENGES = {
 	BingoAchievementChallenge: function(desc, character = "Any") {
 		const thisname = "BingoAchievementChallenge";
 		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
-		checkDescLen(thisname, desc.length, 3);
-		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Passage", , "passage"], "goal selection");
-		var b = Array(4); b.fill(0);
-		b[0] = challengeValue(thisname);
-		b[3] = enumToValue(items[1], "passage");
-		b[2] = b.length - GOAL_LENGTH;
+		const upgrades = {};
+		desc = upgradeDescriptor(desc, upgrades);
+		const template = [
+			{ param: "passage",  type: "string", formatter: "passage", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Passage", position: "0", formatter: "passage", altformatter: "", altthreshold: 0, defaultval: "Traveller" } },
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+		];
+		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
+		function AchievementChallengePaint(p) {
+			return [
+				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
+				{ type: "icon", value: p.passage + "A", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
+				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
+			];
+		}
+		function AchievementChallengeDescription(p) {
+			return "Earn " + (passageToDisplayNameMap[p.passage] || "unknown") + " passage.";
+		}
+		function AchievementChallengeComment(p) {
+			return "";
+		}
+		function AchievementChallengeToBinary(p) {
+			var b = Array(4); b.fill(0);
+			b[0] = challengeValue(p._name);
+			b[3] = enumToValue(p.passage, "passage");
+			b[2] = b.length - GOAL_LENGTH;
+			return new Uint8Array(b);
+		}
 		return {
 			name: thisname,
+			params: params,
 			category: "Obtaining Passages",
-			items: ["Passage"],
-			values: [items[1]],
-			description: "Earn " + (passageToDisplayNameMap[items[1]] || "unknown") + " passage.",
-			comments: "",
-			paint: [
-				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: items[1] + "A", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 }
-			],
-			toBin: new Uint8Array(b)
+			items: ["passage"],
+			values: [params.passage],
+			description: AchievementChallengeDescription(params),
+			comments: AchievementChallengeComment(params),
+			paint: AchievementChallengePaint(params),
+			toBin: AchievementChallengeToBinary(params)
 		};
 	},
 	BingoAllRegionsExcept: function(desc, character = "Any") {
 		const thisname = "BingoAllRegionsExcept";
 		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "System.Int32|13|Amount|1|NULL", "0", "0"]
-		checkDescLen(thisname, desc.length, 6);
-		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
-		if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
-		var current = parseInt(desc[2]);
-		if (isNaN(current) || current < 0 || current > INT_MAX)
-			throw new TypeError(thisname + ": current \"" + desc[2] + "\" not a number or out of range");
-		var required = parseInt(desc[3]);
-		if (isNaN(required)) {
-			//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
-			var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
-			required = parseInt(amounts[1]); desc[3] = amounts[1];
-		}
-		required = Math.min(required, current + CHAR_MAX);
-		if (isNaN(required) || required < 1 || required > INT_MAX)
-			throw new TypeError(thisname + ": required \"" + desc[3] + "\" not a number or SettingBox, or out of range");
-		var b = Array(5); b.fill(0);
-		b[0] = challengeValue(thisname);
-		b[3] = enumToValue(items[1], "regionsreal");
-		b[4] = required - current;
-		desc[1].split("|").forEach(s => b.push(enumToValue(s, "regionsreal")) );
-		b[2] = b.length - GOAL_LENGTH;
-		return {
-			name: thisname,
-			category: "Entering regions while never visiting one",
-			items: [items[2], "To do", "Progress", "Total"],
-			values: [items[1], desc[1], String(current), String(required)],
-			description: "Enter " + String(required - current) + " regions that are not " + regionToDisplayText(character, items[1], "Any Subregion") + ".",
-			comments: "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)",
-			paint: [
+		const upgrades = {
+			6: [ { op: "intFormat", offs: 3, before: "System.Int32|", after: "|Amount|1|NULL" } ]
+		};
+		const template = [
+			{ param: "region",  type: "string", formatter: "regions", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Region", position: "0", formatter: "regionsreal", defaultval: "SU" } },
+			{ param: "remaining", type: "array", formatter: "regionsreal", parse: "list", separator: "|", defaultval: [] },
+			{ param: "current", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
+			{ param: "amount",  type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "1", formatter: "NULL", maxval: INT_MAX, defaultval: 1 } },
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+		];
+		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
+		//checkDescLen(thisname, desc.length, 6);
+		//var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
+		//if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
+		//	throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
+		//var current = parseInt(desc[2]);
+		//if (isNaN(current) || current < 0 || current > INT_MAX)
+		//	throw new TypeError(thisname + ": current \"" + desc[2] + "\" not a number or out of range");
+		//var required = parseInt(desc[3]);
+		//if (isNaN(required)) {
+		//	//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
+		//	var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
+		//	required = parseInt(amounts[1]); desc[3] = amounts[1];
+		//}
+		//required = Math.min(required, current + CHAR_MAX);
+		//if (isNaN(required) || required < 1 || required > INT_MAX)
+		//	throw new TypeError(thisname + ": required \"" + desc[3] + "\" not a number or SettingBox, or out of range");
+		function AllRegionsExceptToPaint(p) {
+			return [
 				{ type: "icon", value: "TravellerA", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: RainWorldColors.Unity_red, rotation: 0 },
-				{ type: "text", value: items[1], color: RainWorldColors.Unity_white },
+				{ type: "text", value: p.region, color: RainWorldColors.Unity_white },
 				{ type: "break" },
-				{ type: "text", value: "[" + String(current) + "/" + String(required) + "]", color: RainWorldColors.Unity_white }
-			],
-			toBin: new Uint8Array(b)
+				{ type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: RainWorldColors.Unity_white }
+			];
+		}
+		function AllRegionsExceptToDescription(p) {
+			return "Enter " + (((p.amount - p.current) > 1) ? String(p.amount - p.current) + " more regions" : (((p.amount - p.current) > 0) ? "one more region" : "no more regions") ) + " without entering " + regionToDisplayText(board.character, p.region, "Any Subregion") + ".";
+		}
+		function AllRegionsExceptToComment(p) {
+			return "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)";
+		}
+		function AllRegionsExceptToBinary(p) {
+			var b = Array(5); b.fill(0);
+			b[0] = challengeValue(p._name);
+			b[3] = enumToValue(p.region, "regionsreal");
+			b[4] = Math.max(0, Math.min(p.required - p.current, CHAR_MAX));
+			p.remaining.forEach(s => b.push(enumToValue(s, "regionsreal")) );
+			b[2] = b.length - GOAL_LENGTH;
+			return new Uint8Array(b);
+		}
+		var v = [], i = [];
+		v.push(String(params.region));    i.push("region");
+		v.push(params.remaining.join(params._templates.remaining.separator)); i.push("remaining");
+		v.push(String(params.current));   i.push("current");
+		v.push(String(params.amount));    i.push("amount");
+		return {
+			name: thisname,
+			params: params,
+			category: "Entering regions while never visiting one",
+			items: i,
+			values: v,
+			description: AllRegionsExceptToDescription(params),
+			comments: AllRegionsExceptToComment(params),
+			paint: AllRegionsExceptToPaint(params),
+			toBin: AllRegionsExceptToBinary(params)
 		};
 	},
 	BingoBombTollChallenge: function(desc, character = "Any") {
@@ -1504,6 +1598,7 @@ const CHALLENGES = {
 			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
 		];
 		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
 		function DamageChallengePaint(p) {
 			var r = [];
 			if (p.weapon !== "Any Weapon") {
@@ -1523,7 +1618,7 @@ const CHALLENGES = {
 				r.push( { type: "text", value: p.subregion, color: RainWorldColors.Unity_white } );
 			}
 			r.push( { type: "break" } );
-			r.push( { type: "text", value: "[0/" + String(p.amount) + "]", color: RainWorldColors.Unity_white } );
+			r.push( { type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: RainWorldColors.Unity_white } );
 			if (p.onecycle)
 				r.push( { type: "icon", value: "cycle_limit", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
 			return r;
@@ -3411,7 +3506,38 @@ const regionCodeToDisplayName = {
 	"SU": "Outskirts",
 	"UW": "The Exterior",
 	"VS": "Pipeyard",
-	"UNKNOWN": "UNKNOWN"
+	"UNKNOWN": "UNKNOWN",
+	//	Watcher regions, from https://alduris.github.io/watcher-map/
+	"WARF": "Aether Ridge",
+	"WBLA": "Badlands",
+	"WARD": "Cold Storage",
+	"WRFA": "Coral Caves",
+	"WTDB": "Desolate Tract",
+	"WARC": "Fetid Glen",
+	"WVWB": "Fractured Gateways",
+	"WARE": "Heat Ducts",
+	"WMPA": "Migration Path",
+	"WPGA": "Pillar Grove",
+	"WRRA": "Rusted Wrecks",
+	"WARB": "Salination",
+	"WSKD": "Shrouded Stacks",
+	"WPTA": "Signal Spires",
+	"WSKC": "Stormy Coast",
+	"WSKB": "Sunbaked Alley",
+	"WARG": "The Surface",
+	"WSKA": "Torrential Railways",
+	"WTDA": "Torrid Desert",
+	"WRFB": "Turbulent Pump",
+	"WVWA": "Verdant Waterways",
+	"WARA": "Shattered Terrace",
+	"WRSA": "Daemon",
+	"WAUA": "Ancient Urban",
+	"WHIR": "Corrupted Factories",
+	"WSUR": "Crumbling Fringes",
+	"WDSR": "Decaying Tunnels",
+	"WGWR": "Infested Wastes",
+	"WSSR": "Unfortunate Evolution",
+	"WORA": "Outer Rim"
 };
 
 /**
@@ -3440,7 +3566,16 @@ const BingoEnum_AllRegionCodes = [
 	"LF", "LM", "MS", "OE",
 	"RM", "SB", "SH", "SI",
 	"SL", "SS", "SU", "UG",
-	"UW", "VS"
+	"UW", "VS",
+	//	Watcher regions
+	"WARF", "WBLA", "WARD", "WRFA",
+	"WTDB", "WARC", "WVWB", "WARE",
+	"WMPA", "WPGA", "WRRA", "WARB",
+	"WSKD", "WPTA", "WSKC", "WSKB",
+	"WARG", "WSKA", "WTDA", "WRFB",
+	"WVWA", "WARA", "WRSA", "WAUA",
+	"WHIR", "WSUR", "WDSR", "WGWR", 
+	"WSSR", "WORA"
 ];
 
 /**
@@ -3523,10 +3658,13 @@ const BingoEnum_AllSubregions = [
 	"Underhang",
 	"Waterfront Facility",
 	"Windswept Spires"
+	//	Watcher subregions
+	//	subregions deprecated, no adds needed
 ];
 
 /**
- *	Creatures that can be dropped in the Depths pit; used by BingoDepthsChallenge
+ *	Creatures that can be dropped in the Depths pit.
+ *	Used by BingoDepthsChallenge.
  *	Value type: string, creature internal name
  */
 const BingoEnum_Depthable = [
@@ -3540,7 +3678,8 @@ const BingoEnum_Depthable = [
 ];
 
 /**
- *	Transportable creature targets; used by BingoTransportChallenge
+ *	Transportable creature targets; used by BingoCreatureGateChallenge,
+ *	BingoDepthsChallenge, and BingoTransportChallenge.
  *	Value type: string, creature internal name
  */
 const BingoEnum_Transportable = [
@@ -3554,6 +3693,7 @@ const BingoEnum_Transportable = [
 
 /**
  *	Pinnable creature targets; used by BingoPinChallenge
+ *	Deprecated; use creatures instead.
  *	Value type: string, creature internal name
  */
 const BingoEnum_Pinnable = [
@@ -4609,187 +4749,172 @@ const iteratorNameToIconColorMap = {
  */
 const BingoEnum_VistaPoints = [
 	//	Base Expedition
-	{ region: "CC", room: "CC_A10",         x:  734, y:  506  },
-	{ region: "CC", room: "CC_B12",         x:  455, y: 1383  },
-	{ region: "CC", room: "CC_C05",         x:  449, y: 2330  },
-	{ region: "CL", room: "CL_C05",         x:  540, y: 1213  },
-	{ region: "CL", room: "CL_H02",         x: 2407, y: 1649  },
-	{ region: "CL", room: "CL_CORE",        x:  471, y:  373  },
-	{ region: "DM", room: "DM_LAB1",        x:  486, y:  324  },
-	{ region: "DM", room: "DM_LEG06",       x:  400, y:  388  },
-	{ region: "DM", room: "DM_O02",         x: 2180, y: 2175  },
-	{ region: "DS", room: "DS_A05",         x:  172, y:  490  },
-	{ region: "DS", room: "DS_A19",         x:  467, y:  545  },
-	{ region: "DS", room: "DS_C02",         x:  541, y: 1305  },
-	{ region: "GW", room: "GW_C09",         x:  607, y:  595  },
-	{ region: "GW", room: "GW_D01",         x: 1603, y:  595  },
-	{ region: "GW", room: "GW_E02",         x: 2608, y:  621  },
-	{ region: "HI", room: "HI_B04",         x:  214, y:  615  },
-	{ region: "HI", room: "HI_C04",         x:  800, y:  768  },
-	{ region: "HI", room: "HI_D01",         x: 1765, y:  655  },
-	{ region: "LC", room: "LC_FINAL",       x: 2700, y:  500  },
-	{ region: "LC", room: "LC_SUBWAY01",    x: 1693, y:  564  },
+	{ region: "CC", room: "CC_A10",         x:  734, y:  506 },
+	{ region: "CC", room: "CC_B12",         x:  455, y: 1383 },
+	{ region: "CC", room: "CC_C05",         x:  449, y: 2330 },
+	{ region: "CL", room: "CL_C05",         x:  540, y: 1213 },
+	{ region: "CL", room: "CL_H02",         x: 2407, y: 1649 },
+	{ region: "CL", room: "CL_CORE",        x:  471, y:  373 },
+	{ region: "DM", room: "DM_LAB1",        x:  486, y:  324 },
+	{ region: "DM", room: "DM_LEG06",       x:  400, y:  388 },
+	{ region: "DM", room: "DM_O02",         x: 2180, y: 2175 },
+	{ region: "DS", room: "DS_A05",         x:  172, y:  490 },
+	{ region: "DS", room: "DS_A19",         x:  467, y:  545 },
+	{ region: "DS", room: "DS_C02",         x:  541, y: 1305 },
+	{ region: "GW", room: "GW_C09",         x:  607, y:  595 },
+	{ region: "GW", room: "GW_D01",         x: 1603, y:  595 },
+	{ region: "GW", room: "GW_E02",         x: 2608, y:  621 },
+	{ region: "HI", room: "HI_B04",         x:  214, y:  615 },
+	{ region: "HI", room: "HI_C04",         x:  800, y:  768 },
+	{ region: "HI", room: "HI_D01",         x: 1765, y:  655 },
+	{ region: "LC", room: "LC_FINAL",       x: 2700, y:  500 },
+	{ region: "LC", room: "LC_SUBWAY01",    x: 1693, y:  564 },
 	{ region: "LC", room: "LC_tallestconnection", x:  153, y:  242 },
-	{ region: "LF", room: "LF_A10",         x:  421, y:  412  },
-	{ region: "LF", room: "LF_C01",         x: 2792, y:  423  },
-	{ region: "LF", room: "LF_D02",         x: 1220, y:  631  },
-	{ region: "OE", room: "OE_RAIL01",      x: 2420, y: 1378  },
-	{ region: "OE", room: "OE_RUINCourtYard", x: 2133, y: 1397  },
-	{ region: "OE", room: "OE_TREETOP",     x:  468, y: 1782  },
-	{ region: "RM", room: "RM_ASSEMBLY",    x: 1550, y:  586  },
-	{ region: "RM", room: "RM_CONVERGENCE", x: 1860, y:  670  },
-	{ region: "RM", room: "RM_I03",         x:  276, y: 2270  },
-	{ region: "SB", room: "SB_D04",         x:  483, y: 1045  },
-	{ region: "SB", room: "SB_E04",         x: 1668, y:  567  },
-	{ region: "SB", room: "SB_H02",         x: 1559, y:  472  },
-	{ region: "SH", room: "SH_A14",         x:  273, y:  556  },
-	{ region: "SH", room: "SH_B05",         x:  733, y:  453  },
-	{ region: "SH", room: "SH_C08",         x: 2159, y:  481  },
-	{ region: "SI", room: "SI_C07",         x:  539, y: 2354  },
-	{ region: "SI", room: "SI_D05",         x: 1045, y: 1258  },
-	{ region: "SI", room: "SI_D07",         x:  200, y:  400  },
-	{ region: "SL", room: "SL_B01",         x:  389, y: 1448  },
-	{ region: "SL", room: "SL_B04",         x:  390, y: 2258  },
-	{ region: "SL", room: "SL_C04",         x:  542, y: 1295  },
-	{ region: "SU", room: "SU_A04",         x:  265, y:  415  },
-	{ region: "SU", room: "SU_B12",         x: 1180, y:  382  },
-	{ region: "SU", room: "SU_C01",         x:  450, y: 1811  },
-	{ region: "UG", room: "UG_A16",         x:  640, y:  354  },
-	{ region: "UG", room: "UG_D03",         x:  857, y: 1826  },
-	{ region: "UG", room: "UG_GUTTER02",    x:  163, y:  241  },
-	{ region: "UW", room: "UW_A07",         x:  805, y:  616  },
-	{ region: "UW", room: "UW_C02",         x:  493, y:  490  },
-	{ region: "UW", room: "UW_J01",         x:  860, y: 1534  },
-	{ region: "VS", room: "VS_C03",         x:   82, y:  983  },
-	{ region: "VS", room: "VS_F02",         x: 1348, y:  533  },
-	{ region: "VS", room: "VS_H02",         x:  603, y: 3265  },
+	{ region: "LF", room: "LF_A10",         x:  421, y:  412 },
+	{ region: "LF", room: "LF_C01",         x: 2792, y:  423 },
+	{ region: "LF", room: "LF_D02",         x: 1220, y:  631 },
+	{ region: "OE", room: "OE_RAIL01",      x: 2420, y: 1378 },
+	{ region: "OE", room: "OE_RUINCourtYard", x: 2133, y: 1397 },
+	{ region: "OE", room: "OE_TREETOP",     x:  468, y: 1782 },
+	{ region: "RM", room: "RM_ASSEMBLY",    x: 1550, y:  586 },
+	{ region: "RM", room: "RM_CONVERGENCE", x: 1860, y:  670 },
+	{ region: "RM", room: "RM_I03",         x:  276, y: 2270 },
+	{ region: "SB", room: "SB_D04",         x:  483, y: 1045 },
+	{ region: "SB", room: "SB_E04",         x: 1668, y:  567 },
+	{ region: "SB", room: "SB_H02",         x: 1559, y:  472 },
+	{ region: "SH", room: "SH_A14",         x:  273, y:  556 },
+	{ region: "SH", room: "SH_B05",         x:  733, y:  453 },
+	{ region: "SH", room: "SH_C08",         x: 2159, y:  481 },
+	{ region: "SI", room: "SI_C07",         x:  539, y: 2354 },
+	{ region: "SI", room: "SI_D05",         x: 1045, y: 1258 },
+	{ region: "SI", room: "SI_D07",         x:  200, y:  400 },
+	{ region: "SL", room: "SL_B01",         x:  389, y: 1448 },
+	{ region: "SL", room: "SL_B04",         x:  390, y: 2258 },
+	{ region: "SL", room: "SL_C04",         x:  542, y: 1295 },
+	{ region: "SU", room: "SU_A04",         x:  265, y:  415 },
+	{ region: "SU", room: "SU_B12",         x: 1180, y:  382 },
+	{ region: "SU", room: "SU_C01",         x:  450, y: 1811 },
+	{ region: "UG", room: "UG_A16",         x:  640, y:  354 },
+	{ region: "UG", room: "UG_D03",         x:  857, y: 1826 },
+	{ region: "UG", room: "UG_GUTTER02",    x:  163, y:  241 },
+	{ region: "UW", room: "UW_A07",         x:  805, y:  616 },
+	{ region: "UW", room: "UW_C02",         x:  493, y:  490 },
+	{ region: "UW", room: "UW_J01",         x:  860, y: 1534 },
+	{ region: "VS", room: "VS_C03",         x:   82, y:  983 },
+	{ region: "VS", room: "VS_F02",         x: 1348, y:  533 },
+	{ region: "VS", room: "VS_H02",         x:  603, y: 3265 },
 	//	Bingo customs/adders                
-	{ region: "CC", room: "CC_SHAFT0x",     x: 1525, y:  217  },
-	{ region: "CL", room: "CL_C03",         x:  808, y:   37  },
-	{ region: "DM", room: "DM_VISTA",       x:  956, y:  341  },
-	{ region: "DS", room: "DS_GUTTER02",    x:  163, y:  241  },
-	{ region: "GW", room: "GW_A24",         x:  590, y:  220  },
-	{ region: "HI", room: "HI_B02",         x:  540, y: 1343  },
-	{ region: "LC", room: "LC_stripmallNEW", x: 1285, y:   50  },
-	{ region: "LF", room: "LF_E01",         x:  359, y:   63  },
-	{ region: "LM", room: "LM_B01",         x:  248, y: 1507  },
-	{ region: "LM", room: "LM_B04",         x:  503, y: 2900  },
-	{ region: "LM", room: "LM_C04",         x:  542, y: 1295  },
-	{ region: "LM", room: "LM_EDGE02",      x: 1750, y: 1715  },
-	{ region: "MS", room: "MS_AIR03",       x: 1280, y:  770  },
-	{ region: "MS", room: "MS_ARTERY01",    x: 4626, y:   39  },
-	{ region: "MS", room: "MS_FARSIDE",     x: 2475, y: 1800  },
-	{ region: "MS", room: "MS_LAB4",        x:  390, y:  240  },
-	{ region: "OE", room: "OE_CAVE02",      x: 1200, y:   35  },
-	{ region: "RM", room: "RM_LAB8",        x: 1924, y:   65  },
-	{ region: "SB", room: "SB_C02",         x: 1155, y:  550  },
-	{ region: "SH", room: "SH_E02",         x:  770, y:   40  },
-	{ region: "SI", room: "SI_C04",         x: 1350, y:  130  },
-	{ region: "SL", room: "SL_AI",          x: 1530, y:   15  },
-	{ region: "SS", room: "SS_A13",         x:  347, y:  595  },
-	{ region: "SS", room: "SS_C03",         x:   60, y:  119  },
-	{ region: "SS", room: "SS_D04",         x:  980, y:  440  },
-	{ region: "SS", room: "SS_LAB12",       x:  697, y:  255  },
-	{ region: "SU", room: "SU_B11",         x:  770, y:   48  },
-	{ region: "UG", room: "UG_A19",         x:  545, y:   43  },
-	{ region: "UW", room: "UW_D05",         x:  760, y:  220  },
-	{ region: "VS", room: "VS_E06",         x:  298, y: 1421  }
+	{ region: "CC", room: "CC_SHAFT0x",     x: 1525, y:  217 },
+	{ region: "CL", room: "CL_C03",         x:  808, y:   37 },
+	{ region: "DM", room: "DM_VISTA",       x:  956, y:  341 },
+	{ region: "DS", room: "DS_GUTTER02",    x:  163, y:  241 },
+	{ region: "GW", room: "GW_A24",         x:  590, y:  220 },
+	{ region: "HI", room: "HI_B02",         x:  540, y: 1343 },
+	{ region: "LC", room: "LC_stripmallNEW", x: 1285, y:   50 },
+	{ region: "LF", room: "LF_E01",         x:  359, y:   63 },
+	{ region: "LM", room: "LM_B01",         x:  248, y: 1507 },
+	{ region: "LM", room: "LM_B04",         x:  503, y: 2900 },
+	{ region: "LM", room: "LM_C04",         x:  542, y: 1295 },
+	{ region: "LM", room: "LM_EDGE02",      x: 1750, y: 1715 },
+	{ region: "MS", room: "MS_AIR03",       x: 1280, y:  770 },
+	{ region: "MS", room: "MS_ARTERY01",    x: 4626, y:   39 },
+	{ region: "MS", room: "MS_FARSIDE",     x: 2475, y: 1800 },
+	{ region: "MS", room: "MS_LAB4",        x:  390, y:  240 },
+	{ region: "OE", room: "OE_CAVE02",      x: 1200, y:   35 },
+	{ region: "RM", room: "RM_LAB8",        x: 1924, y:   65 },
+	{ region: "SB", room: "SB_C02",         x: 1155, y:  550 },
+	{ region: "SH", room: "SH_E02",         x:  770, y:   40 },
+	{ region: "SI", room: "SI_C04",         x: 1350, y:  130 },
+	{ region: "SL", room: "SL_AI",          x: 1530, y:   15 },
+	{ region: "SS", room: "SS_A13",         x:  347, y:  595 },
+	{ region: "SS", room: "SS_C03",         x:   60, y:  119 },
+	{ region: "SS", room: "SS_D04",         x:  980, y:  440 },
+	{ region: "SS", room: "SS_LAB12",       x:  697, y:  255 },
+	{ region: "SU", room: "SU_B11",         x:  770, y:   48 },
+	{ region: "UG", room: "UG_A19",         x:  545, y:   43 },
+	{ region: "UW", room: "UW_D05",         x:  760, y:  220 },
+	{ region: "VS", room: "VS_E06",         x:  298, y: 1421 },
+	//	Watcher addons
+	{ region: "WARF", room: "WARF_B17",     x:  461, y:  290 },
+	{ region: "WARF", room: "WARF_C02",     x: 2110, y:  330 },
+	{ region: "WARF", room: "WARF_D26",     x:  600, y:  100 },
+	{ region: "WBLA", room: "WBLA_F02",     x: 5180, y:  700 },
+	{ region: "WBLA", room: "WBLA_B05",     x: 1650, y:  490 },
+	{ region: "WBLA", room: "WBLA_J01",     x: 4853, y:  650 },
+	{ region: "WARD", room: "WARD_D36",     x:  590, y:  570 },
+	{ region: "WARD", room: "WARD_E26",     x: 1300, y:  590 },
+	{ region: "WARD", room: "WARD_E28",     x:  590, y:  290 },
+	{ region: "WRFA", room: "WRFA_F06",     x: 1290, y: 1525 },
+	{ region: "WRFA", room: "WRFA_E02",     x: 1488, y:  300 },
+	{ region: "WRFA", room: "WRFA_SK0",     x:   25, y:  250 },
+	{ region: "WTDB", room: "WTDB_A08",     x:  475, y:  634 },
+	{ region: "WTDB", room: "WTDB_A22",     x: 1545, y:  660 },
+	{ region: "WTDB", room: "WTDB_A38",     x:  950, y:  610 },
+	{ region: "WARC", room: "WARC_A01",     x:  905, y:  550 },
+	{ region: "WARC", room: "WARC_A05",     x: 2450, y:  570 },
+	{ region: "WARC", room: "WARC_E03",     x: 1511, y:  970 },
+	{ region: "WVWB", room: "WVWB_C01",     x: 2460, y:  440 },
+	{ region: "WVWB", room: "WVWB_D02",     x: 1315, y:  410 },
+	{ region: "WVWB", room: "WVWB_E02",     x: 1559, y:  870 },
+	{ region: "WARE", room: "WARE_H03",     x:  434, y:  625 },
+	{ region: "WARE", room: "WARE_H24",     x:  475, y: 1095 },
+	{ region: "WARE", room: "WARE_I04",     x:  715, y:  100 },
+	{ region: "WMPA", room: "WMPA_D07",     x:  705, y:  935 },
+	{ region: "WMPA", room: "WMPA_A08",     x: 1265, y:  450 },
+	{ region: "WMPA", room: "WMPA_C03",     x: 1111, y:  570 },
+	{ region: "WPGA", room: "WPGA_A09",     x:  150, y:  400 },
+	{ region: "WPGA", room: "WPGA_A14",     x:  491, y:  630 },
+	{ region: "WPGA", room: "WPGA_A13",     x:  733, y:  645 },
+	{ region: "WRRA", room: "WRRA_A09",     x:  492, y:  328 },
+	{ region: "WRRA", room: "WRRA_C03",     x: 1472, y:  348 },
+	{ region: "WRRA", room: "WRRA_B13",     x:  471, y:  290 },
+	{ region: "WARB", room: "WARB_F05",     x: 3590, y:  510 },
+	{ region: "WARB", room: "WARB_G26",     x:  490, y: 1000 },
+	{ region: "WARB", room: "WARB_F16",     x:  860, y:  285 },
+	{ region: "WSKD", room: "WSKD_B33",     x: 2543, y: 1000 },
+	{ region: "WSKD", room: "WSKD_B09",     x:  610, y:  450 },
+	{ region: "WSKD", room: "WSKD_B20",     x: 1650, y:  330 },
+	{ region: "WPTA", room: "WPTA_B04",     x:  390, y:  210 },
+	{ region: "WPTA", room: "WPTA_C02",     x:  958, y: 2235 },
+	{ region: "WPTA", room: "WPTA_B08",     x:   85, y:  290 },
+	{ region: "WSKC", room: "WSKC_A12",     x: 1701, y:  430 },
+	{ region: "WSKC", room: "WSKC_A08",     x:  131, y:  110 },
+	{ region: "WSKC", room: "WSKC_A27",     x:  110, y:  185 },
+	{ region: "WSKB", room: "WSKB_N09",     x:  515, y:  510 },
+	{ region: "WSKB", room: "WSKB_C11",     x:  480, y:  500 },
+	{ region: "WSKB", room: "WSKB_N11",     x:  853, y:   63 },
+	{ region: "WARG", room: "WARG_W08",     x:  460, y:  545 },
+	{ region: "WARG", room: "WARG_O05_Future", x:  950, y:  285 },
+	{ region: "WARG", room: "WARG_G19",     x:  585, y:  490 },
+	{ region: "WSKA", room: "WSKA_D15",     x: 1515, y:  830 },
+	{ region: "WSKA", room: "WSKA_D20",     x:  355, y:  530 },
+	{ region: "WSKA", room: "WSKA_D11",     x: 2631, y:  630 },
+	{ region: "WTDA", room: "WTDA_B08",     x: 6791, y:  470 },
+	{ region: "WTDA", room: "WTDA_Z16",     x: 3759, y:  308 },
+	{ region: "WTDA", room: "WTDA_Z01",     x: 1650, y:  625 },
+	{ region: "WRFB", room: "WRFB_B01",     x:  489, y:  110 },
+	{ region: "WRFB", room: "WRFB_D01",     x:  900, y:  191 },
+	{ region: "WRFB", room: "WRFB_F04",     x:  610, y:    5 },
+	{ region: "WVWA", room: "WVWA_B08",     x:  950, y:   -7 },
+	{ region: "WVWA", room: "WVWA_B06",     x:  702, y:  490 },
+	{ region: "WVWA", room: "WVWA_B10",     x: 1443, y:  170 },
+	{ region: "WARA", room: "WARA_P09",     x:  311, y: 2170 },
+	{ region: "WARA", room: "WARA_P21",     x: 1350, y:   90 },
+	{ region: "WARA", room: "WARA_P06",     x:  430, y:  155 },
+	{ region: "WAUA", room: "WAUA_A03B",    x:  491, y:  420 },
+	{ region: "WAUA", room: "WAUA_SHOP",    x: 1020, y:  450 },
+	{ region: "WAUA", room: "WAUA_E02",     x: 1450, y:  320 }
 ];
 
 /**
- *	Stock (built in / mod generated) Vista Point locations, to drop into goal strings.
- *	Used by BingoVistaExChallenge enum bin-to-string.  Of the form:
- *	"{0}><System.String|{1}|Room|0|vista><{2}><{3}"
- *	where {0} is the region code, {1} is the room name, {2} is the x-coordinate,
- *	and {3} the y-coordinate.
+ *	Known Vista Point locations, to drop into goal strings.
+ *	Used by BingoVistaExChallenge enum bin-to-string (formatter "vista_code").
+ *	Of the form: "{0}><System.String|{1}|Room|0|vista><{2}><{3}", where {0} is
+ *	the region code, {1} is the room name, {2} is the x-coordinate, and {3} the
+ *	y-coordinate.
+ *	Preloaded from BingoEnum_VistaPoints[] on startup; see addVistaPointsToCode().
  */
-const BingoEnum_VistaPoints_Code = [
-	"CC><System.String|CC_A10|Room|0|vista><734><506",
-	"CC><System.String|CC_B12|Room|0|vista><455><1383",
-	"CC><System.String|CC_C05|Room|0|vista><449><2330",
-	"CL><System.String|CL_C05|Room|0|vista><540><1213",
-	"CL><System.String|CL_H02|Room|0|vista><2407><1649",
-	"CL><System.String|CL_CORE|Room|0|vista><471><373",
-	"DM><System.String|DM_LAB1|Room|0|vista><486><324",
-	"DM><System.String|DM_LEG06|Room|0|vista><400><388",
-	"DM><System.String|DM_O02|Room|0|vista><2180><2175",
-	"DS><System.String|DS_A05|Room|0|vista><172><490",
-	"DS><System.String|DS_A19|Room|0|vista><467><545",
-	"DS><System.String|DS_C02|Room|0|vista><541><1305",
-	"GW><System.String|GW_C09|Room|0|vista><607><595",
-	"GW><System.String|GW_D01|Room|0|vista><1603><595",
-	"GW><System.String|GW_E02|Room|0|vista><2608><621",
-	"HI><System.String|HI_B04|Room|0|vista><214><615",
-	"HI><System.String|HI_C04|Room|0|vista><800><768",
-	"HI><System.String|HI_D01|Room|0|vista><1765><655",
-	"LC><System.String|LC_FINAL|Room|0|vista><2700><500",
-	"LC><System.String|LC_SUBWAY01|Room|0|vista><1693><564",
-	"LC><System.String|LC_tallestconnection|Room|0|vista><153><242",
-	"LF><System.String|LF_A10|Room|0|vista><421><412",
-	"LF><System.String|LF_C01|Room|0|vista><2792><423",
-	"LF><System.String|LF_D02|Room|0|vista><1220><631",
-	"OE><System.String|OE_RAIL01|Room|0|vista><2420><1378",
-	"OE><System.String|OE_RUINCourtYard|Room|0|vista><2133><1397",
-	"OE><System.String|OE_TREETOP|Room|0|vista><468><1782",
-	"RM><System.String|RM_ASSEMBLY|Room|0|vista><1550><586",
-	"RM><System.String|RM_CONVERGENCE|Room|0|vista><1860><670",
-	"RM><System.String|RM_I03|Room|0|vista><276><2270",
-	"SB><System.String|SB_D04|Room|0|vista><483><1045",
-	"SB><System.String|SB_E04|Room|0|vista><1668><567",
-	"SB><System.String|SB_H02|Room|0|vista><1559><472",
-	"SH><System.String|SH_A14|Room|0|vista><273><556",
-	"SH><System.String|SH_B05|Room|0|vista><733><453",
-	"SH><System.String|SH_C08|Room|0|vista><2159><481",
-	"SI><System.String|SI_C07|Room|0|vista><539><2354",
-	"SI><System.String|SI_D05|Room|0|vista><1045><1258",
-	"SI><System.String|SI_D07|Room|0|vista><200><400",
-	"SL><System.String|SL_B01|Room|0|vista><389><1448",
-	"SL><System.String|SL_B04|Room|0|vista><390><2258",
-	"SL><System.String|SL_C04|Room|0|vista><542><1295",
-	"SU><System.String|SU_A04|Room|0|vista><265><415",
-	"SU><System.String|SU_B12|Room|0|vista><1180><382",
-	"SU><System.String|SU_C01|Room|0|vista><450><1811",
-	"UG><System.String|UG_A16|Room|0|vista><640><354",
-	"UG><System.String|UG_D03|Room|0|vista><857><1826",
-	"UG><System.String|UG_GUTTER02|Room|0|vista><163><241",
-	"UW><System.String|UW_A07|Room|0|vista><805><616",
-	"UW><System.String|UW_C02|Room|0|vista><493><490",
-	"UW><System.String|UW_J01|Room|0|vista><860><1534",
-	"VS><System.String|VS_C03|Room|0|vista><82><983",
-	"VS><System.String|VS_F02|Room|0|vista><1348><533",
-	"VS><System.String|VS_H02|Room|0|vista><603><3265",
-	"CC><System.String|CC_SHAFT0x|Room|0|vista><1525><217",
-	"CL><System.String|CL_C03|Room|0|vista><808><37",
-	"DM><System.String|DM_VISTA|Room|0|vista><956><341",
-	"DS><System.String|DS_GUTTER02|Room|0|vista><163><241",
-	"GW><System.String|GW_A24|Room|0|vista><590><220",
-	"HI><System.String|HI_B02|Room|0|vista><540><1343",
-	"LC><System.String|LC_stripmallNEW|Room|0|vista><1285><50",
-	"LF><System.String|LF_E01|Room|0|vista><359><63",
-	"LM><System.String|LM_B01|Room|0|vista><248><1507",
-	"LM><System.String|LM_B04|Room|0|vista><503><2900",
-	"LM><System.String|LM_C04|Room|0|vista><542><129",
-	"LM><System.String|LM_EDGE02|Room|0|vista><1750><1715",
-	"MS><System.String|MS_AIR03|Room|0|vista><1280><770",
-	"MS><System.String|MS_ARTERY01|Room|0|vista><4626><39",
-	"MS><System.String|MS_FARSIDE|Room|0|vista><2475><1800",
-	"MS><System.String|MS_LAB4|Room|0|vista><390><240",
-	"OE><System.String|OE_CAVE02|Room|0|vista><1200><35",
-	"RM><System.String|RM_LAB8|Room|0|vista><1924><65",
-	"SB><System.String|SB_C02|Room|0|vista><1155><550",
-	"SH><System.String|SH_E02|Room|0|vista><770><40",
-	"SI><System.String|SI_C04|Room|0|vista><1350><130",
-	"SL><System.String|SL_AI|Room|0|vista><1530><15",
-	"SS><System.String|SS_A13|Room|0|vista><347><595",
-	"SS><System.String|SS_C03|Room|0|vista><60><119",
-	"SS><System.String|SS_D04|Room|0|vista><980><440",
-	"SS><System.String|SS_LAB12|Room|0|vista><697><255",
-	"SU><System.String|SU_B11|Room|0|vista><770><48",
-	"UG><System.String|UG_A19|Room|0|vista><545><43",
-	"UW><System.String|UW_D05|Room|0|vista><760><220",
-	"VS><System.String|VS_E06|Room|0|vista><298><142",
-	"LM><System.String|LM_C04|Room|0|vista><542><1295",
-];
+const BingoEnum_VistaPoints_Code = [];
 
 const BingoEnum_EnterableGates = [
 	"SU_HI", "SU_LF", "SU_DS", "HI_SU",
@@ -5427,6 +5552,9 @@ const ChallengeUpgrades = {
  *	Emits console messages on failure.
  */
 function expandAndValidateLists() {
+	addVistaPointsToCode(BingoEnum_VistaPoints);
+	appendCHALLENGES();
+
 	var a = 0; DataPearlList.forEach(s => { if (dataPearlToRegionMap[s] === undefined) a++; } );
 	if (a > 0) console.log("expandAndValidateLists(): dataPearlToRegionMap[] lacking element(s) from DataPearlList[]");
 	a = 0; DataPearlList.forEach(s => { if (dataPearlToColorMap[s] === undefined) a++; } );
@@ -5443,6 +5571,17 @@ function appendCHALLENGES() {
 	for (var g of BINARY_TO_STRING_DEFINITIONS) {
 		if (exceptions.indexOf(g.name) < 0)
 			BingoEnum_CHALLENGES.push(g.name);
+	}
+}
+
+/**
+ *	Appends preset goals to BingoEnum_VistaPoints_Code[].
+ *	Used on startup with BingoEnum_VistaPoints[].
+ *	Potential future mod use.
+ */
+function addVistaPointsToCode(vistas) {
+	for (var v of vistas) {
+		BingoEnum_VistaPoints_Code.push(v.region + "><System.String|" + v.room + "|Room|0|vista><" + String(v.x) + "><" + String(v.y));
 	}
 }
 
@@ -5737,6 +5876,10 @@ function upgradeDescriptor(d, upg) {
 					d.unshift(step.data);
 				} else if (step.op === "replace") {
 					d[step.offs] = d[step.offs].replace(step.find, step.replace);
+				} else if (step.op === "intFormat") {
+					//	used by BingoAllRegionsExcept v0.85
+					if (!isNaN(parseInt(d[step.offs])))
+						d[step.offs] = step.before + String(parseInt(d[step.offs])) + step.after;
 				} else {
 					console.log(thisname + ": unsupported upgrade operation: " + upg[l][i].op);
 				}
@@ -5771,7 +5914,8 @@ function upgradeDescriptor(d, upg) {
  *		          	(and similarly in ._error and ._templates)
  *		type      	string, primitive type assigned to [param]; one of "bool",
  *		          	"number", "string", "array"; used to read/format parameters
- *		          	after creation
+ *		          	after creation ("array" type is only used for an array of
+ *		          	string elements, keyed from formatter)
  *		formatter 	string, name of enum list (in ALL_ENUMS) to select from
  *		          	(string type)
  *		parse     	parser used to extract the value; one of "parseInt",
@@ -5797,7 +5941,7 @@ function upgradeDescriptor(d, upg) {
 //function challengeTextToAbstract(s, template) {
 //	var desc = s.split("><");
 function challengeTextToAbstract(desc, template) {
-	if (desc.length != template.length) throw new TypeError(thisname + ": found " + desc.length + " parameters, expected: " + template.length);
+	if (desc.length != template.length) throw new TypeError("found " + desc.length + " parameters, expected " + template.length);
 	var params = { _error: {}, _templates: {} };
 	for (var i = 0; i < template.length; i++) {
 		params[template[i].param] = template[i].defaultval;
@@ -5823,9 +5967,16 @@ function challengeTextToAbstract(desc, template) {
 			params[template[i].param] = tmp.value;
 			params._error[template[i].param].splice(-1, 0, ...tmp.error);
 		} else if (template[i].parse === "list") {
-			params[template[i].param] = desc[i].split(template[i].separator);
+			var tmp = desc[i].split(template[i].separator);
+			params[template[i].param] = [];
+			tmp.forEach(s => {
+				if (enumToValue(s, template[i].formatter) == 0)
+					params._error[template[i].param].push(s + " not found in enum, ignoring");
+				else
+					params[template[i].param].push(s);
+			});
 		} else {
-			console.log(thisname + ": unsupported parse operation: " + template[i].parse);
+			console.log("unsupported parse operation: " + template[i].parse);
 		}
 	}
 	return params;
@@ -6002,8 +6153,7 @@ function setMeta() {
 	if (comm !== undefined || character !== undefined
 			|| shelter !== undefined || perks !== undefined) {
 		console.log("Updated.");
-		parseText();
-		redrawBoard();
+		parseButton();
 		return;
 	}
 	console.log("setMeta(comm, character, shelter, perks)\n"
@@ -6024,8 +6174,8 @@ function setMeta() {
 
 function enumeratePerks() {
 	var a = [];
-		el = document.getElementById("perkscheck" + String(i));
 	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+		el = document.getElementById("perkscheck" + String(i));
 		if (el !== null) {
 			if (el.checked)
 				a.push(i);
@@ -6333,6 +6483,5 @@ function generateOneOfEverything() {
 	}
 	s = s.substring(0, s.length - 4);
 	document.getElementById("textbox").value = s;
-	parseText();
-	redrawBoard();
+	parseButton();
 }
