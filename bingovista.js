@@ -31,10 +31,10 @@
  *	sheet, and `frames`, the collection of sprite names and coordinates.
  */
 const atlases = [
-	{ img: "bvicons.png",      txt: "bvicons.txt",      canv: undefined, frames: {} },	/**< anything not found below */
-	{ img: "bingoicons.png",   txt: "bingoicons.txt",   canv: undefined, frames: {} },	/**< from Bingo mod */
-	{ img: "uispritesmsc.png", txt: "uispritesmsc.txt", canv: undefined, frames: {} }, 	/**< from DLC       */
-	{ img: "uiSprites.png",    txt: "uiSprites.txt",    canv: undefined, frames: {} } 	/**< from base game */
+	{ img: "atlases/bvicons.png",      txt: "atlases/bvicons.txt",      canv: undefined, frames: {} },	/**< anything not found below */
+	{ img: "atlases/bingoicons.png",   txt: "atlases/bingoicons.txt",   canv: undefined, frames: {} },	/**< from Bingo mod */
+	{ img: "atlases/uispritesmsc.png", txt: "atlases/uispritesmsc.txt", canv: undefined, frames: {} }, 	/**< from DLC       */
+	{ img: "atlases/uiSprites.png",    txt: "atlases/uiSprites.txt",    canv: undefined, frames: {} } 	/**< from base game */
 ];
 
 /**
