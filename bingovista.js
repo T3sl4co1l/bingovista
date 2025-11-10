@@ -31,10 +31,10 @@
  *	sheet, and `frames`, the collection of sprite names and coordinates.
  */
 const atlases = [
-	{ img: "bvicons.png",      txt: "bvicons.txt",      canv: undefined, frames: {} },	/**< anything not found below */
-	{ img: "bingoicons.png",   txt: "bingoicons.txt",   canv: undefined, frames: {} },	/**< from Bingo mod */
-	{ img: "uispritesmsc.png", txt: "uispritesmsc.txt", canv: undefined, frames: {} }, 	/**< from DLC       */
-	{ img: "uiSprites.png",    txt: "uiSprites.txt",    canv: undefined, frames: {} } 	/**< from base game */
+	{ img: "atlases/bvicons.png",      txt: "atlases/bvicons.txt",      canv: undefined, frames: {} },	/**< anything not found below */
+	{ img: "atlases/bingoicons.png",   txt: "atlases/bingoicons.txt",   canv: undefined, frames: {} },	/**< from Bingo mod */
+	{ img: "atlases/uispritesmsc.png", txt: "atlases/uispritesmsc.txt", canv: undefined, frames: {} }, 	/**< from DLC       */
+	{ img: "atlases/uiSprites.png",    txt: "atlases/uiSprites.txt",    canv: undefined, frames: {} } 	/**< from base game */
 ];
 
 /**
@@ -139,40 +139,6 @@ document.addEventListener("DOMContentLoaded", function() {
 	expandAndValidateLists();
 	initGenerateBlacklist();
 	square.color = RainWorldColors.Unity_white;
-
-	//	Set up DOM elements and listeners
-
-	//	Nav, header and file handling buttons
-	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
-	document.getElementById("clear").addEventListener("click", function(e) {
-		document.getElementById("textbox").value = "";
-		var u = new URL(document.URL);
-		u.search = "";
-		window.history.pushState(null, "", u.href);
-	});
-	document.getElementById("parse").addEventListener("click", parseButton);
-	document.getElementById("copy").addEventListener("click", copyText);
-	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
-	document.getElementById("textbox").addEventListener("paste", pasteText);
-	document.getElementById("boardcontainer").addEventListener("click", clickBoard);
-	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
-	document.getElementById("fileload").addEventListener("change", function() { doLoadFile(this.files) } );
-	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
-	document.getElementById("transp").addEventListener("input", toggleTransp);
-
-	var d = document.getElementById("droptarget");
-	d.addEventListener("dragenter", dragEnterOver);
-	d.addEventListener("dragover", dragEnterOver);
-	d.addEventListener("dragleave", function(e) { this.style.backgroundColor = ""; } );
-	d.addEventListener("drop", dragDrop);
-
-	function dragEnterOver(e) {
-		if (e.dataTransfer.types.includes("text/plain")
-				|| e.dataTransfer.types.includes("Files")) {
-			e.preventDefault();
-			this.style.backgroundColor = "#686868";
-		}
-	}
 
 	//	Prepare atlases
 
@@ -303,12 +269,6 @@ document.addEventListener("DOMContentLoaded", function() {
 		}
 
 	});
-
-	//	Other housekeeping
-
-	kibitzing = !!document.getElementById("kibitzing").checked;
-	transpose = !!document.getElementById("transp").checked;
-
 });
 
 /**
@@ -332,50 +292,6 @@ function setHeaderFromBoard(b) {
 }
 
 /**
- *	Kibitzing check toggled.
- */
-function toggleKibs(e) {
-	kibitzing = !!document.getElementById("kibitzing").checked;
-	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
-}
-
-/**
- *	Transpose check toggled.
- */
-function toggleTransp(e) {
-	transpose = !!document.getElementById("transp").checked;
-	redrawBoard();
-	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
-}
-
-/**
- *	Data dropped onto the page.
- */
-function dragDrop(e) {
-	e.preventDefault();
-	this.style.backgroundColor = "";
-	var d = e.dataTransfer;
-	setError("");
-	if (d.types.includes("Files")) {
-		doLoadFile(d.files);
-	} else {
-		var s;
-		for (var i = 0; i < d.items.length; i++) {
-			if (d.items[i].type.match("^text/plain")) {
-				d.items[i].getAsString(function(s) {
-					document.getElementById("textbox").value = s;
-					parseButton();
-				});
-				return;
-			}
-		}
-		setError("Please drop a text file.");
-	}
-}
-
-/**
  *	Sets a message in the error box.
  */
 function setError(s) {
@@ -384,162 +300,42 @@ function setError(s) {
 	mb.appendChild(document.createTextNode(s));
 }
 
-function doLoadFile(files) {
-	for (var i = 0; i < files.length; i++) {
-		if (files[i].type.match("^text/plain")) {
-			var fr = new FileReader();
-			fr.onload = function() {
-				document.getElementById("textbox").value = this.result;
-				parseButton();
-			};
-			fr.onerror = function(e) {
-				setError("File read error: " + e.message);
-			};
-			fr.readAsText(files[i]);
-			return;
-		}
-	}
-	setError("Please select a text file.");
-}
-
 /**
- *	Parse Text button pressed.
+ *	Redraws a board on a canvas.
+ *	@param {string} [canvas] The `id` of the canvas to draw on.
+ *	@param {*} [board] board structure (see global `board`).
  */
-function parseButton(e) {
+function redrawBoard(canvasId, board) {
+	const canvas = document.getElementById(canvasId);
+	canvas.dataset.width = board.width;
+	canvas.dataset.height = board.height;
 
-	var s = document.getElementById("textbox").value;
-	s = s.replace(/;\n+/, ";");
-	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
-	board = parseText(s);
-	document.getElementById("textbox").value = s;
+	var goalSquare = {}; Object.assign(goalSquare, square)
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / board.width) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / board.height) - goalSquare.margin - goalSquare.border);
 
-	//	Parse meta from the document, if not already set
-	if (board.comments === "")
-		board.comments = document.getElementById("hdrttl")?.innerText || "Untitled";
-	if (board.character === "")
-		board.character = document.getElementById("hdrchar")?.innerText || "Any";
-	if (board.shelter === "")
-		board.shelter = document.getElementById("hdrshel")?.innerText || "";
-	if (board.shelter === "random") board.shelter = "";
-	if (board.perks === undefined) {
-		board.perks = 0;
-		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-			el = document.getElementById("perkscheck" + String(i));
-			if (el !== null) {
-				if (el.checked)
-					board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
-				else
-					board.perks &= ~Object.values(BingoEnum_EXPFLAGS)[i];
-			} else
-				break;
-		}
-	}
-	//	Refresh meta table (parameters that weren't overwritten here)
-	setHeaderFromBoard(board);
-	//	And refresh bin, now that we've changed it
-	board.toBin = boardToBin(board);
-
-	//	Adjust graphical dimensions based on canvas and board sizes
-	var canv = document.getElementById("board");
-	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
-	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
-	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
-
-	if (selected !== undefined) {
-		//	See if we can re-select the same square (position) in the new board
-		if (selected.row < board.height && selected.col < board.width) {
-			selectSquare(selected.col, selected.row);
-		} else {
-			selected = undefined;
-		}
-	}
-	if (selected === undefined)
-		selectSquare(-1, -1);
-
-	redrawBoard();
-
-	var u = new URL(document.URL);
-	u.searchParams.set("b", binToBase64u(board.toBin));
-	window.history.pushState(null, "", u.href);
-
-}
-
-/**
- *	Pasted to textbox.
- */
-function pasteText(e) {
-	//	Let default happen, but trigger a parse in case no edits are required by the user
-	setTimeout((e) => { parseButton(e); }, 10);
-}
-
-/**
- *	Clicked on Copy.
- */
-function copyText(e) {
-	navigator.clipboard.writeText(document.getElementById("textbox").value);
-	setError("Text copied to clipboard.");
-}
-
-/**
- *	Clicked on Show/Hide.
- */
-function clickShowPerks(e) {
-	var elem = document.getElementById("hdrperks");
-	if (elem.style.display === "none")
-		elem.style.display = "initial";
-	else
-		elem.style.display = "none";
-}
-
-/**
- *	Clicked on canvas.
- */
-function clickBoard(e) {
-	if (board !== undefined) {
-		var rect = document.getElementById("boardcontainer").getBoundingClientRect();
-		var x = Math.floor(e.clientX - Math.round(rect.left)) - (square.border + square.margin) / 2;
-		var y = Math.floor(e.clientY - Math.round(rect.top )) - (square.border + square.margin) / 2;
-		if (transpose) {
-			var t = y; y = x; x = t;
-		}
-		var sqWidth = square.width + square.margin + square.border;
-		var sqHeight = square.height + square.margin + square.border;
-		var col = Math.floor(x / sqWidth);
-		var row = Math.floor(y / sqHeight);
-		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - square.margin)
-				&& (y % sqHeight) < (sqHeight - square.margin)) {
-			selectSquare(col, row);
-		} else {
-			selectSquare(-1, -1);
-		}
-	}
-}
-
-/**
- *	Redraws a given board canvas by ID, based on current `board` data.
- */
-function redrawBoard(canvas = "board") {
-	var ctx = document.getElementById(canvas).getContext("2d");
-	ctx.fillStyle = square.background;
+	var ctx = canvas.getContext("2d");
+	ctx.fillStyle = goalSquare.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 	for (var i = 0; i < board.goals.length; i++) {
 		var x, y, t;
-		x = Math.floor(i / board.height) * (square.width + square.margin + square.border)
-				+ (square.border + square.margin) / 2;
-		y = (i % board.height) * (square.height + square.margin + square.border)
-				+ (square.border + square.margin) / 2;
+		x = Math.floor(i / board.height) * (goalSquare.width + goalSquare.margin + goalSquare.border)
+				+ (goalSquare.border + goalSquare.margin) / 2;
+		y = (i % board.height) * (goalSquare.height + goalSquare.margin + goalSquare.border)
+				+ (goalSquare.border + goalSquare.margin) / 2;
 		if (transpose) {
 			t = y; y = x; x = t;
 		}
-		drawSquare(ctx, board.goals[i], x, y, square);
+		drawSquare(ctx, board.goals[i], x, y, goalSquare);
 	}
 }
 
 /**
- *	Select the square at (col, row) to show details of.
+ *	Select the square at (col, row) on canvas canvasId to show details of.
  *	If either argument is out of range, clears the selection instead.
  */
-function selectSquare(col, row) {
+function selectSquare(col, row, canvasId) {
 	var el = document.getElementById("desctxt");
 	var ctx = document.getElementById("square").getContext("2d");
 	if (row < 0 || col < 0 || row >= board.height || col >= board.width) {
@@ -598,7 +394,7 @@ function selectSquare(col, row) {
 		el.appendChild(el2);
 	}
 
-	setCursor(row, col);
+	setCursor(row, col, canvasId);
 
 	return;
 
@@ -620,49 +416,25 @@ function selectSquare(col, row) {
 }
 
 /**
- *	Key input to board container; pare down to arrow keys for navigating squares
- */
-function navSquares(e) {
-	if (board !== undefined && ["board", "boardcontainer", "cursor"].includes(e.target.id)) {
-		var dRow = 0, dCol = 0;
-		if (e.key === "Up"    || e.key === "ArrowUp"   ) dRow = -1;
-		if (e.key === "Down"  || e.key === "ArrowDown" ) dRow = 1;
-		if (e.key === "Left"  || e.key === "ArrowLeft" ) dCol = -1;
-		if (e.key === "Right" || e.key === "ArrowRight") dCol = 1;
-		if (dRow || dCol) {
-			e.preventDefault();
-			var col = 0, row = 0;
-			if (selected !== undefined) {
-				col = selected.col;
-				row = selected.row;
-			}
-			if (transpose) {
-				var t = dCol; dCol = dRow; dRow = t;
-			}
-			row += dRow; col += dCol;
-			if (row < 0) row += board.height;
-			if (row >= board.height) row -= board.height;
-			if (col < 0) col += board.width;
-			if (col >= board.width) col -= board.width;
-			selectSquare(col, row);
-		}
-	}
-}
-
-/**
  *	Position cursor
  */
-function setCursor(row, col) {
+function setCursor(row, col, canvasId) {
+	const canvas = document.getElementById(canvasId);
+	var goalSquare = {}; Object.assign(goalSquare, square);
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((parseInt(canvas.dataset.width) + parseInt(canvas.dataset.height)) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / parseInt(canvas.dataset.width)) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / parseInt(canvas.dataset.height)) - goalSquare.margin - goalSquare.border);
+
 	//	Firefox border offset bug
 	var fixX = 0, fixY = 1;
 	if (typeof mozInnerScreenX !== 'undefined' || typeof InstallTrigger !== 'undefined') {
 		fixY = 0;
 	}
 	var curSty = document.getElementById("cursor").style;
-	curSty.width  = String(square.width  + square.border - 5 - fixX) + "px";
-	curSty.height = String(square.height + square.border - 4 - fixY) + "px";
-	var x = square.margin / 2 - 1 + col * (square.width + square.margin + square.border);
-	var y = square.margin / 2 + 0 + row * (square.height + square.margin + square.border);
+	curSty.width  = String(goalSquare.width  + goalSquare.border - 5 - fixX) + "px";
+	curSty.height = String(goalSquare.height + goalSquare.border - 4 - fixY) + "px";
+	var x = goalSquare.margin / 2 - 1 + col * (goalSquare.width + goalSquare.margin + goalSquare.border);
+	var y = goalSquare.margin / 2 + 0 + row * (goalSquare.height + goalSquare.margin + goalSquare.border);
 	if (transpose) [x, y] = [y, x];
 	curSty.left = String(x + fixX) + "px"; curSty.top  = String(y + fixY) + "px";
 	curSty.display = "initial";
@@ -6454,7 +6226,7 @@ function generateRandomRandomGoals(n) {
 		for (retries = 0; retries < 100; retries++) {
 			goalTxt = binGoalToText(goalFromNumber(goalNum, Math.random()));
 			try {
-				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></));
+				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></), s);
 			} catch (e) {
 				goalTxt = "";
 			}
