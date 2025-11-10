@@ -214,7 +214,7 @@ textarea {
 	--></style>
   </head>
   <body>
-	<h1>Rain World: Bingo Mod<br> Board Viewer</h1>
+	<h1><a name="view">Rain World: Bingo Mod<br>Board Viewer</a></h1>
 	<table class="hdrtbl"><tbody id="header">
 	  <tr><td>Title</td><td id="hdrttl">Untitled</td></tr>
 	  <tr><td>Size</td><td id="hdrsize"></td></tr>
@@ -236,22 +236,22 @@ textarea {
 	<p>&nbsp;</p>
 	<div style="display: none;"><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label> (flashbang warning)</div>
 	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
-	<div><label><input type="checkbox" id="transp" checked>Transpose Board</label> (matches < v1.25 visual arrangement)</div>
+	<div><label><input type="checkbox" id="transp" checked>Transpose Board</label> (matches &lt;v1.25 visual arrangement)</div>
 	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
 	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text">&nbsp;&nbsp;&nbsp;<input type="button" id="copy" value="Copy Text"></div>
 	<p>Paste/edit above, or select file or drag-and-drop below:</p>
 	<table class="droptbl"><tr><td class="drop" id="droptarget"><input type="file" id="fileload" accept=".txt,text/plain"></td></tr></table>
 	<p class="errorbox" id="errorbox"></p>
 	<p>&nbsp;</p>
-	<h2>About</h2>
-	<p>Bingo Board Viewer, by <a href="https://github.com/T3sl4co1l/bingovista/">T3sl4co1l</a>, for use with Rain World Bingo Mod v1.25 (by Nacu and others).</p>
+	<h2><a name="about">About</a></h2>
+	<p>Bingo Board Viewer, by <a href="https://github.com/T3sl4co1l/bingovista/">T3sl4co1l</a>, for use with Rain World Bingo Mod v1.26 (by Nacu and others).</p>
 	<p>Usage: in-game, while configuring the board and selecting challenges, press "Copy".  Clipboard contents can be pasted into the cleared textbox above.  It can also pasted and copied between chat windows, etc., for easy sharing, or pasted into and saved as a text file (*.TXT) for storage.  These files can be loaded by clicking Choose File (or Browse... or etc., whatever your browser shows).  Or click-and-drag a text file from a file folder into the drop zone, on or around the file input area.  In any case, the text content is loaded into the text box to allow visual confirmation (and possible manual editing).</p>
 	<p>For convenience, pasting into the text box also triggers parsing.  Parsing takes in any valid goals and renders them in the square as in-game.  Goals in error show a null symbol, with error information in the square's description.  If corrections are needed, or manual edits made, do them in the text box, then press Parse Text.  Parsing automatically detects and corrects for white space before and after the board, and between goals (delimited by "bChG" markers).  Parse also updates the URL to use the shorthand / encoded board string.</p>
 	<p><em>Review the board before sharing!</em>  Goals may not read properly (particularly likely with customized options, or after mod updates), and error squares take up extra space in the URL.  Doesn't hurt to double-check the URL as well: simply refresh the page, to load it from URL instead of parsing from text.  If any squares have changed, or read in error afterwards, a bug report is welcome!</p>
 	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, and all parameters and values used in it.</p>
 	<p>"Kibitzing" enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
 	<p>Metadata is... not terribly convenient to update right now. It's not used by the mod as of v1.1, so it doesn't matter beyond appearances here, anyway. That said: Title, Shelter and Perks are read from this page's HTML, when pressing Parse.  This doesn't help much, because only perks are selectable; Title and Shelter can be edited by choosing Inspect Element in your browser and modifying them manually.  Then pressing Parse to set the URL.  For a more comprehensive method, try the <span class="code">setMeta()</span> function in the debug console. Once encoded in the URL, the URL can be shared, and metadata will show as set.</p>
-	<h2>Tips and Guides</h2>
+	<h2><a name="tips">Tips and Guides</a></h2>
 	<p>Curious what all the notes are?  Enable Kibitzing and view <a href="https://t3sl4co1l.github.io/bingovista/bingovista.html?b=UndCaQEZBwcAJwAAAAAAKAAAAAAAT25lIG9mIEV2ZXJ5dGhpbmcAAAEAAQQCABgUVAIDBAUGBwgJCgsMDQ4PEBESExQVFhcEAAMaS1AFAAMGMC4GAAICrwcAAqtmCQABAwoAAAswARcMEANgJxEOAAEJDwACdwIQEAAREAFnEgAB4xQAAiVaFVAGLgfdMgkBFgABIhcAAg0qGAACd1sZAAAaAAEVGwABChwQA6MqAx0ABINMIg4eAAL_Kh8AACAAACEAArhiIgADBfdQIwABBCQAAsc2JQACHWwmAAMFBAInAAJTACkAAUkqAAINFCsQACwAAQwtEAYDHDM-CBwuAAIErQMQAQQwEAIN1DEAAgdiMgABKTMAAXY0AAECNRADqgcNNgABywAA">a board with every goal on it</a>.  (This board won't work in-game, it's purely for Viewer illustration.)</p>
 	<p>[Base expedition and v1.08+] Vista point locations can be found on these community maps from <a href="https://rainworld.miraheze.org/wiki/Regions">Regions - Official Rain World Wiki</a>:</p>
 	<ul>
@@ -275,7 +275,7 @@ textarea {
 	<p>(As of v1.08, the customized vista points are disabled by default; they are planned to become available <em>as an option</em> in a future version.  If you liked them, they can always be entered manually; see the <span class="code">BingoEnum_VistaPoints</span> array for suggested rooms and coordinates.)</p>
 	<p><a href="https://noblecat57.github.io/">Rain World Downpour Map | noblecat57</a> interactive map viewer is recommended, and is also linked by room-specific goal commentary where possible.</p>
 	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, DrekiOrmur and shrubfromtomorrow for contributions, and alphappy and diedirl for tips and help.</p>
-	<h2>Changelog</h2>
+	<h2><a name="changes">Changelog</a></h2>
 	<ul>
 	  <li>2025/08/26: Large update taking too long; updating to v1.25 support.</li>
 	  <li>2025/08/10: Testing experimental new feature; large update coming soon(!).</li>

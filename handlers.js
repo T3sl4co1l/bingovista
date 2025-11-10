@@ -10,8 +10,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	document.getElementById("transp").addEventListener("input", toggleTransp);
 	document.getElementById("textbox").addEventListener("paste", pasteText);
 	document.getElementById("clear").addEventListener("click", clearText);
-	document.getElementById("parse").addEventListener("click", parseText);
-	document.getElementById("parse").addEventListener("click", redrawBoard.bind(this, "board", board));
+	document.getElementById("parse").addEventListener("click", parseButton);
 	document.getElementById("copy").addEventListener("click", copyText);
 
 	document.getElementById("fileload").addEventListener("change", (e) => doLoadFile(e.target.files));
@@ -22,8 +21,8 @@ document.addEventListener("DOMContentLoaded", function() {
 	d.addEventListener("drop", dragDrop);
 
 	//	Other housekeeping
-	kibitzing = !!document.getElementById("kibitzing").checked;
-	transpose = !!document.getElementById("transp").checked;
+	kibitzing = document.getElementById("kibitzing").checked;
+	transpose = document.getElementById("transp").checked;
 });
 
 /**
@@ -121,7 +120,7 @@ function toggleTransp(e) {
  */
 function pasteText(e) {
 	//	Let default happen, but trigger a parse in case no edits are required by the user
-	setTimeout((e) => {parseText(e); redrawBoard();}, 10);
+	setTimeout(parseButton, 10);
 }
 
 /**
@@ -137,21 +136,22 @@ function clearText(e) {
 /**
  *	Parse Text button pressed.
  */
-function parseText(e) {
+function parseButton(e) {
+
 	var s = document.getElementById("textbox").value;
+	s = s.replace(/;\n+/, ";");
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
+	board = parseText(s);
 	document.getElementById("textbox").value = s;
-	
-	board = parseBoard(document.getElementById("textbox").value);
-	//	Parse meta from the document if not set by `parseBoard()`
-	if (document.getElementById("hdrttl") !== null && board.comments === undefined)
-		board.comments = document.getElementById("hdrttl").innerText;
-	if (document.getElementById("hdrchar") !== null && board.character === undefined)
-		board.character = document.getElementById("hdrchar").innerText || "Any";
-	if (document.getElementById("hdrshel") !== null && board.shelter === undefined) {
-		board.shelter = document.getElementById("hdrshel").innerText;
-		if (board.shelter === "random") board.shelter = "";
-	}
+
+	//	Parse meta from the document, if not already set
+	if (board.comments === "")
+		board.comments = document.getElementById("hdrttl")?.innerText || "Untitled";
+	if (board.character === "")
+		board.character = document.getElementById("hdrchar")?.innerText || "Any";
+	if (board.shelter === "")
+		board.shelter = document.getElementById("hdrshel")?.innerText || "";
+	if (board.shelter === "random") board.shelter = "";
 	if (board.perks === undefined) {
 		board.perks = 0;
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
@@ -165,7 +165,18 @@ function parseText(e) {
 				break;
 		}
 	}
-		if (selected !== undefined) {
+	//	Refresh meta table (parameters that weren't overwritten here)
+	setHeaderFromBoard(board);
+	//	And refresh bin, now that we've changed it
+	board.toBin = boardToBin(board);
+
+	//	Adjust graphical dimensions based on canvas and board sizes
+	var canv = document.getElementById("board");
+	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
+	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
+	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
+
+	if (selected !== undefined) {
 		//	See if we can re-select the same square (position) in the new board
 		if (selected.row < board.height && selected.col < board.width) {
 			selectSquare(selected.col, selected.row);
@@ -176,18 +187,11 @@ function parseText(e) {
 	if (selected === undefined)
 		selectSquare(-1, -1);
 
-	//	Fill meta table with board info
-	setHeaderFromBoard(board);
+	redrawBoard();
 
-	//	prepare board binary encoding
-	board.toBin = boardToBin(board);
-	s = binToBase64u(board.toBin);
 	var u = new URL(document.URL);
-	u.searchParams.set("b", s);
+	u.searchParams.set("b", binToBase64u(board.toBin));
 	window.history.pushState(null, "", u.href);
-
-	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
 
 }
 
@@ -205,8 +209,7 @@ function doLoadFile(files) {
 			var fr = new FileReader();
 			fr.onload = function() {
 				document.getElementById("textbox").value = this.result;
-				parseText();
-				redrawBoard();
+				parseButton();
 			};
 			fr.onerror = function(e) {
 				setError("File read error: " + e.message);
@@ -253,8 +256,7 @@ function dragDrop(e) {
 			if (d.items[i].type.match("^text/plain")) {
 				d.items[i].getAsString(function(s) {
 					document.getElementById("textbox").value = s;
-					parseText();
-					redrawBoard();
+					parseButton();
 				});
 				return;
 			}
