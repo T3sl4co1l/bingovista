@@ -3,8 +3,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
 	//	Nav, header and file handling buttons
 	document.getElementById("hdrshow").addEventListener("click", clickShowPerks);
-	document.getElementById("boardcontainer").addEventListener("click", clickBoard);
-	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
+	document.getElementById("board").addEventListener("click", clickBoard);
+	document.getElementById("board").addEventListener("keydown", navSquares);
 
 	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
 	document.getElementById("transp").addEventListener("input", toggleTransp);
@@ -170,11 +170,7 @@ function parseButton(e) {
 	//	And refresh bin, now that we've changed it
 	board.toBin = boardToBin(board);
 
-	//	Adjust graphical dimensions based on canvas and board sizes
-	var canv = document.getElementById("board");
-	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
-	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
-	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
+	redrawBoard();
 
 	if (selected !== undefined) {
 		//	See if we can re-select the same square (position) in the new board
@@ -187,12 +183,9 @@ function parseButton(e) {
 	if (selected === undefined)
 		selectSquare(-1, -1);
 
-	redrawBoard();
-
 	var u = new URL(document.URL);
 	u.searchParams.set("b", binToBase64u(board.toBin));
 	window.history.pushState(null, "", u.href);
-
 }
 
 /**
