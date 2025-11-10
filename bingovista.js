@@ -39,7 +39,7 @@ const atlases = [
 
 /**
  *	Bingo square graphics, dimensions (in px) and other properties.
- *	Adjusted by parseText() to fit to canvas; see also: drawSquare calls 
+ *	See also: drawSquare calls
  */
 const square = {
 	width: 85,
@@ -280,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function() {
 function setHeaderFromBoard(b) {
 	var el = document.getElementById("hdrttl");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(b.comments));
+	el.appendChild(document.createTextNode(b.comments || "Untitled"));
 	el = document.getElementById("hdrsize");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(String(b.width) + " x " + String(b.height)));
@@ -304,30 +304,41 @@ function setError(s) {
 }
 
 /**
- *	Redraws a given board canvas by ID, based on current `board` data.
+ *	Redraws a board on a canvas.
+ *	@param {string} [canvas="board"] The `id` of the canvas to draw on.
+ *	@param {*} [p_board=board] board structure (see global `board`).
  */
-function redrawBoard(canvas = "board") {
-	var ctx = document.getElementById(canvas).getContext("2d");
-	ctx.fillStyle = square.background;
+function redrawBoard(canvasId = "board", p_board = board) {
+	const canvas = document.getElementById(canvasId);
+	canvas.dataset.width = p_board.width;
+	canvas.dataset.height = p_board.height;
+
+	var goalSquare = {}; Object.assign(goalSquare, square)
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((p_board.width + p_board.height) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / p_board.width) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / p_board.height) - goalSquare.margin - goalSquare.border);
+
+	var ctx = canvas.getContext("2d");
+	ctx.fillStyle = goalSquare.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-	for (var i = 0; i < board.goals.length; i++) {
+	for (var i = 0; i < p_board.goals.length; i++) {
 		var x, y, t;
-		x = Math.floor(i / board.height) * (square.width + square.margin + square.border)
-				+ (square.border + square.margin) / 2;
-		y = (i % board.height) * (square.height + square.margin + square.border)
-				+ (square.border + square.margin) / 2;
+		x = Math.floor(i / p_board.height) * (goalSquare.width + goalSquare.margin + goalSquare.border)
+				+ (goalSquare.border + goalSquare.margin) / 2;
+		y = (i % p_board.height) * (goalSquare.height + goalSquare.margin + goalSquare.border)
+				+ (goalSquare.border + goalSquare.margin) / 2;
 		if (transpose) {
 			t = y; y = x; x = t;
 		}
-		drawSquare(ctx, board.goals[i], x, y, square);
+		drawSquare(ctx, p_board.goals[i], x, y, goalSquare);
 	}
 }
 
 /**
- *	Select the square at (col, row) to show details of.
+ *	Select the square at (col, row) on canvas canvasId to show details of.
  *	If either argument is out of range, clears the selection instead.
  */
-function selectSquare(col, row) {
+function selectSquare(col, row, canvasId = "board") {
 	var el = document.getElementById("desctxt");
 	var ctx = document.getElementById("square").getContext("2d");
 	if (row < 0 || col < 0 || row >= board.height || col >= board.width) {
@@ -386,7 +397,7 @@ function selectSquare(col, row) {
 		el.appendChild(el2);
 	}
 
-	setCursor(row, col);
+	setCursor(row, col, canvasId);
 
 	return;
 
@@ -410,17 +421,23 @@ function selectSquare(col, row) {
 /**
  *	Position cursor
  */
-function setCursor(row, col) {
+function setCursor(row, col, canvasId) {
+	const canvas = document.getElementById(canvasId);
+	var goalSquare = {}; Object.assign(goalSquare, square);
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((parseInt(canvas.dataset.width) + parseInt(canvas.dataset.height)) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / parseInt(canvas.dataset.width)) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / parseInt(canvas.dataset.height)) - goalSquare.margin - goalSquare.border);
+
 	//	Firefox border offset bug
 	var fixX = 0, fixY = 1;
 	if (typeof mozInnerScreenX !== 'undefined' || typeof InstallTrigger !== 'undefined') {
 		fixY = 0;
 	}
 	var curSty = document.getElementById("cursor").style;
-	curSty.width  = String(square.width  + square.border - 5 - fixX) + "px";
-	curSty.height = String(square.height + square.border - 4 - fixY) + "px";
-	var x = square.margin / 2 - 1 + col * (square.width + square.margin + square.border);
-	var y = square.margin / 2 + 0 + row * (square.height + square.margin + square.border);
+	curSty.width  = String(goalSquare.width  + goalSquare.border - 5 - fixX) + "px";
+	curSty.height = String(goalSquare.height + goalSquare.border - 4 - fixY) + "px";
+	var x = goalSquare.margin / 2 - 1 + col * (goalSquare.width + goalSquare.margin + goalSquare.border);
+	var y = goalSquare.margin / 2 + 0 + row * (goalSquare.height + goalSquare.margin + goalSquare.border);
 	if (transpose) [x, y] = [y, x];
 	curSty.left = String(x + fixX) + "px"; curSty.top  = String(y + fixY) + "px";
 	curSty.display = "initial";
@@ -521,6 +538,78 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 		}
 	}
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/**
+ * Parse a string into a board object representation.
+ * @param {string} text string to parse into board
+ */
+function parseBoard(text) {
+	text = text.trim().replace(/\s*bChG\s*/g, "bChG");
+	var goals = text.split(/bChG/);
+	var size = Math.ceil(Math.sqrt(goals.length));
+	var board = {
+		comments: undefined,
+		character: undefined,
+		perks: undefined,
+		shelter: undefined,
+		mods: [],
+		size: size,
+		width: size,
+		height: size,
+		goals: [],
+		toBin: undefined
+	};
+
+	//	Detect board version:
+	//	assertion: no challenge names are shorter than 14 chars (true as of 1.25)
+	//	assertion: no character names are longer than 10 chars (true of base game + Downpour)
+	//	0.90+: character prefix, ";" delimited --> check within first 12 chars
+	//	0.86: character prefix, "_" delimited --> check within first 12 chars
+	//	0.85: no prefix, gonzo right into the goal list --> first token (to "~") is valid goal name or error
+	if (goals[0].search(/[A-Za-z]{1,12}[_;]/) == 0) {
+		//	Seems 0.86 or 0.90, find which
+		if (goals[0].indexOf(";") > 0) {
+			board.version = "0.90";
+			board.character = goals[0].substring(0, goals[0].indexOf(";"));
+			goals[0] = goals[0].substring(goals[0].indexOf(";") + 1);
+		} else if (goals[0].indexOf("_") > 0) {
+			board.version = "0.86";
+			board.character = goals[0].substring(0, goals[0].indexOf("_"));
+			goals[0] = goals[0].substring(goals[0].indexOf("_") + 1);
+		}
+		board.character = BingoEnum_CharToDisplayText[board.character] || "Any";
+	} else {
+		board.version = "0.85";
+	}
+
+	for (var i = 0; i < goals.length; i++) {
+		var type, desc;
+		if (goals[i].search("~") > 0 && goals[i].search("><") > 0) {
+			[type, desc] = goals[i].split("~");
+			desc = desc.split(/></);
+			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
+			if (CHALLENGES[type] !== undefined) {
+				try {
+					board.goals.push(CHALLENGES[type](desc, board.character));
+				} catch (er) {
+					board.goals.push(CHALLENGES["BingoChallenge"]( [
+						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
+				}
+			} else {
+				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
+			}
+		} else {
+			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
+		}
+	}
+	if (goals.length == 0)
+		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
+
+	//	prepare board binary encoding
+	board.toBin = boardToBin(board);
+
+	return board;
 }
 
 /**
@@ -5972,7 +6061,7 @@ function generateRandomRandomGoals(n) {
 		for (retries = 0; retries < 100; retries++) {
 			goalTxt = binGoalToText(goalFromNumber(goalNum, Math.random()));
 			try {
-				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></));
+				goal = CHALLENGES[goalTxt.split("~")[0]](goalTxt.split("~")[1].split(/></), s);
 			} catch (e) {
 				goalTxt = "";
 			}

@@ -42,21 +42,27 @@ function clickShowPerks(e) {
  */
 function clickBoard(e) {
 	if (board !== undefined) {
-		var rect = document.getElementById("boardcontainer").getBoundingClientRect();
-		var x = Math.floor(e.clientX - Math.round(rect.left)) - (square.border + square.margin) / 2;
-		var y = Math.floor(e.clientY - Math.round(rect.top )) - (square.border + square.margin) / 2;
+		const canvas = e.target;
+		var goalSquare = {}; Object.assign(goalSquare, square)
+		goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((parseInt(canvas.dataset.width) + parseInt(canvas.dataset.height)) * 91)) * 2, 2);
+		goalSquare.width = Math.round((canvas.width / parseInt(canvas.dataset.width)) - goalSquare.margin - goalSquare.border);
+		goalSquare.height = Math.round((canvas.height / parseInt(canvas.dataset.height)) - goalSquare.margin - goalSquare.border);
+
+		var rect = canvas.getBoundingClientRect();
+		var x = Math.floor(e.clientX - Math.round(rect.left)) - (goalSquare.border + goalSquare.margin) / 2;
+		var y = Math.floor(e.clientY - Math.round(rect.top )) - (goalSquare.border + goalSquare.margin) / 2;
 		if (transpose) {
 			var t = y; y = x; x = t;
 		}
-		var sqWidth = square.width + square.margin + square.border;
-		var sqHeight = square.height + square.margin + square.border;
+		var sqWidth = goalSquare.width + goalSquare.margin + goalSquare.border;
+		var sqHeight = goalSquare.height + goalSquare.margin + goalSquare.border;
 		var col = Math.floor(x / sqWidth);
 		var row = Math.floor(y / sqHeight);
-		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - square.margin)
-				&& (y % sqHeight) < (sqHeight - square.margin)) {
-			selectSquare(col, row);
+		if (x >= 0 && y >= 0 && (x % sqWidth) < (sqWidth - goalSquare.margin)
+				&& (y % sqHeight) < (sqHeight - goalSquare.margin)) {
+			selectSquare(col, row, canvas.id);
 		} else {
-			selectSquare(-1, -1);
+			selectSquare(-1, -1, canvas.id);
 		}
 	}
 }
@@ -86,7 +92,7 @@ function navSquares(e) {
 			if (row >= board.height) row -= board.height;
 			if (col < 0) col += board.width;
 			if (col >= board.width) col -= board.width;
-			selectSquare(col, row);
+			selectSquare(col, row, e.target.id);
 		}
 	}
 }
@@ -135,31 +141,19 @@ function parseText(e) {
 	var s = document.getElementById("textbox").value;
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
 	document.getElementById("textbox").value = s;
-	var goals = s.split(/bChG/);
-	var size = Math.ceil(Math.sqrt(goals.length));
-	if (board === undefined) {
-		board = {
-			comments: "Untitled",
-			character: "Any",
-			perks: 0,
-			shelter: "",
-			mods: [],
-			size: size,
-			width: size,
-			height: size,
-			goals: [],
-			toBin: undefined
-		};
-	} else {
-		//	Board already exists, parse meta from the document
-		if (document.getElementById("hdrttl") !== null)
-			board.comments = document.getElementById("hdrttl").innerText || "Untitled";
-		if (document.getElementById("hdrchar") !== null)
-			board.character = document.getElementById("hdrchar").innerText;
-		if (document.getElementById("hdrshel") !== null) {
-			board.shelter = document.getElementById("hdrshel").innerText;
-			if (board.shelter === "random") board.shelter = "";
-		}
+	
+	board = parseBoard(document.getElementById("textbox").value);
+	//	Parse meta from the document if not set by `parseBoard()`
+	if (document.getElementById("hdrttl") !== null && board.comments === undefined)
+		board.comments = document.getElementById("hdrttl").innerText;
+	if (document.getElementById("hdrchar") !== null && board.character === undefined)
+		board.character = document.getElementById("hdrchar").innerText || "Any";
+	if (document.getElementById("hdrshel") !== null && board.shelter === undefined) {
+		board.shelter = document.getElementById("hdrshel").innerText;
+		if (board.shelter === "random") board.shelter = "";
+	}
+	if (board.perks === undefined) {
+		board.perks = 0;
 		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
 			el = document.getElementById("perkscheck" + String(i));
 			if (el !== null) {
@@ -170,56 +164,8 @@ function parseText(e) {
 			} else
 				break;
 		}
-		board.goals = [];
-		board.size = size; board.width = size; board.height = size;
 	}
-
-	//	Detect board version:
-	//	assertion: no challenge names are shorter than 14 chars (true as of 1.25)
-	//	assertion: no character names are longer than 10 chars (true of base game + Downpour)
-	//	0.90+: character prefix, ";" delimited --> check within first 12 chars
-	//	0.86: character prefix, "_" delimited --> check within first 12 chars
-	//	0.85: no prefix, gonzo right into the goal list --> first token (to "~") is valid goal name or error
-	if (goals[0].search(/[A-Za-z]{1,12}[_;]/) == 0) {
-		//	Seems 0.86 or 0.90, find which
-		if (goals[0].indexOf(";") > 0) {
-			board.version = "0.90";
-			board.character = goals[0].substring(0, goals[0].indexOf(";"));
-			goals[0] = goals[0].substring(goals[0].indexOf(";") + 1);
-		} else if (goals[0].indexOf("_") > 0) {
-			board.version = "0.86";
-			board.character = goals[0].substring(0, goals[0].indexOf("_"));
-			goals[0] = goals[0].substring(goals[0].indexOf("_") + 1);
-		}
-		board.character = BingoEnum_CharToDisplayText[board.character] || "Any";
-	} else {
-		board.version = "0.85";
-	}
-
-	for (var i = 0; i < goals.length; i++) {
-		var type, desc;
-		if (goals[i].search("~") > 0 && goals[i].search("><") > 0) {
-			[type, desc] = goals[i].split("~");
-			desc = desc.split(/></);
-			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
-			if (CHALLENGES[type] !== undefined) {
-				try {
-					board.goals.push(CHALLENGES[type](desc, board.character));
-				} catch (er) {
-					board.goals.push(CHALLENGES["BingoChallenge"]( [
-						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
-				}
-			} else {
-				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
-			}
-		} else {
-			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
-		}
-	}
-	if (goals.length == 0)
-		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
-
-	if (selected !== undefined) {
+		if (selected !== undefined) {
 		//	See if we can re-select the same square (position) in the new board
 		if (selected.row < board.height && selected.col < board.width) {
 			selectSquare(selected.col, selected.row);
@@ -229,12 +175,6 @@ function parseText(e) {
 	}
 	if (selected === undefined)
 		selectSquare(-1, -1);
-
-	//	Adjust graphical dimensions based on canvas and board sizes
-	var canv = document.getElementById("board");
-	square.margin = Math.max(Math.round((canv.width + canv.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
-	square.width = Math.round((canv.width / board.width) - square.margin - square.border);
-	square.height = Math.round((canv.height / board.height) - square.margin - square.border);
 
 	//	Fill meta table with board info
 	setHeaderFromBoard(board);
