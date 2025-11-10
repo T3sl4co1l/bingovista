@@ -302,32 +302,32 @@ function setError(s) {
 
 /**
  *	Redraws a board on a canvas.
- *	@param {string} [canvas="board"] The `id` of the canvas to draw on.
- *	@param {*} [p_board=board] board structure (see global `board`).
+ *	@param {string} [canvas] The `id` of the canvas to draw on.
+ *	@param {*} [board] board structure (see global `board`).
  */
-function redrawBoard(canvasId = "board", p_board = board) {
+function redrawBoard(canvasId, board) {
 	const canvas = document.getElementById(canvasId);
-	canvas.dataset.width = p_board.width;
-	canvas.dataset.height = p_board.height;
+	canvas.dataset.width = board.width;
+	canvas.dataset.height = board.height;
 
 	var goalSquare = {}; Object.assign(goalSquare, square)
-	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((p_board.width + p_board.height) * 91)) * 2, 2);
-	goalSquare.width = Math.round((canvas.width / p_board.width) - goalSquare.margin - goalSquare.border);
-	goalSquare.height = Math.round((canvas.height / p_board.height) - goalSquare.margin - goalSquare.border);
+	goalSquare.margin = Math.max(Math.round((canvas.width + canvas.height) * 2 / ((board.width + board.height) * 91)) * 2, 2);
+	goalSquare.width = Math.round((canvas.width / board.width) - goalSquare.margin - goalSquare.border);
+	goalSquare.height = Math.round((canvas.height / board.height) - goalSquare.margin - goalSquare.border);
 
 	var ctx = canvas.getContext("2d");
 	ctx.fillStyle = goalSquare.background;
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-	for (var i = 0; i < p_board.goals.length; i++) {
+	for (var i = 0; i < board.goals.length; i++) {
 		var x, y, t;
-		x = Math.floor(i / p_board.height) * (goalSquare.width + goalSquare.margin + goalSquare.border)
+		x = Math.floor(i / board.height) * (goalSquare.width + goalSquare.margin + goalSquare.border)
 				+ (goalSquare.border + goalSquare.margin) / 2;
-		y = (i % p_board.height) * (goalSquare.height + goalSquare.margin + goalSquare.border)
+		y = (i % board.height) * (goalSquare.height + goalSquare.margin + goalSquare.border)
 				+ (goalSquare.border + goalSquare.margin) / 2;
 		if (transpose) {
 			t = y; y = x; x = t;
 		}
-		drawSquare(ctx, p_board.goals[i], x, y, goalSquare);
+		drawSquare(ctx, board.goals[i], x, y, goalSquare);
 	}
 }
 
@@ -335,7 +335,7 @@ function redrawBoard(canvasId = "board", p_board = board) {
  *	Select the square at (col, row) on canvas canvasId to show details of.
  *	If either argument is out of range, clears the selection instead.
  */
-function selectSquare(col, row, canvasId = "board") {
+function selectSquare(col, row, canvasId) {
 	var el = document.getElementById("desctxt");
 	var ctx = document.getElementById("square").getContext("2d");
 	if (row < 0 || col < 0 || row >= board.height || col >= board.width) {

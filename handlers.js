@@ -102,7 +102,7 @@ function navSquares(e) {
 function toggleKibs(e) {
 	kibitzing = e.target.checked;
 	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
+		selectSquare(selected.col, selected.row, "board");
 }
 
 /**
@@ -110,9 +110,9 @@ function toggleKibs(e) {
  */
 function toggleTransp(e) {
 	transpose = e.target.checked;
-	redrawBoard();
+	redrawBoard("board", board);
 	if (selected !== undefined)
-		selectSquare(selected.col, selected.row);
+		selectSquare(selected.col, selected.row, "board");
 }
 
 /**
@@ -170,18 +170,18 @@ function parseButton(e) {
 	//	And refresh bin, now that we've changed it
 	board.toBin = boardToBin(board);
 
-	redrawBoard();
+	redrawBoard("board", board);
 
 	if (selected !== undefined) {
 		//	See if we can re-select the same square (position) in the new board
 		if (selected.row < board.height && selected.col < board.width) {
-			selectSquare(selected.col, selected.row);
+			selectSquare(selected.col, selected.row, "board");
 		} else {
 			selected = undefined;
 		}
 	}
 	if (selected === undefined)
-		selectSquare(-1, -1);
+		selectSquare(-1, -1, "board");
 
 	var u = new URL(document.URL);
 	u.searchParams.set("b", binToBase64u(board.toBin));
