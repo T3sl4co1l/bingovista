@@ -317,7 +317,7 @@ document.addEventListener("DOMContentLoaded", function() {
 function setHeaderFromBoard(b) {
 	var el = document.getElementById("hdrttl");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(b.comments));
+	el.appendChild(document.createTextNode(b.comments || "Untitled"));
 	el = document.getElementById("hdrsize");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
 	el.appendChild(document.createTextNode(String(b.width) + " x " + String(b.height)));
@@ -413,25 +413,31 @@ function parseButton(e) {
 	board = parseText(s);
 	document.getElementById("textbox").value = s;
 
-	//	Parse meta from the document
-	if (document.getElementById("hdrttl") !== null)
-		board.comments = document.getElementById("hdrttl").innerText || "Untitled";
-	if (document.getElementById("hdrchar") !== null)
-		board.character = document.getElementById("hdrchar").innerText;
-	if (document.getElementById("hdrshel") !== null) {
-		board.shelter = document.getElementById("hdrshel").innerText;
-		if (board.shelter === "random") board.shelter = "";
+	//	Parse meta from the document, if not already set
+	if (board.comments === "")
+		board.comments = document.getElementById("hdrttl")?.innerText || "Untitled";
+	if (board.character === "")
+		board.character = document.getElementById("hdrchar")?.innerText || "Any";
+	if (board.shelter === "")
+		board.shelter = document.getElementById("hdrshel")?.innerText || "";
+	if (board.shelter === "random") board.shelter = "";
+	if (board.perks === undefined) {
+		board.perks = 0;
+		for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
+			el = document.getElementById("perkscheck" + String(i));
+			if (el !== null) {
+				if (el.checked)
+					board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
+				else
+					board.perks &= ~Object.values(BingoEnum_EXPFLAGS)[i];
+			} else
+				break;
+		}
 	}
-	for (var i = 0, el; i < Object.values(BingoEnum_EXPFLAGS).length; i++) {
-		el = document.getElementById("perkscheck" + String(i));
-		if (el !== null) {
-			if (el.checked)
-				board.perks |= Object.values(BingoEnum_EXPFLAGS)[i];
-			else
-				board.perks &= ~Object.values(BingoEnum_EXPFLAGS)[i];
-		} else
-			break;
-	}
+	//	Refresh meta table (parameters that weren't overwritten here)
+	setHeaderFromBoard(board);
+	//	And refresh bin, now that we've changed it
+	board.toBin = boardToBin(board);
 
 	//	Adjust graphical dimensions based on canvas and board sizes
 	var canv = document.getElementById("board");
@@ -451,9 +457,6 @@ function parseButton(e) {
 		selectSquare(-1, -1);
 
 	redrawBoard();
-
-	//	Fill meta table with board info
-	setHeaderFromBoard(board);
 
 	var u = new URL(document.URL);
 	u.searchParams.set("b", binToBase64u(board.toBin));
@@ -765,15 +768,17 @@ function drawIcon(ctx, icon, x, y, colr, scale, rot) {
 /**
  *	Parse a board in text format.
  *	Returns an abstract board object.
+ *	Optional metadata, that aren't set in the board string, are left
+ *	as "".  These are comments, character and shelter.
  */
 function parseText(s) {
 	var goals = s.split(/bChG/);
 	goals.forEach((s, i) => goals[i] = s.trim());
 	var size = Math.ceil(Math.sqrt(goals.length));
 	var board = {
-		comments: "Untitled",
-		character: "Any",
-		perks: 0,
+		comments: "",
+		character: "",
+		perks: undefined,
 		shelter: "",
 		mods: [],
 		size: size,
@@ -812,7 +817,7 @@ function parseText(s) {
 			board.character = goals[0].substring(0, underscore);
 			goals[0] = goals[0].substring(underscore + 1);
 		}
-		board.character = BingoEnum_CharToDisplayText[board.character] || "Any";
+		board.character = BingoEnum_CharToDisplayText[board.character] || "";
 	} else {
 		board.version = "0.85";
 	}
@@ -825,20 +830,20 @@ function parseText(s) {
 			if (type === "BingoMoonCloak") type = "BingoMoonCloakChallenge";	//	1.08 hack
 			if (CHALLENGES[type] !== undefined) {
 				try {
-					board.goals.push(CHALLENGES[type](desc));
+					board.goals.push(CHALLENGES[type](desc, board));
 				} catch (er) {
 					board.goals.push(CHALLENGES["BingoChallenge"]( [
-						"Error: " + er.message + "; descriptor: " + desc.join("><") ] ));
+						"Error: " + er.message + "; descriptor: " + desc.join("><") ], board));
 				}
 			} else {
-				board.goals.push(CHALLENGES["BingoChallenge"](["Error: unknown type: [" + type + "," + desc.join(",") + "]"]));
+				board.goals.push(CHALLENGES["BingoChallenge"]( ["Error: unknown type: [" + type + "," + desc.join(",") + "]"], board));
 			}
 		} else {
-			board.goals.push(CHALLENGES["BingoChallenge"](["Error extracting goal: " + goals[i]]));
+			board.goals.push(CHALLENGES["BingoChallenge"]( ["Error extracting goal: " + goals[i]], board));
 		}
 	}
 	if (goals.length == 0)
-		board.goals.push(CHALLENGES["BingoChallenge"]("blank"));
+		board.goals.push(CHALLENGES["BingoChallenge"]( ["blank"], board));
 
 	//	collect or re-set the binary format and we're done
 	board.toBin = boardToBin(board);
@@ -920,8 +925,8 @@ function binToString(a) {
 		throw new TypeError("binToString: unknown magic number: 0x" + readLong(a, 0).toString(16) + ", expected: 0x69427752");
 	//	(6, 7) uint8_t boardWidth; uint8_t boardHeight;
 	var b = {
-		comments: "Untitled",
-		character: "Any",
+		comments: "",
+		character: "",
 		perks: 0,
 		shelter: "",
 		mods: [],
@@ -1029,6 +1034,8 @@ function binGoalToText(c) {
 				//	little-endian, variable byte length, unsigned integer
 				outputs[0] += c[GOAL_LENGTH + p[j].offset + k] * (1 << (8 * k));
 			}
+			if (p[j].signed && p[j].formatter == "" && outputs[0] >= (1 << (k * 8 - 1)))
+				outputs[0] = outputs[0] - (1 << (k * 8));
 
 		} else if (p[j].type === "bool") {
 			//	Boolean: reads one bit at the specified offset and position
@@ -1060,7 +1067,8 @@ function binGoalToText(c) {
 			outputs = c.subarray(GOAL_LENGTH + c[p[j].offset + GOAL_LENGTH], maxIdx);
 		}
 
-		if (p[j].formatter === "") {
+		var f = p[j].formatter;
+		if (f === "") {
 			if (stringtype) {
 				//	Unformatted string, decode bytes into utf-8
 				replacer = d.decode(outputs);
@@ -1070,15 +1078,14 @@ function binGoalToText(c) {
 			}
 		} else {
 			//	Formatted number/array, convert it and join
-			if (ALL_ENUMS[p[j].formatter] === undefined)
-				throw new TypeError("binGoalToText: formatter \"" + p[j].formatter + "\" not found");
+			if (ALL_ENUMS[f] === undefined)
+				throw new TypeError("binGoalToText: formatter \"" + f + "\" not found");
 			tmp = [];
 			for (k = 0; k < outputs.length; k++) {
-				var f = p[j].formatter;
 				if (p[j].altthreshold === undefined || outputs[k] < p[j].altthreshold) {
-					if (ALL_ENUMS[p[j].formatter][outputs[k] - 1] === undefined)
-						throw new TypeError("binGoalToText: formatter \"" + p[j].formatter + "\", value out of range: " + String(outputs[k]));
-					tmp.push(ALL_ENUMS[p[j].formatter][outputs[k] - 1]);
+					if (ALL_ENUMS[f][outputs[k] - 1] === undefined)
+						throw new TypeError("binGoalToText: formatter \"" + f + "\", value out of range: " + String(outputs[k]));
+					tmp.push(ALL_ENUMS[f][outputs[k] - 1]);
 				} else {
 					if (ALL_ENUMS[p[j].altformatter][outputs[k] - p[j].altthreshold] === undefined)
 						throw new TypeError("binGoalToText: alternative formatter \"" + p[j].altformatter + "\", value out of range: " + String(outputs[k]));
@@ -1101,8 +1108,10 @@ function binGoalToText(c) {
  *	From Bingomod decomp/source, with some customization (particularly across
  *	versions).
  *
- *	Assumption: global `board` variable's header properties have been set, and can
- *	be read at this point.
+ *	Called with parameters:
+ *	desc    list of goal parameters to parse (goal_text.split("><"))
+ *	board   (to be) global board object, under construction; header/meta properties
+ *	can be read from here.
  *
  *	Adding new challenges:
  *	Append at the bottom. Yeah, they're not going to be alphabetical order anymore.
@@ -1119,7 +1128,7 @@ function binGoalToText(c) {
  *	BingoEnum_CHALLENGES.
  */
 const CHALLENGES = {
-	BingoChallenge: function(desc) {
+	BingoChallenge: function(desc, board) {
 		const thisname = "BingoChallenge";
 		//	Keep as template and default; behavior is as a zero-terminated string container
 		desc[0] = desc[0].substring(0, 255);
@@ -1134,7 +1143,7 @@ const CHALLENGES = {
 			category: "Empty challenge class",
 			items: [],	/**< items and values arrays must have equal length */
 			values: [],
-			description: desc[0],	/**< HTML allowed (for other than base name === "BingoChallenge" objects) */
+			description: desc[0],	/**< HTML allowed for other goals (not this one) */
 			comments: "",	/**< HTML allowed */
 			paint: [
 				{ type: "text", value: "∅", color: RainWorldColors.Unity_white }
@@ -1142,18 +1151,19 @@ const CHALLENGES = {
 			toBin: b.subarray(0, enc.length + GOAL_LENGTH)
 		};
 	},
-	BingoAchievementChallenge: function(desc) {
+	BingoAchievementChallenge: function(desc, board) {
 		const thisname = "BingoAchievementChallenge";
 		//	assert: desc of format ["System.String|Traveller|Passage|0|passage", "0", "0"]
 		const upgrades = {};
 		desc = upgradeDescriptor(desc, upgrades);
 		const template = [
 			{ param: "passage",  type: "string", formatter: "passage", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Passage", position: "0", formatter: "passage", altformatter: "", altthreshold: 0, defaultval: "Traveller" } },
-			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
-			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 }
 		];
 		var params = challengeTextToAbstract(desc, template);
 		params._name = thisname;
+		params._board = board;
 		function AchievementChallengePaint(p) {
 			return [
 				{ type: "icon", value: "smallEmptyCircle", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -1186,7 +1196,7 @@ const CHALLENGES = {
 			toBin: AchievementChallengeToBinary(params)
 		};
 	},
-	BingoAllRegionsExcept: function(desc) {
+	BingoAllRegionsExcept: function(desc, board) {
 		const thisname = "BingoAllRegionsExcept";
 		//	desc of format ["System.String|UW|Region|0|regionsreal", "SU|HI|DS|CC|GW|SH|VS|LM|SI|LF|UW|SS|SB|LC", "0", "System.Int32|13|Amount|1|NULL", "0", "0"]
 		const upgrades = {
@@ -1195,29 +1205,14 @@ const CHALLENGES = {
 		const template = [
 			{ param: "region",  type: "string", formatter: "regions", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Region", position: "0", formatter: "regionsreal", defaultval: "SU" } },
 			{ param: "remaining", type: "array", formatter: "regionsreal", parse: "list", separator: "|", defaultval: [] },
-			{ param: "current", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
-			{ param: "amount",  type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "1", formatter: "NULL", maxval: INT_MAX, defaultval: 1 } },
-			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
-			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+			{ param: "current", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 },
+			{ param: "amount",  type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "1", formatter: "NULL", minval: 0, maxval: INT_MAX, defaultval: 1 } },
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 }
 		];
 		var params = challengeTextToAbstract(desc, template);
 		params._name = thisname;
-		//checkDescLen(thisname, desc.length, 6);
-		//var items = checkSettingBox(thisname, desc[0], ["System.String", , "Region", , "regionsreal"], "region selection");
-		//if (BingoEnum_AllRegionCodes.indexOf(items[1]) < 0)
-		//	throw new TypeError(thisname + ": \"" + items[1] + "\" not found in regions");
-		//var current = parseInt(desc[2]);
-		//if (isNaN(current) || current < 0 || current > INT_MAX)
-		//	throw new TypeError(thisname + ": current \"" + desc[2] + "\" not a number or out of range");
-		//var required = parseInt(desc[3]);
-		//if (isNaN(required)) {
-		//	//	0.85: desc[3] is just a number; 0.90: uses SettingBox, try parsing it that way
-		//	var amounts = checkSettingBox(thisname, desc[3], ["System.Int32", , "Amount", , "NULL"], "amount");
-		//	required = parseInt(amounts[1]); desc[3] = amounts[1];
-		//}
-		//required = Math.min(required, current + CHAR_MAX);
-		//if (isNaN(required) || required < 1 || required > INT_MAX)
-		//	throw new TypeError(thisname + ": required \"" + desc[3] + "\" not a number or SettingBox, or out of range");
+		params._board = board;
 		function AllRegionsExceptToPaint(p) {
 			return [
 				{ type: "icon", value: "TravellerA", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -1228,7 +1223,7 @@ const CHALLENGES = {
 			];
 		}
 		function AllRegionsExceptToDescription(p) {
-			return "Enter " + (((p.amount - p.current) > 1) ? String(p.amount - p.current) + " more regions" : (((p.amount - p.current) > 0) ? "one more region" : "no more regions") ) + " without entering " + regionToDisplayText(board.character, p.region, "Any Subregion") + ".";
+			return "Enter " + (((p.amount - p.current) > 1) ? String(p.amount - p.current) + " more regions" : (((p.amount - p.current) > 0) ? "one more region" : "no more regions") ) + " without entering " + regionToDisplayText(p._board.character, p.region, "Any Subregion") + ".";
 		}
 		function AllRegionsExceptToComment(p) {
 			return "This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is Progress equaling Total; thus we can set a lower bar and play a \"The Wanderer\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)";
@@ -1259,95 +1254,110 @@ const CHALLENGES = {
 			toBin: AllRegionsExceptToBinary(params)
 		};
 	},
-	BingoBombTollChallenge: function(desc) {
+	BingoBombTollChallenge: function(desc, board) {
 		const thisname = "BingoBombTollChallenge";
 		//	desc of format (< v1.2) ["System.String|gw_c05|Scavenger Toll|1|tolls", "System.Boolean|false|Pass the Toll|0|NULL", "0", "0"]
 		//	or (>= 1.2) ["System.Boolean|true|Specific toll|0|NULL", "System.String|gw_c05|Scavenger Toll|3|tolls", "System.Boolean|false|Pass the Toll|2|NULL", "0", "System.Int32|3|Amount|1|NULL", "empty", "0", "0"]
-		if (desc.length == 4) {
-			desc.splice(2, 0, "0", "System.Int32|3|Amount|1|NULL", "empty");
-			desc.unshift("System.Boolean|true|Specific toll|0|NULL");
-		}
-		checkDescLen(thisname, desc.length, 8);
-		var v = [], i = [];
-		var items = checkSettingBox(thisname, desc[0], ["System.Boolean", , "Specific toll", , "NULL"], "specific flag"); v.push(items[1]); i.push(items[2]);
-		items = checkSettingBox(thisname, desc[1], ["System.String", , "Scavenger Toll", , "tolls"], "toll selection"); v.push(items[1]); i.push(items[2]);
-		items = checkSettingBox(thisname, desc[2], ["System.Boolean", , "Pass the Toll", , "NULL"], "pass toll flag"); v.push(items[1]); i.push(items[2]);
-		items = checkSettingBox(thisname, desc[4], ["System.Int32", , "Amount", , "NULL"], "amount"); v.push(items[1]); i.push(items[2]);
-		v.push(desc[5]); i.push("bombed");
-		if (v[0] !== "true" && v[0] !== "false")
-			throw new TypeError(thisname + ": specific flag \"" + v[0] + "\" not 'true' or 'false'");
-		if (!BingoEnum_BombableOutposts.includes(v[1]))
-			throw new TypeError(thisname + ": \"" + v[1] + "\" not found in tolls");
-		if (v[2] !== "true" && v[2] !== "false")
-			throw new TypeError(thisname + ": pass flag \"" + v[2] + "\" not 'true' or 'false'");
-		var amt = parseInt(v[3]);
-		if (isNaN(amt) || amt < 1 || amt > CHAR_MAX)
-			throw new TypeError(thisname + ": amount \"" + v[3] + "\" not a number or out of range");
-		var bombed = v[4].split("%");
-		for (var k = 0; k < bombed.length; k++) {
-			if (!BingoEnum_BombedDict.includes(bombed[k]))
-				throw new TypeError(thisname + ": dict entry \"" + bombed[k] + "\" not found in tolls_bombed");
-		}
-		var d;
-		if (v[0] === "true") {
-			var regi = regionOfRoom(v[1]).toUpperCase();
-			if (BingoEnum_AllRegionCodes.indexOf(regi) < 0)
-				throw new TypeError(thisname + ": region \"" + regi + "\" not found in AllRegionCodes[]");
-			var r = regionToDisplayText(board.character, regi, "Any Subregion");
-			if (v[1] === "gw_c11")
-				r += " underground";
-			if (v[1] === "gw_c05")
-				r += " surface";
-			d = "Throw a grenade at the " + r + " Scavenger toll" + ((v[2] === "true") ? ", then pass it." : ".");
-		} else {
-			if (amt <= 1)
-				d = "Throw a grenade at a Scavenger toll";
-			else
-				d = "Throw grenades at " + String(amt) + " Scavenger tolls";
-			d += ((v[2] === "true") ? ", then pass them." : ".");
-		}
-		var p = [
-			{ type: "icon", value: "Symbol_StunBomb", scale: 1, color: entityIconColor("ScavengerBomb"), rotation: 0 },
-			{ type: "icon", value: "scavtoll", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
-			{ type: "break" },
-			{ type: "text", value: (v[0] === "false") ? ("[0/" + String(amt) + "]") : v[1].toUpperCase(), color: RainWorldColors.Unity_white }
+		const upgrades = {
+			4: [	//	< v1.2
+				{ op: "splice", offs: 2, rem: 0, data: ["0", "System.Int32|3|Amount|1|NULL", "empty"] },
+				{ op: "unshift", data: "System.Boolean|true|Specific toll|0|NULL" }
+			]
+		};
+		desc = upgradeDescriptor(desc, upgrades);
+		const template = [
+			{ param: "specific",  type: "bool",   formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Boolean", name: "Specific toll", position: "0", formatter: "NULL", defaultval: false } },
+			{ param: "roomName",  type: "string", formatter: "tolls", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Scavenger Toll", position: "3", formatter: "tolls", altformatter: "", altthreshold: 0, defaultval: "su_c02" } },
+			{ param: "pass",      type: "bool",   formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Boolean", name: "Pass the Toll", position: "2", formatter: "NULL", defaultval: false } },
+			{ param: "current",   type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: CHAR_MAX, defaultval: 0 },
+			{ param: "amount",    type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "1", formatter: "NULL", minval: 0, maxval: CHAR_MAX, defaultval: 1 } },
+			{ param: "bombed",    type: "list",   formatter: "tolls_bombed", parse: "list", separator: "%", minval: 1, defaultval: "empty" },
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 }
 		];
-		if (v[2] === "true")
-			p.splice(2, 0, { type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
-		var b = Array(4); b.fill(0);
-		if (v[0] === "true") {
-			//	can use old version
-			b[0] = challengeValue("BingoBombTollChallenge");
-			applyBool(b, 1, 4, v[2]);
-			b[3] = enumToValue(v[1], "tolls");
-			b[2] = b.length - GOAL_LENGTH;
-		} else {
-			//	new format
-			b = Array(5); b.fill(0);
-			b[0] = challengeValue("BingoBombTollExChallenge");
-			applyBool(b, 1, 4, v[2]);
-			applyBool(b, 1, 5, v[0]);
-			b[3] = enumToValue(v[1], "tolls");
-			b[4] = amt;
-			for (var k = 0; k < bombed.length; k++) {
-				b.push(BingoEnum_BombedDict.indexOf(bombed[k]));
-			}
-			b[2] = b.length - GOAL_LENGTH;
+		var params = challengeTextToAbstract(desc, template);
+		params._name = thisname;
+		params._board = board;
+		function BombTollChallengeToPaint(p) {
+			var r = [
+				{ type: "icon", value: "Symbol_StunBomb", scale: 1, color: entityIconColor("ScavengerBomb"), rotation: 0 },
+				{ type: "icon", value: "scavtoll", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: p.specific ? p.roomName.toUpperCase() : ("[" + String(p.current) + "/" + String(p.amount) + "]"), color: RainWorldColors.Unity_white }
+			];
+			if (p.pass)
+				r.splice(2, 0, { type: "icon", value: "singlearrow", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 } );
+			return r;
 		}
+		function BombTollChallengeToComments(p) {
+			return "A hit is registered within a 500-unit radius of the toll. Bomb and pass can be done in either order within a cycle; or even bombed in a previous cycle, then passed later.<br>" +
+				"When the <span class=\"code\">specific</span> flag is set, <span class=\"code\">amount</span> and <span class=\"code\">current</span> are unused; when cleared, <span class=\"code\">Scavenger Toll</span> is unused.<br>" +
+				"The <span class=\"code\">bombed</span> list records the state of the multi-toll version. It's a dictionary of the form: <span class=\"code\">{room name}|{false/true}[%...]</span>, where the braces are replaced with the respective values, and <span class=\"code\">|</span> and <span class=\"code\">%</span> are literal, and (\"...\") indicates subsequent key-value pairs; or <span class=\"code\">empty</span> when empty. (Room names are case-sensitive, matching the game-internal naming.)  A room is added to the list when bombed, with a Boolean value of <span class=\"code\">false</span> before passing, or <span class=\"code\">true</span> after. By preloading this list, a customized \"all but these tolls\" challenge could be crafted (but, do note the list does not show in-game!)." + getMapLink(p.roomName.toUpperCase(), p._board.character);
+		}
+		function BombTollChallengeToDescription(p) {
+			var d;
+			if (p.specific) {
+				var regi = regionOfRoom(p.roomName).toUpperCase();
+				if (BingoEnum_AllRegionCodes.indexOf(regi) < 0)
+					throw new TypeError(thisname + ": region \"" + regi + "\" not found in AllRegionCodes[]");
+				var r = regionToDisplayText(p._board.character, regi, "Any Subregion");
+				if (p.roomName === "gw_c11")
+					r += " underground";
+				if (p.roomName === "gw_c05")
+					r += " surface";
+				d = "Throw a grenade at the " + r + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
+			} else {
+				if (p.amount <= 1)
+					d = "Throw a grenade at a Scavenger toll";
+				else
+					d = "Throw grenades at " + String(p.amount) + " Scavenger tolls";
+				d += (p.pass ? ", then pass them." : ".");
+			}
+			return d;
+		}
+		function BombTollChallengeToBinary(p) {
+			var b = Array(4); b.fill(0);
+			if (p.specific === "true") {
+				//	can use old version
+				b[0] = challengeValue("BingoBombTollChallenge");
+				applyBool(b, 1, 4, String(p.pass));
+				b[3] = enumToValue(p.roomName, "tolls");
+				b[2] = b.length - GOAL_LENGTH;
+			} else {
+				//	new format
+				b = Array(5); b.fill(0);
+				b[0] = challengeValue("BingoBombTollExChallenge");
+				applyBool(b, 1, 4, String(p.pass));
+				applyBool(b, 1, 5, String(p.specific));
+				b[3] = enumToValue(p.roomName, "tolls");
+				b[4] = p.amount;
+				for (var k = 0; k < p.bombed.length; k++) {
+					b.push(BingoEnum_BombedDict.indexOf(p.bombed[k]));
+				}
+				b[2] = b.length - GOAL_LENGTH;
+			}
+			return new Uint8Array(b);
+		}
+		var v = [], i = [];
+		v.push(String(params.specific)); i.push("specific");
+		v.push(String(params.roomName)); i.push("roomName");
+		v.push(String(params.pass));     i.push("pass");
+		v.push(String(params.current));  i.push("current");
+		v.push(String(params.amount));   i.push("amount");
+		v.push(String(params.bombed.join(params._templates.bombed.separator))); i.push("bombed");
 		return {
 			name: thisname,
+			params: params,
 			category: "Throwing grenades at Scavenger tolls",
 			items: i,
 			values: v,
-			description: d,
-			comments: "A hit is registered within a 500-unit radius of the toll. Bomb and pass can be done in either order within a cycle; or even bombed in a previous cycle, then passed later.<br>" +
-			"When the <span class=\"code\">specific</span> flag is set, <span class=\"code\">amount</span> and <span class=\"code\">current</span> are unused; when cleared, <span class=\"code\">Scavenger Toll</span> is unused.<br>" +
-			"The <span class=\"code\">bombed</span> list records the state of the multi-toll version. It's a dictionary of the form: <span class=\"code\">{room name}|{false/true}[%...]</span>, where the braces are replaced with the respective values, and <span class=\"code\">|</span> and <span class=\"code\">%</span> are literal, and (\"...\") indicates subsequent key-value pairs; or <span class=\"code\">empty</span> when empty. (Room names are case-sensitive, matching the game-internal naming.)  A room is added to the list when bombed, with a Boolean value of <span class=\"code\">false</span> before passing, or <span class=\"code\">true</span> after. By preloading this list, a customized \"all but these tolls\" challenge could be crafted (but, do note the list does not show in-game!)." + getMapLink(v[1].toUpperCase()),
-			paint: p,
-			toBin: new Uint8Array(b)
+			description: BombTollChallengeToDescription(params),
+			comments: BombTollChallengeToComments(params),
+			paint: BombTollChallengeToPaint(params),
+			toBin: BombTollChallengeToBinary(params)
 		};
 	},
-	BingoCollectPearlChallenge: function(desc) {
+	BingoCollectPearlChallenge: function(desc, board) {
 		const thisname = "BingoCollectPearlChallenge";
 		//	desc of format ["System.Boolean|true|Specific Pearl|0|NULL", "System.String|LF_bottom|Pearl|1|pearls", "0", "System.Int32|1|Amount|3|NULL", "0", "0", ""]
 		checkDescLen(thisname, desc.length, 7);
@@ -1421,7 +1431,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCraftChallenge: function(desc) {
+	BingoCraftChallenge: function(desc, board) {
 		const thisname = "BingoCraftChallenge";
 		//	desc of format ["System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -1455,7 +1465,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCreatureGateChallenge: function(desc) {
+	BingoCreatureGateChallenge: function(desc, board) {
 		const thisname = "BingoCreatureGateChallenge";
 		//	desc of format ["System.String|CicadaA|Creature Type|1|transport", "0", "System.Int32|4|Amount|0|NULL", "empty", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -1491,7 +1501,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoCycleScoreChallenge: function(desc) {
+	BingoCycleScoreChallenge: function(desc, board) {
 		const thisname = "BingoCycleScoreChallenge";
 		//	desc of format ["System.Int32|126|Target Score|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1519,7 +1529,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDamageChallenge: function(desc) {
+	BingoDamageChallenge: function(desc, board) {
 		const thisname = "BingoDamageChallenge";
 		//	desc of format (< v1.091) ["System.String|JellyFish|Weapon|0|weapons", "System.String|WhiteLizard|Creature Type|1|creatures", "0", "System.Int32|6|Amount|2|NULL", "0", "0"]
 		//	or (>= v1.091) ["System.String|JellyFish|Weapon|0|weapons", "System.String|AquaCenti|Creature Type|1|creatures", "0", "System.Int32|5|Amount|2|NULL", "System.Boolean|false|In One Cycle|0|NULL", "System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions", "0", "0"]
@@ -1539,16 +1549,17 @@ const CHALLENGES = {
 		const template = [
 			{ param: "weapon",  type: "string", formatter: "weapons", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Weapon", position: "0", formatter: "weapons", altformatter: "", altthreshold: 0, defaultval: "Any Weapon" } },
 			{ param: "victim",  type: "string", formatter: "creatures", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Creature Type", position: "1", formatter: "creatures", altformatter: "", altthreshold: 0, defaultval: "Any Creature" } },
-			{ param: "current", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
-			{ param: "amount",  type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "2", formatter: "NULL", maxval: INT_MAX, defaultval: 1 } },
+			{ param: "current", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 },
+			{ param: "amount",  type: "number", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Int32", name: "Amount", position: "2", formatter: "NULL", minval: 0, maxval: INT_MAX, defaultval: 1 } },
 			{ param: "onecycle",  type: "bool", formatter: "", parse: "SettingBox", parseFmt: { datatype: "System.Boolean", name: "In One Cycle", position: "3", formatter: "NULL", defaultval: false } },
 			{ param: "region",  type: "string", formatter: "regions", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Region", position: "5", formatter: "regions", defaultval: "Any Region" } },
 			{ param: "subregion",  type: "string", formatter: "subregions", parse: "SettingBox", parseFmt: { datatype: "System.String", name: "Subregion", position: "4", formatter: "subregions", defaultval: "Any Subregion" } },
-			{ param: "completed", type: "number", formatter: "", parse: "parseInt", defaultval: 0 },
-			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", defaultval: 0 }
+			{ param: "completed", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 },
+			{ param: "revealed",  type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: INT_MAX, defaultval: 0 }
 		];
 		var params = challengeTextToAbstract(desc, template);
 		params._name = thisname;
+		params._board = board;
 		function DamageChallengePaint(p) {
 			var r = [];
 			if (p.weapon !== "Any Weapon") {
@@ -1574,7 +1585,7 @@ const CHALLENGES = {
 			return r;
 		}
 		function DamageChallengeDescription(p) {
-			var r = regionToDisplayText(board.character, p.region, p.subregion);
+			var r = regionToDisplayText(p._board.character, p.region, p.subregion);
 			if (r > "") r = ", in " + r;
 			var d = "Hit " + entityDisplayText(p.victim) + " with " + entityDisplayText(p.weapon);
 			d += " " + String(p.amount) + ((p.amount > 1) ? " times" : " time") + r;
@@ -1602,6 +1613,7 @@ const CHALLENGES = {
 		var v = [], i = [];
 		v.push(String(params.weapon));    i.push("weapon");
 		v.push(String(params.victim));    i.push("victim");
+		v.push(String(params.current));   i.push("current");
 		v.push(String(params.amount));    i.push("amount");
 		v.push(String(params.onecycle));  i.push("onecycle");
 		v.push(String(params.region));    i.push("region");
@@ -1619,14 +1631,14 @@ const CHALLENGES = {
 			toBin: DamageChallengeToBinary(params)
 		};
 	},
-	BingoDepthsChallenge: function(desc) {
+	BingoDepthsChallenge: function(desc, board) {
 		const thisname = "BingoDepthsChallenge";
 		//	desc of format ["System.String|VultureGrub|Creature Type|0|depths", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
 		var items = checkSettingBox(thisname, desc[0], ["System.String", , "Creature Type", , "depths"], "creature selection");
 		if (BingoEnum_Depthable[items[1]] === undefined && creatureNameToDisplayTextMap[items[1]] === undefined)
 			throw new TypeError(thisname + ": \"" + items[1] + "\" not found in creatures");
-		d = entityNameQuantify(1, items[1]);
+		d = entityNameQuantify(1, entityDisplayText(items[1]));
 		var b = Array(4); b.fill(0);
 		b[0] = challengeValue(thisname);
 		if (BingoEnum_Transportable.includes(items[1]))
@@ -1640,7 +1652,7 @@ const CHALLENGES = {
 			items: [items[2]],
 			values: [items[1]],
 			description: "Drop " + d + " into the Depths drop room (SB_D06).",
-			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06"),
+			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06", board.character),
 			paint: [
 				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "deathpiticon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -1650,7 +1662,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDodgeLeviathanChallenge: function(desc) {
+	BingoDodgeLeviathanChallenge: function(desc, board) {
 		const thisname = "BingoDodgeLeviathanChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -1670,7 +1682,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDontUseItemChallenge: function(desc) {
+	BingoDontUseItemChallenge: function(desc, board) {
 		const thisname = "BingoDontUseItemChallenge";
 		//	desc of format ["System.String|BubbleGrass|Item type|0|banitem", "0", "0", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -1698,7 +1710,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEatChallenge: function(desc) {
+	BingoEatChallenge: function(desc, board) {
 		const thisname = "BingoEatChallenge";
 		//	desc of format (< v1.2) ["System.Int32|6|Amount|1|NULL", "0", "0", "System.String|DangleFruit|Food type|0|food", "0", "0"]
 		//	or (>= v1.2) ["System.Int32|4|Amount|3|NULL", "0", "0", "System.String|SlimeMold|Food type|0|food", "System.Boolean|false|While Starving|2|NULL", "0", "0"]
@@ -1746,7 +1758,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEchoChallenge: function(desc) {
+	BingoEchoChallenge: function(desc, board) {
 		const thisname = "BingoEchoChallenge";
 		//	desc of format (< v1.2) ["System.String|SB|Region|0|echoes", "System.Boolean|false|While Starving|1|NULL", "0", "0"]
 		//	or (>= v1.2) ["System.Boolean|false|Specific Echo|0|NULL", "System.String|SB|Region|1|echoes", "System.Boolean|true|While Starving|3|NULL", "0", "System.Int32|2|Amount|2|NULL", "0", "0", ""]
@@ -1809,7 +1821,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEnterRegionChallenge: function(desc) {
+	BingoEnterRegionChallenge: function(desc, board) {
 		const thisname = "BingoEnterRegionChallenge";
 		//	desc of format ["System.String|CC|Region|0|regionsreal", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1835,7 +1847,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoGlobalScoreChallenge: function(desc) {
+	BingoGlobalScoreChallenge: function(desc, board) {
 		const thisname = "BingoGlobalScoreChallenge";
 		//	desc of format ["0", "System.Int32|271|Target Score|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -1862,7 +1874,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoGreenNeuronChallenge: function(desc) {
+	BingoGreenNeuronChallenge: function(desc, board) {
 		const thisname = "BingoGreenNeuronChallenge";
 		//	desc of format ["System.Boolean|true|Looks to the Moon|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -1892,7 +1904,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoHatchNoodleChallenge: function(desc) {
+	BingoHatchNoodleChallenge: function(desc, board) {
 		const thisname = "BingoHatchNoodleChallenge";
 		//	desc of format ["0", "System.Int32|3|Amount|1|NULL", "System.Boolean|true|At Once|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -1928,7 +1940,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoHellChallenge: function(desc) {
+	BingoHellChallenge: function(desc, board) {
 		const thisname = "BingoHellChallenge";
 		//	desc of format ["0", "System.Int32|2|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -1958,7 +1970,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoItemHoardChallenge: function(desc) {
+	BingoItemHoardChallenge: function(desc, board) {
 		const thisname = "BingoItemHoardChallenge";
 		//	desc of format (< v1.092) ["System.Int32|5|Amount|1|NULL", "System.String|PuffBall|Item|0|expobject", "0", "0"]
 		//	or (>= 1.092) ["System.Boolean|true|Any Shelter|2|NULL", "0", "System.Int32|4|Amount|0|NULL", "System.String|DangleFruit|Item|1|expobject", "0", "0", ""]
@@ -2037,7 +2049,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoKarmaFlowerChallenge: function(desc) {
+	BingoKarmaFlowerChallenge: function(desc, board) {
 		const thisname = "BingoKarmaFlowerChallenge";
 		//	assert: desc of format ["0", "System.Int32|5|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2065,7 +2077,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoKillChallenge: function(desc) {
+	BingoKillChallenge: function(desc, board) {
 		const thisname = "BingoKillChallenge";
 		//	assert: desc of format (< v1.2) ["System.String|Scavenger|Creature Type|0|creatures", "System.String|Any Weapon|Weapon Used|6|weaponsnojelly", "System.Int32|5|Amount|1|NULL", "0", "System.String|Any Region|Region|5|regions", "System.String|Any Subregion|Subregion|4|subregions", "System.Boolean|false|In one Cycle|3|NULL", "System.Boolean|false|Via a Death Pit|7|NULL", "System.Boolean|false|While Starving|2|NULL", "0", "0"]
 		//	or (>= v1.2) [System.String|TentaclePlant|Creature Type|0|creatures", "System.String|Any Weapon|Weapon Used|6|weaponsnojelly", "System.Int32|4|Amount|1|NULL", "0", "System.String|Any Region|Region|5|regions", "System.Boolean|false|In one Cycle|3|NULL", "System.Boolean|false|Via a Death Pit|7|NULL", "System.Boolean|false|While Starving|2|NULL", "System.Boolean|false|While under mushroom effect|8|NULL", "0", "0"]
@@ -2184,7 +2196,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoMaulTypesChallenge: function(desc) {
+	BingoMaulTypesChallenge: function(desc, board) {
 		const thisname = "BingoMaulTypesChallenge";
 		//	desc of format "0", "System.Int32|4|Amount|0|NULL", "0", "0", ""
 		checkDescLen(thisname, desc.length, 5);
@@ -2211,7 +2223,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoMaulXChallenge: function(desc) {
+	BingoMaulXChallenge: function(desc, board) {
 		const thisname = "BingoMaulXChallenge";
 		//	desc of format ["0", "System.Int32|13|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2238,7 +2250,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoNeuronDeliveryChallenge: function(desc) {
+	BingoNeuronDeliveryChallenge: function(desc, board) {
 		const thisname = "BingoNeuronDeliveryChallenge";
 		//	desc of format ["System.Int32|2|Amount of Neurons|0|NULL", "0", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2256,7 +2268,7 @@ const CHALLENGES = {
 			category: "Gifting neurons",
 			items: ["Amount"],
 			values: [String(amt)],
-			description: "Deliver " + entityNameQuantify(amt, "Neurons") + " to " + iteratorNameToDisplayTextMap[oracle] + ".",
+			description: "Deliver " + entityNameQuantify(amt, entityDisplayText("SSOracleSwarmer")) + " to " + iteratorNameToDisplayTextMap[oracle] + ".",
 			comments: "",
 			paint: [
 				{ type: "icon", value: "Symbol_Neuron", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -2268,7 +2280,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoNoNeedleTradingChallenge: function(desc) {
+	BingoNoNeedleTradingChallenge: function(desc, board) {
 		const thisname = "BingoNoNeedleTradingChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -2292,7 +2304,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoNoRegionChallenge: function(desc) {
+	BingoNoRegionChallenge: function(desc, board) {
 		const thisname = "BingoNoRegionChallenge";
 		//	desc of format ["System.String|SI|Region|0|regionsreal", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2317,7 +2329,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPearlDeliveryChallenge: function(desc) {
+	BingoPearlDeliveryChallenge: function(desc, board) {
 		const thisname = "BingoPearlDeliveryChallenge";
 		//	desc of format ["System.String|LF|Pearl from Region|0|regions", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2349,7 +2361,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPearlHoardChallenge: function(desc) {
+	BingoPearlHoardChallenge: function(desc, board) {
 		const thisname = "BingoPearlHoardChallenge";
 		//	desc of format (< v1.2) ["System.Boolean|false|Common Pearls|0|NULL", "System.Int32|2|Amount|1|NULL", "System.String|SL|In Region|2|regions", "0", "0"]
 		//	or (>= v1.2) ["System.Boolean|true|Common Pearls|0|NULL", "System.Boolean|false|Any Shelter|2|NULL", "0", "System.Int32|2|Amount|1|NULL", "System.String|LF|Region|3|regions", "0", "0", ""]
@@ -2418,7 +2430,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPinChallenge: function(desc) {
+	BingoPinChallenge: function(desc, board) {
 		const thisname = "BingoPinChallenge";
 		//	desc of format ["0", "System.Int32|5|Amount|0|NULL", "System.String|PinkLizard|Creature Type|1|creatures", "", "System.String|SU|Region|2|regions", "0", "0"]
 		checkDescLen(thisname, desc.length, 7);
@@ -2468,7 +2480,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoPopcornChallenge: function(desc) {
+	BingoPopcornChallenge: function(desc, board) {
 		const thisname = "BingoPopcornChallenge";
 		//	desc of format ["0", "System.Int32|6|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2496,7 +2508,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoRivCellChallenge: function(desc) {
+	BingoRivCellChallenge: function(desc, board) {
 		const thisname = "BingoRivCellChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -2517,7 +2529,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoSaintDeliveryChallenge: function(desc) {
+	BingoSaintDeliveryChallenge: function(desc, board) {
 		const thisname = "BingoSaintDeliveryChallenge";
 		//	desc of format ["0", "0"]
 		checkDescLen(thisname, desc.length, 2);
@@ -2540,7 +2552,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoSaintPopcornChallenge: function(desc) {
+	BingoSaintPopcornChallenge: function(desc, board) {
 		const thisname = "BingoSaintPopcornChallenge";
 		//	desc of format ["0", "System.Int32|7|Amount|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2568,7 +2580,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoStealChallenge: function(desc) {
+	BingoStealChallenge: function(desc, board) {
 		const thisname = "BingoStealChallenge";
 		//	assert: desc of format ["System.String|Rock|Item|1|theft",
 		//	"System.Boolean|false|From Scavenger Toll|0|NULL",
@@ -2617,7 +2629,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTameChallenge: function(desc) {
+	BingoTameChallenge: function(desc, board) {
 		const thisname = "BingoTameChallenge";
 		//	assert: desc of format ["System.String|EelLizard|Creature Type|0|friend", "0", "0"]
 		//	or ["System.Boolean|true|Specific Creature Type|0|NULL", "System.String|BlueLizard|Creature Type|0|friend", "0", "System.Int32|3|Amount|3|NULL", "0", "0", ""]
@@ -2666,13 +2678,13 @@ const CHALLENGES = {
 			category: "Befriending creatures",
 			items: i,
 			values: v,
-			description: (v[0] === "true") ? ("Befriend " + c + ".") : ("Befriend [0/" + amt + "] unique creatures."),
+			description: (v[0] === "true") ? ("Befriend " + c + ".") : ("Befriend [0/" + amt + "] unique creature types."),
 			comments: "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>Feeding occurs when: 1. the player drops an edible item, creature or corpse, 2. within view of the creature, and 3. the creature bites that object. A \"happy lizard\" sound indicates success. The creature does not need to den with the item to increase reputation. Stealing the object back from the creature's jaws does not reduce reputation.<br>A rescue occurs when: 1. a creature sees or is grabbed by a threat, 2. the player attacks the threat (if the creatures was grabbed, the predator must be stunned enough to drop the creature), and 3. the creature sees the attack (or gets dropped because of it).<br>For the multiple-tame option, creature <i>types</i> count toward progress (multiple tames of a given type/color/species do not increase the count). Note that any befriendable creature type counts towards the total, including both Lizards and Squidcadas.",
 			paint: p,
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTradeChallenge: function(desc) {
+	BingoTradeChallenge: function(desc, board) {
 		const thisname = "BingoTradeChallenge";
 		//	desc of format ["0", "System.Int32|15|Value|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2699,7 +2711,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTradeTradedChallenge: function(desc) {
+	BingoTradeTradedChallenge: function(desc, board) {
 		const thisname = "BingoTradeTradedChallenge";
 		//	desc of format ["0", "System.Int32|3|Amount of Items|0|NULL", "empty", "0", "0"]
 		checkDescLen(thisname, desc.length, 5);
@@ -2728,7 +2740,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoTransportChallenge: function(desc) {
+	BingoTransportChallenge: function(desc, board) {
 		const thisname = "BingoTransportChallenge";
 		//	desc of format ["System.String|Any Region|From Region|0|regions", "System.String|DS|To Region|1|regions", "System.String|CicadaA|Creature Type|2|transport", "", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -2776,7 +2788,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoUnlockChallenge: function(desc) {
+	BingoUnlockChallenge: function(desc, board) {
 		const thisname = "BingoUnlockChallenge";
 		//	desc of format ["System.String|SingularityBomb|Unlock|0|unlocks", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2834,7 +2846,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoVistaChallenge: function(desc) {
+	BingoVistaChallenge: function(desc, board) {
 		const thisname = "BingoVistaChallenge";
 		//	desc of format ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
 		checkDescLen(thisname, desc.length, 6);
@@ -2846,10 +2858,10 @@ const CHALLENGES = {
 			throw new TypeError(thisname + ": \"" + desc[0] + "\" not found in regions");
 		var v = regionToDisplayText(board.character, desc[0], "Any Subregion");
 		var roomX = parseInt(desc[2]);
-		if (isNaN(roomX) || roomX < 0 || roomX > INT_MAX)
+		if (isNaN(roomX) || roomX < -INT_MAX || roomX > INT_MAX)
 			throw new TypeError(thisname + ": amount \"" + desc[2] + "\" not a number or out of range");
 		var roomY = parseInt(desc[3]);
-		if (isNaN(roomY) || roomY < 0 || roomY > INT_MAX)
+		if (isNaN(roomY) || roomY < -INT_MAX || roomY > INT_MAX)
 			throw new TypeError(thisname + ": amount \"" + desc[3] + "\" not a number or out of range");
 		var idx = BingoEnum_VistaPoints.findIndex(o => o.room == items[1] && o.x == roomX && o.y == roomY);
 		if (idx < 0) {
@@ -2874,7 +2886,7 @@ const CHALLENGES = {
 			items: ["Region"],
 			values: [desc[0]],
 			description: "Reach the vista point in " + v + ".",
-			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1]) + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
+			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1], board.character) + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "break" },
@@ -2883,12 +2895,12 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoVistaExChallenge: function(desc) {
-		return CHALLENGES.BingoVistaChallenge(desc);
+	BingoVistaExChallenge: function(desc, board) {
+		return CHALLENGES.BingoVistaChallenge(desc, board);
 	},
 	//	Challenges are alphabetical up to here (initial version); new challenges/variants added chronologically below
 	//	added 0.86 (in 0.90 update cycle)
-	BingoEnterRegionFromChallenge: function(desc) {
+	BingoEnterRegionFromChallenge: function(desc, board) {
 		const thisname = "BingoEnterRegionFromChallenge";
 		//	desc of format ["System.String|GW|From|0|regionsreal", "System.String|SH|To|0|regionsreal", "0", "0"]
 		checkDescLen(thisname, desc.length, 4);
@@ -2918,7 +2930,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoMoonCloakChallenge: function(desc) {
+	BingoMoonCloakChallenge: function(desc, board) {
 		const thisname = "BingoMoonCloakChallenge";
 		//	desc of format ["System.Boolean|false|Deliver|0|NULL", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2945,7 +2957,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoBroadcastChallenge: function(desc) {
+	BingoBroadcastChallenge: function(desc, board) {
 		const thisname = "BingoBroadcastChallenge";
 		//	desc of format ["System.String|Chatlog_SI3|Broadcast|0|chatlogs", "0", "0"]
 		checkDescLen(thisname, desc.length, 3);
@@ -2979,17 +2991,17 @@ const CHALLENGES = {
 	 *	Stubs to maintain extended BINARY_TO_STRING_DEFINITIONS entries.
 	 *	See binGoalToText() and ChallengeUpgrades[]; these names are
 	 *	replaced with their originals to maintain compatibility.  */
-	BingoDamageExChallenge: function(desc) {
-		return CHALLENGES.BingoDamageChallenge(desc);
+	BingoDamageExChallenge: function(desc, board) {
+		return CHALLENGES.BingoDamageChallenge(desc, board);
 	},
-	BingoTameExChallenge: function(desc) {
-		return CHALLENGES.BingoTameChallenge(desc);
+	BingoTameExChallenge: function(desc, board) {
+		return CHALLENGES.BingoTameChallenge(desc, board);
 	},
 	/*	added 1.2 */
-	BingoBombTollExChallenge: function(desc) {
-		return CHALLENGES.BingoBombTollChallenge(desc);
+	BingoBombTollExChallenge: function(desc, board) {
+		return CHALLENGES.BingoBombTollChallenge(desc, board);
 	},
-	BingoDodgeNootChallenge: function(desc) {
+	BingoDodgeNootChallenge: function(desc, board) {
 		const thisname = "BingoDodgeNootChallenge";
 		//	desc of format ["System.Int32|6|Amount|0|NULL", "0", "0", "0"]
 		//	amount, current, completed, revealed
@@ -3018,7 +3030,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoDontKillChallenge: function(desc) {
+	BingoDontKillChallenge: function(desc, board) {
 		const thisname = "BingoDontKillChallenge";
 		//	desc of format ["System.String|DaddyLongLegs|Creature Type|0|creatures", "0", "0"]
 		//	victim, completed, revealed
@@ -3049,10 +3061,10 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoEchoExChallenge: function(desc) {
-		return CHALLENGES.BingoEchoChallenge(desc);
+	BingoEchoExChallenge: function(desc, board) {
+		return CHALLENGES.BingoEchoChallenge(desc, board);
 	},
-	BingoGourmandCrushChallenge: function(desc) {
+	BingoGourmandCrushChallenge: function(desc, board) {
 		const thisname = "BingoGourmandCrushChallenge";
 		//	desc of format ["0", "System.Int32|9|Amount|0|NULL", "0", "0", ""]
 		//	current, amount, completed, revealed, crushed
@@ -3081,10 +3093,10 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoItemHoardExChallenge: function(desc) {
-		return CHALLENGES.BingoItemHoardChallenge(desc);
+	BingoItemHoardExChallenge: function(desc, board) {
+		return CHALLENGES.BingoItemHoardChallenge(desc, board);
 	},
-	BingoIteratorChallenge: function(desc) {
+	BingoIteratorChallenge: function(desc, board) {
 		const thisname = "BingoIteratorChallenge";
 		//	desc of format ["System.Boolean|false|Looks to the Moon|0|NULL", "0", "0"]
 		//	oracle, completed, revealed
@@ -3110,7 +3122,7 @@ const CHALLENGES = {
 			toBin: new Uint8Array(b)
 		};
 	},
-	BingoLickChallenge: function(desc) {
+	BingoLickChallenge: function(desc, board) {
 		const thisname = "BingoLickChallenge";
 		//	desc of format ["0", "System.Int32|{0}|Amount|0|NULL", "0", "0", ""]
 		//	current, amount, completed, revealed, lickers
@@ -3129,7 +3141,7 @@ const CHALLENGES = {
 			category: "Getting licked by lizards",
 			items: ["Amount"],
 			values: [String(amt)],
-			description: "Get licked by " + ((amt > 1) ? (String(amt) + " unique lizards.") : ("a lizard.")),
+			description: "Get licked by " + ((amt > 1) ? (String(amt) + " different individual lizards.") : ("a lizard.")),
 			comments: "",
 			paint: [
 				{ type: "icon", value: "lizlick", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -3683,7 +3695,11 @@ const BingoEnum_BombableOutposts = [
 	"lc_stripmallnew",
 	"lf_j01",
 	"oe_tower04",
-	"sb_topside"
+	"sb_topside",
+	//	Watcher tolls
+	"warf_g01",
+	"wbla_f01",
+	"wskd_b41"
 ];
 
 /**
@@ -3725,7 +3741,14 @@ const BingoEnum_BombedDict = [
 	"LC_stripmallNEW|true",
 	"LF_J01|true",
 	"OE_TOWER04|true",
-	"SB_TOPSIDE|true"
+	"SB_TOPSIDE|true",
+	//	Watcher addons
+	"warf_g01|false",
+	"wbla_f01|false",
+	"wskd_b41|false",
+	"warf_g01|true",
+	"wbla_f01|true",
+	"wskd_b41|true"
 ];
 
 /**
@@ -3857,7 +3880,8 @@ const BingoEnum_ArenaUnlocksGreen = [
 	"Gourmand",
 	"Rivulet",
 	"Saint",
-	"Spearmaster"
+	"Spearmaster",
+	"Watcher"
 ];
 
 /**
@@ -3888,10 +3912,8 @@ const BingoEnum_ArenaUnlocksRed = [
 	"VS-safari"
 ];
 
-var BingoEnum_AllUnlocks = BingoEnum_ArenaUnlocksBlue.concat(
-			BingoEnum_ArenaUnlocksGold).concat(
-			BingoEnum_ArenaUnlocksRed).concat(
-			BingoEnum_ArenaUnlocksGreen);
+/** Populated on startup by expandAndValidateLists() */
+const BingoEnum_AllUnlocks = [];
 
 /**
  *	Assorted color constants that don't belong
@@ -4573,9 +4595,9 @@ const BingoEnum_CharToDisplayText = {
  *  or e.g.
  *		Object.keys(BINARY_TO_STRING_DEFINITIONS)[idx].name
  *		BINARY_TO_STRING_DEFINITIONS.findIndex(a => a.name === txt)
+ *	Populated by expandAndValidateLists().
  */
-const BingoEnum_CHALLENGES = [
-];
+const BingoEnum_CHALLENGES = [];
 
 const BingoEnum_EXPFLAGS = {
 	"LANTERN":   0x00000001,
@@ -4652,6 +4674,15 @@ const BingoEnum_EXPFLAGS_Groups = {
 	"HUNTED":    "bur-hunted",
 	"PURSUED":   "bur-pursued"
 };
+
+/** Currently unused, but for reference; from Watcher Expeditions Mod */
+const EXPFLAGS_WatcherExpedition = [
+	{ name: "WA_CAMO",   value: 0x00800000, title: "Perk: Camouflage",      group: "unl-watcher-camo"        },
+	{ name: "WA_RANG",   value: 0x01000000, title: "Perk: Permanent Warps", group: "unl-watcher-permwarp"    },
+	{ name: "WA_POISON", value: 0x02000000, title: "Perk: Poison Spear",    group: "unl-watcher-PoisonSpear" },
+	{ name: "WA_WARP",   value: 0x04000000, title: "Perk: Boomerang Fever", group: "unl-watcher-boomerang"   },
+	{ name: "WA_ROTTED", value: 0x08000000, title: "Burden: Rotten",        group: "bur-watcher_rot"         }
+];
 
 /**
  *	Boolean strings, for completeness.
@@ -5340,10 +5371,10 @@ const BINARY_TO_STRING_DEFINITIONS = [
 	{
 		name: "BingoVistaChallenge",
 		params: [
-			{ type: "number", offset: 0, size: 1, formatter: "regions" },	//	0: Region choice
-			{ type: "string", offset: 5, size: 0, formatter: "", joiner: "" },	//	1: Room name (verbatim) (read to zero terminator or end of goal)
-			{ type: "number", offset: 1, size: 2, formatter: ""        },	//	2: Room X coordinate (decimal)
-			{ type: "number", offset: 3, size: 2, formatter: ""        } 	//	3: Room Y coordinate (decimal)
+			{ type: "number", offset: 0, size: 1, formatter: "regions"        },	//	0: Region choice
+			{ type: "string", offset: 5, size: 0, formatter: "", joiner: ""   },	//	1: Room name (verbatim) (read to zero terminator or end of goal)
+			{ type: "number", offset: 1, size: 2, signed: true, formatter: "" },	//	2: Room X coordinate (decimal)
+			{ type: "number", offset: 3, size: 2, signed: true, formatter: "" } 	//	3: Room Y coordinate (decimal)
 		],
 		desc: "{0}><System.String|{1}|Room|0|vista><{2}><{3}><0><0"
 	},
@@ -5502,26 +5533,29 @@ const ChallengeUpgrades = {
  *	Emits console messages on failure.
  */
 function expandAndValidateLists() {
-	addVistaPointsToCode(BingoEnum_VistaPoints);
-	appendCHALLENGES();
+	var a;
 
-	var a = 0; DataPearlList.forEach(s => { if (dataPearlToRegionMap[s] === undefined) a++; } );
+	BingoEnum_ArenaUnlocksBlue.forEach(s => BingoEnum_AllUnlocks.push(s));
+	BingoEnum_ArenaUnlocksGold.forEach(s => BingoEnum_AllUnlocks.push(s));
+	BingoEnum_ArenaUnlocksRed.forEach(s => BingoEnum_AllUnlocks.push(s));
+	BingoEnum_ArenaUnlocksGreen.forEach(s => BingoEnum_AllUnlocks.push(s));
+
+	addVistaPointsToCode(BingoEnum_VistaPoints);
+
+	for (var g of BINARY_TO_STRING_DEFINITIONS) {
+		BingoEnum_CHALLENGES.push(g.name);
+	}
+	a = 0; Object.keys(CHALLENGES).forEach(s => { if (BingoEnum_CHALLENGES.indexOf(s) < 0) a++; } );
+	if (a > 0) console.log("expandAndValidateLists(): BingoEnum_CHALLENGES[] lacking element(s) from Object.keys(CHALLENGES)");
+	a = 0; BingoEnum_CHALLENGES.forEach(s => { if (CHALLENGES[s] === undefined) a++; } );
+	if (a > 0) console.log("expandAndValidateLists(): CHALLENGES lacking element(s) from BingoEnum_CHALLENGES[]");
+
+	a = 0; DataPearlList.forEach(s => { if (dataPearlToRegionMap[s] === undefined) a++; } );
 	if (a > 0) console.log("expandAndValidateLists(): dataPearlToRegionMap[] lacking element(s) from DataPearlList[]");
 	a = 0; DataPearlList.forEach(s => { if (dataPearlToColorMap[s] === undefined) a++; } );
 	if (a > 0) console.log("expandAndValidateLists(): dataPearlToColorMap[] lacking element(s) from DataPearlList[]");
 	a = 0; DataPearlList.forEach(s => { if (dataPearlToDisplayTextMap[s] === undefined) a++; } );
 	if (a > 0) console.log("expandAndValidateLists(): dataPearlToDisplayTextMap[] lacking element(s) from DataPearlList[]");
-}
-
-/**
- *	Called on startup.  Appends goals to BingoEnum_CHALLENGES[].
- */
-function appendCHALLENGES() {
-	var exceptions = Object.keys(ChallengeUpgrades);
-	for (var g of BINARY_TO_STRING_DEFINITIONS) {
-		if (exceptions.indexOf(g.name) < 0)
-			BingoEnum_CHALLENGES.push(g.name);
-	}
 }
 
 /**
@@ -5745,18 +5779,26 @@ function checkSettingBoxEx(s, template) {
 }
 
 /**
- *	Generate a valid? link to the RW map viewer, of the specified room,
- *	and current global state (board.character, map_link_base).
+ *	Generate a valid? HTML link to the RW map viewer (from map_link_base),
+ *	for the specified character (e.g. board.character value) and room.
  */
-function getMapLink(room) {
+function getMapLink(room, chr) {
 	if (map_link_base === "")
 		return "";
 	var reg = regionOfRoom(room);
+
+	//	Replacements from BingoVistaChallenge.cs
+	if (room === "GW_E02" && (chr === "Artificer" || chr === "Spearmaster")) room = "GW_E02_PAST";
+	if (room === "GW_D01" && (chr === "Artificer" || chr === "Spearmaster")) room = "GW_D01_PAST";
+	if (room === "UW_C02" && chr === "Rivulet") room = "UW_C02RIV";
+	if (room === "UW_D05" && chr === "Rivulet") room = "UW_D05RIV";
+
 	var ch = Object.keys(BingoEnum_CharToDisplayText)[
-			Object.values(BingoEnum_CharToDisplayText).indexOf(board.character)] || "White";
+			Object.values(BingoEnum_CharToDisplayText).indexOf(chr)
+		] || "White";
 	ch = ch.toLowerCase();
-	return "<br><a href=\"" + map_link_base + "?slugcat=" + ch + "&region=" + reg + "&room=" + room
-			+ "\" target=\"_blank\">" + room + " on Rain World Downpour Map" + "</a>";
+	return "<br><a href=\"" + map_link_base + "?slugcat=" + ch + "&region=" + reg + "&room="
+			+ room + "\" target=\"_blank\">" + room + " on Rain World Downpour Map" + "</a>";
 }
 
 /**
@@ -5851,9 +5893,9 @@ function upgradeDescriptor(d, upg) {
  *				parse: "SettingBox", parseFmt: (*) },
  *		{ param: "number2",  type: "number", formatter: "",
  *				parse: "parseInt", defaultval: 0 },
- *		{ param: "list3",    type: "array",  formatter: "enum2",
+ *		{ param: "list3",    type: "list",   formatter: "enum2",
  *				parse: "list", separator: "|", defaultval: "" }
- *		{ param: "dict4",    type: "array",   formatter: "",
+ *		{ param: "dict4",    type: "list",   formatter: "",
  *				parse: "list", separator: "%", defaultval: "empty" }
  *	]
  *	Each descriptor element is processed pairwise with each template
@@ -5863,8 +5905,8 @@ function upgradeDescriptor(d, upg) {
  *		param     	string, name of property this parameter will be assigned to
  *		          	(and similarly in ._error and ._templates)
  *		type      	string, primitive type assigned to [param]; one of "bool",
- *		          	"number", "string", "array"; used to read/format parameters
- *		          	after creation ("array" type is only used for an array of
+ *		          	"number", "string", "list"; used to read/format parameters
+ *		          	after creation ("list" type is only used for an array of
  *		          	string elements, keyed from formatter)
  *		formatter 	string, name of enum list (in ALL_ENUMS) to select from
  *		          	(string type)
@@ -5872,10 +5914,13 @@ function upgradeDescriptor(d, upg) {
  *		          	"SettingBox", "list"
  *		defaultval	default value (of native type) stored in param if text
  *		          	cannot be parsed, or for initialization
+ *		minval    	int: minimum clamping value; list: if less than this many
+ *		          	elements, use defaultval instead
+ *		maxval    	maximum clamping value of int type
  *	additional properties depend on type:
- *		parseFmt 	SettingBox parser; object is passed to checkSettingBoxEx()
+ *		parseFmt 	for SettingBox parser; object is passed to checkSettingBoxEx()
  *		         	(see its comment for more information)
- *		separator 	list parser; delimiter string (i.e., .split(separator))
+ *		separator 	for list parser; delimiter string (i.e., .split(separator))
  *
  *	@return Object of the form:
  *	{
@@ -5925,6 +5970,10 @@ function challengeTextToAbstract(desc, template) {
 				else
 					params[template[i].param].push(s);
 			});
+			if (params[template[i].param].length < template[i].minval) {
+				params[template[i].param] = [template[i].defaultval];
+				params._error[template[i].param].push("count less than minimum; using default");
+			}
 		} else {
 			console.log("unsupported parse operation: " + template[i].parse);
 		}
