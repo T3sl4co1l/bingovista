@@ -286,7 +286,10 @@ function setHeaderFromBoard(b) {
 	el.appendChild(document.createTextNode(b.character || "Any"));
 	el = document.getElementById("hdrshel");
 	while (el.childNodes.length) el.removeChild(el.childNodes[0]);
-	el.appendChild(document.createTextNode(b.shelter || "random"));
+	if (b.shelter)
+		el.innerHTML = getMapLink(b.shelter, b.character);
+	else
+		el.appendChild(document.createTextNode("random"));
 	perksToChecksList(b.perks);
 	addModsToHeader(b.mods);
 }
@@ -1064,7 +1067,7 @@ const CHALLENGES = {
 		function BombTollChallengeToComments(p) {
 			return "A hit is registered within a 500-unit radius of the toll. Bomb and pass can be done in either order within a cycle; or even bombed in a previous cycle, then passed later.<br>" +
 				"When the <span class=\"code\">specific</span> flag is set, <span class=\"code\">amount</span> and <span class=\"code\">current</span> are unused; when cleared, <span class=\"code\">Scavenger Toll</span> is unused.<br>" +
-				"The <span class=\"code\">bombed</span> list records the state of the multi-toll version. It's a dictionary of the form: <span class=\"code\">{room name}|{false/true}[%...]</span>, where the braces are replaced with the respective values, and <span class=\"code\">|</span> and <span class=\"code\">%</span> are literal, and (\"...\") indicates subsequent key-value pairs; or <span class=\"code\">empty</span> when empty. (Room names are case-sensitive, matching the game-internal naming.)  A room is added to the list when bombed, with a Boolean value of <span class=\"code\">false</span> before passing, or <span class=\"code\">true</span> after. By preloading this list, a customized \"all but these tolls\" challenge could be crafted (but, do note the list does not show in-game!)." + getMapLink(p.roomName.toUpperCase(), p._board.character);
+				"The <span class=\"code\">bombed</span> list records the state of the multi-toll version. It's a dictionary of the form: <span class=\"code\">{room name}|{false/true}[%...]</span>, where the braces are replaced with the respective values, and <span class=\"code\">|</span> and <span class=\"code\">%</span> are literal, and (\"...\") indicates subsequent key-value pairs; or <span class=\"code\">empty</span> when empty. (Room names are case-sensitive, matching the game-internal naming.)  A room is added to the list when bombed, with a Boolean value of <span class=\"code\">false</span> before passing, or <span class=\"code\">true</span> after. By preloading this list, a customized \"all but these tolls\" challenge could be crafted (but, do note the list does not show in-game!).";
 		}
 		function BombTollChallengeToDescription(p) {
 			var d;
@@ -1077,7 +1080,7 @@ const CHALLENGES = {
 					r += " underground";
 				if (p.roomName === "gw_c05")
 					r += " surface";
-				d = "Throw a grenade at the " + r + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
+				d = "Throw a grenade at the " + getMapLink(p.roomName.toUpperCase(), p._board.character, r) + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
 			} else {
 				if (p.amount <= 1)
 					d = "Throw a grenade at a Scavenger toll";
@@ -1423,8 +1426,8 @@ const CHALLENGES = {
 			category: "Dropping a creature in the depth pit",
 			items: [items[2]],
 			values: [items[1]],
-			description: "Drop " + d + " into the Depths drop room (SB_D06).",
-			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop." + getMapLink("SB_D06", board.character),
+			description: "Drop " + d + " into the Depths drop room (" + getMapLink("SB_D06", board.character) + ").",
+			comments: "Player, and creature of target type, must be in the room at the same time, and the creature's position must be below the drop.",
 			paint: [
 				{ type: "icon", value: entityIconAtlas(items[1]), scale: 1, color: entityIconColor(items[1]), rotation: 0 },
 				{ type: "icon", value: "deathpiticon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
@@ -2658,7 +2661,7 @@ const CHALLENGES = {
 			items: ["Region"],
 			values: [desc[0]],
 			description: "Reach the vista point in " + v + ".",
-			comments: "Room: " + items[1] + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + getMapLink(items[1], board.character) + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
+			comments: "Room: " + getMapLink(items[1], board.character) + " at x: " + String(roomX) + ", y: " + String(roomY) + "; is a " + ((idx >= 0) ? "stock" : "customized") + " location." + "<br>Note: the room names for certain Vista Points in Spearmaster/Artificer Garbage Wastes, and Rivulet Underhang, are not generated correctly for their world state, and so may not show correctly on the map; the analogous rooms are however fixed up in-game.",
 			paint: [
 				{ type: "icon", value: "vistaicon", scale: 1, color: RainWorldColors.Unity_white, rotation: 0 },
 				{ type: "break" },
@@ -5554,7 +5557,7 @@ function checkSettingBoxEx(s, template) {
  *	Generate a valid? HTML link to the RW map viewer (from map_link_base),
  *	for the specified character (e.g. board.character value) and room.
  */
-function getMapLink(room, chr) {
+function getMapLink(room, chr, textOverride) {
 	if (map_link_base === "")
 		return "";
 	var reg = regionOfRoom(room);
@@ -5569,8 +5572,8 @@ function getMapLink(room, chr) {
 			Object.values(BingoEnum_CharToDisplayText).indexOf(chr)
 		] || "White";
 	ch = ch.toLowerCase();
-	return "<br><a href=\"" + map_link_base + "?slugcat=" + ch + "&region=" + reg + "&room="
-			+ room + "\" target=\"_blank\">" + room + " on Rain World Downpour Map" + "</a>";
+	return "<a href=\"" + map_link_base + "?slugcat=" + ch + "&region=" + reg + "&room="
+			+ room + "\" target=\"_blank\" title=\"View on interactive map\">" + (textOverride || room) + "</a>";
 }
 
 /**
