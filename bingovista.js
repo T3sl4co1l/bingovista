@@ -770,16 +770,18 @@ constructor(params) {
 	this.enums.unlocksgreen = [ "Artificer", "Gourmand", "Rivulet", "Saint", "Spearmaster" ];
 	this.maps.unlocksgreen = this.enums.unlocksgreen.map(s => ({ type: "green",
 			unlockColor: Bingovista.colors.GreenColor, name: s, text: s,
-			icon: this.entityIconAtlas("Slugcat"), color: this.entityIconColor("Slugcat_" + s) } ));
+			icon: this.entityIconAtlas("Slugcat"),
+			color: this.maps.characters.find(o => o.text === s).color }));
 	this.maps.unlocks = this.maps.unlocksblue.concat(this.maps.unlocksgold)
 			.concat(this.maps.unlocksred).concat(this.maps.unlocksgreen);
 	this.enums.unlocks = this.enums.unlocksblue.concat(this.enums.unlocksgold)
 			.concat(this.enums.unlocksred).concat(this.enums.unlocksgreen);
+
 	//	Watcher update
 	this.enums.characters.push("Watcher");
 	this.maps.characters.push( { name: "Watcher", text: "Watcher", color: "#17234e", icon: "Kill_Slugcat" } );
 	this.enums.unlocks.push("SeedCob");
-	this.maps.unlocks.push( { type: "blue", name: "SeedCob", text: "Popcorn Plants", icon: "popcorn_plant", color: "#68283a" } );
+	this.maps.unlocks.push( { type: "blue", unlockColor: Bingovista.colors.AntiGold, name: "SeedCob", text: "Popcorn Plants", icon: "popcorn_plant", color: "#68283a" } );
 	this.enums.vista_code = [];
 	for (var v of this.maps.vistas) {
 		this.enums.vista_code.push(v.region + "><System.String|" + v.room + "|Room|0|vista><" + String(v.x) + "><" + String(v.y));
