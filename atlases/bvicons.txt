@@ -14,4 +14,20 @@
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":21,"h":25},
 	"sourceSize": {"w":21,"h":25}
+},
+"Symbol_PearlStar.png":
+{
+	"frame": {"x":35,"y":0,"w":9,"h":9},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":9,"h":9},
+	"sourceSize": {"w":9,"h":9}
+},
+"Symbol_KarmaFlower.png":
+{
+	"frame": {"x":44,"y":0,"w":17,"h":30},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":17,"h":30},
+	"sourceSize": {"w":17,"h":30}
 }}}

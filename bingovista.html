@@ -7,57 +7,22 @@
 	<link rel="preload" as="image" href="atlases/bingoicons.png" crossorigin="anonymous">
 	<link rel="preload" as="image" href="atlases/uiSprites.png" crossorigin="anonymous">
 	<link rel="preload" as="image" href="atlases/uispritesmsc.png" crossorigin="anonymous">
+	<link rel="preload" as="image" href="atlases/bvicons.png" crossorigin="anonymous">
 	<link rel="preload" as="fetch" href="atlases/bingoicons.txt" crossorigin="anonymous">
 	<link rel="preload" as="fetch" href="atlases/uiSprites.txt" crossorigin="anonymous">
 	<link rel="preload" as="fetch" href="atlases/uispritesmsc.txt" crossorigin="anonymous">
-	<script src="handlers.js"></script>
+	<link rel="preload" as="fetch" href="atlases/bvicons.txt" crossorigin="anonymous">
 	<link rel="preload" as="script" href="bingovista.js">
+	<link rel="preload" as="script" href="view.js">
 	<link rel="icon" type="image/png" sizes="48x48" href="favicon.ico">
+	<link rel="StyleSheet" href="bv.css" media="all">
 	<style type="text/css" media="all"><!--
 @font-face {
-    font-family: "Rodondo";
-    src: url(Rodondo.otf) format("OpenType");
-}
-.desctxt {
-	text-align: left;
-	font: 16px "Segoe UI Semibold", Verdana, sans-serif;
-	padding-left: 0.6em;
-	vertical-align: top;
-	width: 24em;
-}
-.desctxt * {
-	text-align: inherit;
-	margin: 4px 0 0 0;
-}
-.desctxt br {
-	margin: 0 0 6px 0;
-}
-.descch {
-	font: 700 16px "Segoe UI Bold", Verdana, sans-serif;
-}
-.desclist {
-	border-collapse: collapse;
-}
-.desclist tbody tr td {
-	font: 14px "Segoe UI", sans-serif;
-	padding: 2px 4px;
-	border: 1px solid #484848;
-}
-.desclist tbody tr :first-child {
-	text-align: right;
-}
-.desclist thead tr td {
-	font: 600 14px "Segoe UI Semibold", sans-serif;
-	text-align: center;
-	padding: 2px 4px;
-	border: 1px solid #484848;
-	border-bottom-color: #a0a0a0;
-}
-.desccomm {
-	font: 14px "Segoe UI", sans-serif;
+	font-family: "Rodondo";
+	src: url(Rodondo.otf) format("OpenType");
 }
 .drop {
-	border: 1px solid #a0a0a0;
+	border: 1px solid #808080;
 	border-radius: 0.63em;
 	text-align: center;
 }
@@ -70,27 +35,6 @@
 	font-size: small;
 	margin-top: 4px;
 }
-.hdrtbl {
-	border-collapse: collapse;
-	max-width: 550px;
-}
-.hdrtbl tr td {
-	font: 600 14px "Segoe UI Semibold", sans-serif;
-	padding: 2px 4px;
-	border: 1px solid #484848;
-}
-.hdrtbl tr:first-child td {
-	font-weight: bold;
-	font-size: large;
-	text-align: center;
-}
-.hdrtbl tr td:first-child {
-	text-align: right;
-}
-.hdrtbl tr td:last-child {
-	text-align: left;
-	padding-right: 0.7em;
-}
 a:link {
 	color: #90a0ff;
 }
@@ -98,9 +42,11 @@ a:visited {
 	color: #ff90e8;
 }
 body {
+	background-color: #020204;
+	color: #ffffff;
 	font-family: Verdana, Arial, sans-serif;
-	line-height: 130%;
 	font-size: 100%;
+	line-height: 130%;
 	text-size-adjust: none;
 	-webkit-text-size-adjust: none;
 }
@@ -108,9 +54,6 @@ body div {
 	text-align: center;
 	margin-left: auto;
 	margin-right: auto;
-}
-canvas {
-	border: 1px solid #404040;
 }
 div {
 	margin-top: 0.5em;
@@ -133,7 +76,7 @@ input[type=button] {
 	padding: 4px 6px;
 }
 input[type=file] {
-	border: 1px solid #808080;
+	border: 1px solid #c0c0c0;
 	padding: 6px;
 }
 label input {
@@ -146,32 +89,29 @@ p {
 	max-width: 50em;
 }
 span.code {
-    font-family: Courier New, monospace;
-    font-weight: bold;
-    font-size: 100%;
-    white-space: nowrap;
-    background-color: #584800;
-    color: #ffffff;
+	font-family: Courier New, monospace;
+	font-weight: bold;
+	font-size: 100%;
+	white-space: nowrap;
+	background-color: #584800;
+	color: #ffffff;
 }
 table {
-	margin: 6px auto 0 auto;
+	margin: 0 auto 0 auto;
+}
+body table {
+	margin-left: 6px;
 }
 td div {
 	text-align: left;
-	}
-td label {
-	display: inline-block;
-	padding: 0 3px;
-}
-td label input {
-	padding: 2px;
 }
 textarea {
-	padding: 0.2em 0.4em;
-	width: 36em;
-	height: 20em;
-	background-color: #f2f2f2;
+	background-color: #404040;
+	color: #ffffff;
 	line-break: anywhere;
+	padding: 0.2em 0.4em;
+	height: 20em;
+	width: 36em;
 }
 ul li {
 	margin: 0 2em 4px 1.5em;
@@ -180,7 +120,7 @@ ul li {
 @media only screen and (min-width: 830px) {
 	body div {
 		text-align: left;
-		margin-left: 1em;
+		margin-left: 6px;
 		margin-right: initial;
 	}
 	h1 {
@@ -188,55 +128,20 @@ ul li {
 		line-height: 90%;
 		text-align: left;
 	}
-	table {
+	body table {
 		margin: 6px auto 0 calc(1em - 2px);
 	}
-}
-	--></style>
-	<style type="text/css" media="screen" id="darkmode"><!--
-body {
-	color: #ffffff;
-	background-color: #020204;
-}
-canvas {
-	border: 1px solid #b0b0b0;
-}
-.drop {
-	border: 1px solid #808080;
-}
-input[type=file] {
-	border-color: #c0c0c0;
-}
-textarea {
-	color: #ffffff;
-	background-color: #404040;
 }
 	--></style>
   </head>
   <body>
 	<h1><a name="view">Rain World: Bingo Mod<br>Board Viewer</a></h1>
-	<table class="hdrtbl"><tbody id="header">
-	  <tr><td>Title</td><td id="hdrttl">Untitled</td></tr>
-	  <tr><td>Size</td><td id="hdrsize"></td></tr>
-	  <tr><td>Character</td><td id="hdrchar"></td></tr>
-	  <tr><td>Shelter</td><td id="hdrshel"></td></tr>
-	  <tr><td>Perks/flags</td><td>
-		<div style="margin-left: 6px; margin-bottom: 4px;"><input type="button" value="Show / Hide" id="hdrshow" tabindex="1"></div>
-		<div style="margin-left: 0px; display: none;" id="hdrperks"></div>
-	  </td></tr>
-	  <tr><td>Mods</td><td id="hdrmods">none</td></tr>
-	</tbody></table>
-	<div id="boardcontainer" style="position: relative; width: 456px; height: 456px;">
-	  <canvas width="454" height="454" id="board" tabindex="0" style="position: absolute; top: 0px; left: 0px; z-index: 1;" data-width="1" data-height="1">
-		Canvas support and scripting are required.
-	  </canvas>
-	  <div id="cursor" style="display: none; width: 39px; height: 39px; margin: 0; border: 4px solid #ff8090; border-radius: 6px; position: absolute; top: 0px; left: 0px; z-index: 2;"></div>
-	</div>
-	<table><tr><td style="vertical-align: top; padding-top: 6px;"><canvas width="90" height="90" id="square"></canvas></td><td class="desctxt" id="desctxt">Select a square to view details.</td></tr></table>
+	<div id="header"></div>
+	<div id="boardcontainer" style="width: 456px; height: 456px;" tabindex="0">Canvas support and scripting are required.</div>
+	<table><tr><td style="vertical-align: top;"><div id="descsq" style="width: 92px; height: 92px;"></div></td><td id="desctxt">Select a square to view details.</td></tr></table>
 	<p>&nbsp;</p>
-	<div style="display: none;"><label><input type="radio" name="seldark" id="dark" checked>Dark Mode</label> <label><input type="radio" name="seldark" id="light">Light Mode</label> (flashbang warning)</div>
 	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
-	<div><label><input type="checkbox" id="transp" checked>Transpose Board</label> (matches &lt;v1.25 visual arrangement)</div>
+	<div><label><input type="checkbox" id="transp">Transpose Board</label> (matches &lt;v1.25 visual arrangement)</div>
 	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
 	<div><input type="button" id="clear" value="Clear">&nbsp;&nbsp;&nbsp;<input type="button" id="parse" value="Parse Text">&nbsp;&nbsp;&nbsp;<input type="button" id="copy" value="Copy Text"></div>
 	<p>Paste/edit above, or select file or drag-and-drop below:</p>
@@ -277,6 +182,7 @@ textarea {
 	<p>Thanks to Videocult and friends for Rain World, Nacu for putting in the work and ICED37 for making it happen, DrekiOrmur and shrubfromtomorrow for contributions, and alphappy and diedirl for tips and help.</p>
 	<h2><a name="changes">Changelog</a></h2>
 	<ul>
+	  <li>2025/12/04: Large update finally here! Significant refactoring, (hopefully) making the module more usable in outside projects. Few functional updates actually, but be on the lookout for bugs and errors.</li>
 	  <li>2025/08/26: Large update taking too long; updating to v1.25 support.</li>
 	  <li>2025/08/10: Testing experimental new feature; large update coming soon(!).</li>
 	  <li>2025/07/30: More commentary tweaks, and a "one of everything" board to easily show all commentary.</li>
@@ -289,5 +195,6 @@ textarea {
 	  <li>2025/02/19: First release, 0.85 mod support.</li>
 	</ul>
 	<script src="bingovista.js"></script>
+	<script src="view.js"></script>
   </body>
 </html>

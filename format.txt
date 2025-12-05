@@ -40,11 +40,11 @@ Top-level file structure:
 .  --+---------------------- Goals ---------------------
 .    |    ---- goal 0 ----      ---- goal 1, etc. ----
 .    | +------+-----+-- . . -+--- . . .
-.    | | type | len |  var.  | 
-.    | |      |     |  data  | 
+.    | | type | len |  var.  |
+.    | |      |     |  data  |
 .    | +------+-----+-- . . -+--- . . .
 .    | ^      ^     ^        ^
-.    | 0      1     2        2 + goal[0]->len
+.    | 0      1     2        2 + goals[0].len
 .  --+--------------------------------------------------
 .     ^
 .   goals
@@ -84,19 +84,40 @@ Limits: offsets are 16-bit, limiting the header to about 64kiB; goals list is in
 
 Recommended `comments` format is line (CRLF) separated, with the first two lines being title, and sub-title or name or description.  Subsequent lines can add flavor text, commentary, s..story content I guess?, or whatever; or store more variables, perhaps as `"key: value\r\n"` pairs.  Possible uses may evolve over time; I would generally suggest to keep it clean, well formatted, and human-read/writable.
 
-The `mods` section is a list of mod packs, in order added to the viewer context.  Mods must match exactly the hash and key specified; this may prove inconvenient as updates are made from time to time (mod pack creators are encouraged to keep all released versions available and accessible).  A possible structure for an entry is:
+Mods
+---
+
+The `mods` section is a list of mod packs and settings, in order of addition to the viewer context.  Mods are enumerated by a unique ID or hash code.  Codes shall be unique to each version of each modpack.  Modpacks shall be registered in a central repository (e.g., added to Bingovista from time to time), also for review/security purposes as they're likely to contain active code that runs in the viewer context.  On loading a board, the board viewer will iterate the list of registered modpacks, matching by hash code, then load them automatically, before parsing goal data.
+
+Similar to goals (see below), mods are prototypically represented by an identifier byte, length, and contents:
 
 struct bingo_mod_s {
-	uint32_t hash;
-	uint16_t length; 	//	Length of name[]
-	uint8_t name[];
+	uint8_t type;
+	uint8_t length;	//	sizeof(data)
+	uint8_t data[];
 };
 
-These may be taken as filling the remaining space from `mods` to `goals`; or perhaps a few bytes at `mods` indicates number of entries; or the hash must be nonzero and a zero field indicates end of list.   TBD.
+`type` is enumerated as:
 
-`name` is a descriptive name of the modpack to be loaded: this is suggested to have at least a title and version number included.  `hash` is a hash of the modpack file (full JSON plaintext as provided by its creator).  Somewhat longer strings are allowed here, but again with the usual cautions: avoid obnoxiously long titles or data stored here.  A hash algorithm is not defined at this time.
+/*	value increments by 1 for each entry  */
+enum MODPACK_TYPE_e {
+	MODPACK_END = 0,
+	MODPACK_PACK
+	/* , reserved codes TBD, */
+};
 
-On loading a board, any mod packs available to the reader will be checked for exact match (hash, then name), and loaded automatically.  (Various sources are envisioned: local files in a native viewer app; server-side or localstorage for a web app; externally hosted (URL) sources; etc.  No source requirements are defined at this time.)   The user will be prompted to supply any missing packs.
+`MODPACK_END` is a termination sentinel, indicating the final block of the list.  `length` and `hash` of this block are not read, and can be omitted, so that the sentinel byte itself is the complete block.  Typically, the mod list will be placed before (and abutting) `goals`; this condition will also be tested: a gap between sections is acceptable, overlap is invalid.
+
+`MODPACK_PACK` represents one modpack, with any configuration settings it needs:
+
+struct bingo_mod_pack_s {
+	uint8_t type;  	//	== MODPACK_PACK
+	uint8_t length;	//	== sizeof(data)
+	uint32_t hash;
+	uint8_t data[];
+};
+
+The amount and meaning of `data` depends on the modpack; for file encoding purposes, it should be considered an arbitrary binary string.  Typical uses might be: flags indicating extended perks; difficulty settings, score multipliers, etc.; customized world or story state; hidden item locations; etc.  Anything that can't/shouldn't be encoded in a goal, that's relevant to global or meta state, is a good fit here.
 
 
 Goals
@@ -109,7 +130,7 @@ A goal has the prototype:
 struct bingo_goal_s {
 	uint8_t type;   	//	BINGO_GOALS index
 	uint8_t flags;  	//	GOAL_FLAGS bit vector
-	uint8_t length; 	//	Length of data[]
+	uint8_t length; 	//	sizeof(data)
 	uint8_t data[]; 	//	defined by the goal
 };
 
@@ -118,41 +139,41 @@ Length is technically redundant, defined by the goal.  It is provided for three 
 2. An undefined goal type could not be scanned past, dooming all subsequent goals to a fate of data loss or corruption.
 3. Simplicity: corollary to (1), variable-length goals (containing one or more [variable] strings, lists, etc.) might require deeper inspection (summing length bytes, finding zeros, etc.).  Would rather spend an extra byte than have to functionalize that.
 
-`data` is defined per goal.
+A "hidden" flag is desirable, to implement hidden goals similar to base Expedition.  This could be inserted as its own byte (as shown), leeched off the `type` or `length` fields (e.g. take the top bit, reducing the range of the field by half -- it might not ever be needed), or implemented arbitrarily within each goal's `data`.  Dedicating a single byte to this purpose seems a simple and acceptable compromise.
 
-Goals generally (always?) use three data types to select options: Boolean, Integer, or String.  In the v0.85 text format, these are obtained from a SettingBox instance, where strings are selected from a goal- and selection-specific list.
+As of v1.3, the status flags are still unused.  It seems unlikely that more than four bits will ever be needed; they remain reserved for future use.  The upper nibble has been made available for storing challenge flags; thus, boolean parameters are read starting from this position (offsetof(flags)).
 
-A "hidden" flag is desirable, to implement hidden goals similar to base Expedition.  This could be inserted as a new byte in this structure (as shown), leeched off the `type` or `length` fields (e.g. take the top bit, reducing the range of the field by half -- it might not prove necessary), or implemented arbitrarily within each goal's `data`.  For now, it's being placed here; the lower nibble shall be reserved for future use, while the upper nibble can be shared with challenge flags (consequently, boolean parameters can read starting from this region of the goal object).
+`data` is parsed using supplementary information.  A goal definition specifies how many, and what type of, parameters it's composed of.  Strings from base game and Bingo Mod are provided for rich use of enums, minimizing encode size.
 
-Supplementary information is used to parse `data`.  A goal definition specifies which parameters (number, type and order) it's composed of, and provides any sets of strings needed to index names from.  Strings from base game and Bingo Mod are also provided as defaults.
+Goals utilize four data types: Boolean, Integer, String, and List.  The first three generally come from a SettingBox instance, where a Boolean can be selected on a checkbox, or an Integer with a number box, or a String value from a droplist of accepted strings.  (We implement the string lists here with an enum.)  Integers (and Booleans coerced to Integers) also occasionally appear in the text format, "naked"; they are used for internal values like partial completion flags, or progression amounts before the completion total has been achieved.  Free (variable-length or zero-terminated) Strings, and Lists, are used for variable-length data: typically, data that aren't otherwise enumerable (e.g. room names), or that record a list of partially completed goals that can't be expressed by a simple number.
 
 Observationally, Integers range from 0...500 (except for BingoVistaChallenge which stores room coordinates), and strings are short (10s of characters).  I suppose room names (if not stored in enums) could be arbitrary length, but it seems unlikely anyone should need more than 250 or so characters.
 
 A goal might look like so:
 
 struct goal_steal_s {
-	uint8_t theft;  	//	STEALABLESTOABLE index
-	uint8_t bflags; 	//	bit 0: true = from Scavenger toll, false = from Scavengers
+	uint8_t type;   	//	== BINGO_GOAL_STEAL
+	uint8_t flags;  	//	bits 0-3 reserved; bit 4: true = from Scavenger toll, false = from Scavengers
+	uint8_t length; 	//	== sizeof(uint8_t) + sizeof(uint16_t) == 3
+	uint8_t theft;  	//	index to STEALABLESTOABLE ("theft") enum
 	uint16_t amount;	//	number of items to steal
-};	//	sizeof(goal_steal_s) == 4
+};	//	sizeof(goal_steal_s) == 6
 
-Compare to the text format (split by "><"'s): ["System.String|Rock|Item|1|theft", "System.Boolean|false|From Scavenger Toll|0|NULL", "0", "System.Int32|3|Amount|2|NULL", "0", "0"].  The corresponding goal descriptor might contain:
+Compare to the text format (split by "><"'s): ["System.String|Rock|Item|1|theft", "System.Boolean|false|From Scavenger Toll|0|NULL", "0", "System.Int32|3|Amount|2|NULL", "0", "0"].  The corresponding goal descriptor contains:
 
-BingoStealChallenge: {
+{
+	name: "BingoStealChallenge",
 	params: [
-		{ type: "select", name: "Item",   enum: "steal_theft", size: 1, offset: 0 },
-		{ type: "bool",   name: "From Scavenger Toll", bit: 4, size: 1, offset: 0 },
-		{ type: "number", name: "Amount",                      size: 2, offset: 2 }
+		{ type: "number", offset: 0, size: 1, formatter: "theft"   },	//	0: Item choice
+		{ type: "bool",   offset: 0,  bit: 4, formatter: "boolean" },	//	1: From Toll flag
+		{ type: "number", offset: 1, size: 2, formatter: ""        } 	//	2: Steal amount
 	],
-	desc: "some format string incorporating replacement tags and conditionals",
-	draw: {
-		//	some scheme to generate conditional icons, strings and line breaks from given parameters
-	}
+	desc: "System.String|{0}|Item|1|theft><System.Boolean|{1}|From Scavenger Toll|0|NULL><0><System.Int32|{2}|Amount|2|NULL><0><0"
 }
 
-`params` lists parameters in any order, and creates a parameter of the same `name` which can be referenced by `desc` and `draw`.  `type` is one of: "select", "number", "bool" or "string".  `name` is also the text label displayed for that parameter.  `enum` is the list a `type: "select"` is `select`ing from.  `offset` is the offset within `data` (`bool`: `data`-2) to read from.  `bit` is the bit position to check (`bool` only).
+`params` is the list of parameters.  The ordering is used by `desc`, into which the values are substituted.  Thus the "{0}" might get replaced with "Rock", and so on.  `type` describes how the field is filled: one bit, one byte or word (numerically), or a string/array.  `formatter` is the enum or conversion table to apply to the value (or each in a string/array of values).  `offset` is the starting offset within `data` (for `bool`: `data` - 2) from which to read the parameter.  `bit` is the bit position to check (`bool` only).  `size` is the number of bytes to read as a number.  Other parameters and details are documented in the comments on `BINARY_TO_STRING_DEFINITIONS`.
 
-Enums are provided "pre-installed" in the viewer (and, obviously, in the game itself), and include all sets of in-game items, creatures, regions, and Expedition and Bingo goal targets.  The names of these lists are given in the Enums section.  Mod packs can add their own global enums, and append to existing global enums; indices beyond pre-installed ranges therefore depend on which mods are loaded, and in what order.  Mod packs can also add to the list of parsers, or replace existing 
+Enums are provided "pre-installed" in the viewer (and, obviously, in the game itself), and include all sets of in-game items, creatures, regions, and Expedition and Bingo goal targets.  The names of these lists are given in the Enums section.  Mod packs can add their own global enums, and append to existing global enums; indices beyond pre-installed ranges therefore depend on which mods are loaded, and in what order.  Mod packs can also add to the list of parsers, or replace existing parsers.
 
 Another example:
 
@@ -164,30 +185,27 @@ struct goal_vista_s {
 
 Text format example: ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
 
-Vistas are peculiar, as room coordinates are stored in the goal -- they are uniquely customizable by goal alone.  This quality seems worth preserving; therefore, rather than preparing an enum list of tokens, or even rooms or regions, the full room name is stored.  This could take up some dozens of bytes, making it one of the longer (maximum length) goals  but room and region names are likely to remain small, so this seems an acceptable compromise.
+Vistas are peculiar, and are worth some discussion.  They also present a conundrum for gameplay purposes.
 
-Region code shall be separated from the string by reading until the first underscore; all extant examples follow this pattern, and mods are likely to (or perhaps required to, by other code I haven't looked into, or customary due to tools?).
+As room coordinates are stored in the goal, Vistas are uniquely customizable in the goal text.  This quality seems worth preserving; therefore, rather than preparing an enum list of tokens, or even rooms or regions, the full room name is stored.  This could take up some dozens of bytes, making it one of the longer (worst-case length) goals; but room and region names are likely to remain small, so this seems an acceptable compromise.  (Later (in v0.90), an alternate encoding was added, using an enum of stock Vista locations.  The general version remains as a fallback.)
 
-Note that base Expedition provides three vistas per region, and no hint of which was chosen at goal generation time; if this behavior is desired, suppress location and room code in any generator, editor or viewer to avoid spoiling the goal.  These data are always present in such a scheme, and a sufficiently dedicated player can always access it.
+Region code shall be separated from the string by reading until the first underscore; all official examples follow this pattern, existing mods (generally?) do, and future mods are likely to continue to do so.  (Perhaps this is actually required, by other code I don't know about; or is customary in available tools.)
 
-A more reliable method to avoid spoilers would be changing the goal (or perhaps adding another one) to include region index only, and selecting the room or token (and syncing the choice online between multiple players when applicable) at game start.  This reduces the amount of time available for an intrepid player to analyze the goal, and most likely requires tools to do so (memory viewer or debugger attached to the game, packet analyzer to view communications).  (Perhaps generation could even be deferred until the first player enters the region of interest; but this carries the alternate risk that that player betrays their in-game location over the network, similarly visible by packet analysis, or BepInEx logs when logging is enabled.)
+Note that base Expedition provides three vistas per region, and no hint of which was chosen at goal generation time; if this behavior is desired, any generator, editor or viewer must suppress location and room code to avoid spoiling the goal.  These data are always present in the board data, and a sufficiently dedicated player can always access it; this is not a solvable problem on the formatting side, unfortunately.
 
-TODO: finish implementing all the stock goals, to understand what types of fields are used
+A more reliable method to avoid spoilers, would be adding an alternative goal type, which includes region index only, then selecting the room or token at game start (including syncing that choice between connected players in multiplayer games).  This reduces the amount of time available for an intrepid player to analyze the goal (i.e., it might "leak" into the game log files), and most likely requires tools to do so (e.g. remote board viewing mod, or if nothing else, memory viewer / debugger attached to the game, or packet analyzer viewing communications).
 
 
 Enums
 ---
 
-Some of the enums used by the viewer, are listed below.
-
-This section is incomplete; please refer to bingovista.js for complete listings.
+Some of the enums used by the viewer are listed below, for illustration.  (Please refer to bingovista.js for complete listings.)  For simplicity, these have been split up and expressed in likely C syntax.
 
 ---
 
 Header `character` takes the following value:
 
-/*	value increments by 1 for each entry  */
-enum CHARACTERS {
+enum CHARACTERS_e {
 	CHAR_MONK = 0,
 	CHAR_SURVIVOR,
 	CHAR_HUNTER,
@@ -196,9 +214,13 @@ enum CHARACTERS {
 	CHAR_RIVULET,
 	CHAR_SPEARMASTER,
 	CHAR_SAINT,
-	CHAR_INV
-/*	, CHAR_NIGHT */	//	TODO: Watcher
+	CHAR_INV,
+	CHAR_NIGHT,
+	CHAR_WATCHER
+	/* , additional mod-defined characters, */
 };
+
+(Trivia: Nightcat actually went unused; turns out, Watcher is their own thing internally.  Probably because some mods have implemented Nightcat, and a new one avoids breaking them?)
 
 This value indexes the following arrays:
 
@@ -213,8 +235,9 @@ const char* const CHARACTER_KEYS[] = {
 	"Rivulet",
 	"Spear",
 	"Saint",
-	"Sofanthiel"
-	/*, "Night" */
+	"Sofanthiel",
+	"Night",
+	"Watcher"
 };
 
 /*	character display text names (English)  */
@@ -228,15 +251,16 @@ const char* const CHARACTER_VALUES[] = {
 	"Rivulet",
 	"Spearmaster",
 	"Saint",
-	"Sofanthiel"
-	/*, "Nightcat" */
+	"Sofanthiel",
+	"Nightcat",
+	"Watcher"
 };
 
 ---
 
-Header `perks` is a bit array taking any sum of following values:
+Header `perks` is a bit array taking any sum of these values:
 
-enum EXPEDITION_FLAGS {	/*	min size: uint32_t  */
+enum EXPEDITION_FLAGS_e {	/*	min size: uint32_t  */
 	/*	In no particular order; compiled from https://rainworld.miraheze.org/wiki/Expedition#Perks on 2025/02/07 */
 	EXPFLAG_LANTERN    = 0x00000001,
 	EXPFLAG_MASK       = 0x00000002,
@@ -259,9 +283,20 @@ enum EXPEDITION_FLAGS {	/*	min size: uint32_t  */
 	EXPFLAG_HUNTED     = 0x00040000,
 	EXPFLAG_PURSUED    = 0x00080000,
 	EXPFLAG_AURA       = 0x00100000,
+	EXPFLAG_LOCKOUT    = 0x00200000,	//	lockout and blackout flags added v0.90
+	EXPFLAG_BLACKOUT   = 0x00400000,
+	EXPFLAG_RESERVED23 = 0x00800000,
+	EXPFLAG_RESERVED24 = 0x01000000,
+	EXPFLAG_RESERVED25 = 0x02000000,
+	EXPFLAG_RESERVED26 = 0x04000000,
+	EXPFLAG_RESERVED27 = 0x08000000,
+	EXPFLAG_RESERVED28 = 0x10000000,
+	EXPFLAG_RESERVED29 = 0x20000000,
+	EXPFLAG_RESERVED30 = 0x40000000,
+	EXPFLAG_RESERVED31 = 0x80000000
 };
 
-The corresponding display names are listed below; indices are in enumerated order, or as given by `floor(log2(flag)))`.  The function of these should be self-explanatory.
+The corresponding display names are listed below; indices are in enumerated order, or as given by `floor(log2(flag)))`.  The corresponding function should be self-explanatory.
 
 const char* const EXPFLAG_NAMES[] = {
 	"Perk: Scavenger Lantern",
@@ -285,9 +320,20 @@ const char* const EXPFLAG_NAMES[] = {
 	"Burden: Hunted",
 	"Burden: Pursued",
 	"Aura",
+	"Gameplay: Lockout",
+	"Gameplay: Blackout",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	""
 };
 
-As of v0.85, these are not used, and can be considered optional; recommended play settings for the board, let's say.  A future version may choose to implement these, in various ways (as initial values for user choice, fixed as in pre-baked Expedition missions, etc.).
+As of v1.3, these are not used by the mod, and can be considered optional; they can be viewed as recommended play settings for the board.  A future version of the mod may choose to implement these, in various ways (as initial values for user choice, fixed as in pre-baked Expedition missions, etc.).
 
 In a given version that does not define bits beyond these, they can be used by mods, or ignored (placing additional flags in the mod-specific section).  Making no particular recommendations at this time.  Maybe it'll be easier to configure things separately?  Then again, having everything in one list (and using big enough integers to hold onto all flags at once?) probably simplifies modding and readout.  TBD.
 
@@ -297,48 +343,62 @@ Bingo goal `type`:
 
 Goals defined by Expedition and Bingo as of Bingo v0.85.  Indexed by `struct bingo_goal_s::type`.  Values:
 
-enum BINGO_GOALS {
-​	BINGOGOAL_CHALLENGE,	//	Default, unused or unimplemented item
-	BINGOGOAL_ACHIEVEMENT,
-​	BINGOGOAL_ALLREGIONSEXCEPT,
-​	BINGOGOAL_BOMBTOLL,
-​	BINGOGOAL_COLLECTPEARL,
-​	BINGOGOAL_CRAFT,
-​	BINGOGOAL_CREATUREGATE,
-​	BINGOGOAL_CYCLESCORE,
-​	BINGOGOAL_DAMAGE,
-​	BINGOGOAL_DEPTHS,
-​	BINGOGOAL_DODGELEVIATHAN,
-​	BINGOGOAL_DONTUSEITEM,
-​	BINGOGOAL_EAT,
-​	BINGOGOAL_ECHO,
-​	BINGOGOAL_ENTERREGION,
-​	BINGOGOAL_GLOBALSCORE,
-​	BINGOGOAL_GREENNEURON,
-​	BINGOGOAL_HATCHNOODLE,
-​	BINGOGOAL_HELL,
-​	BINGOGOAL_ITEMHOARD,
-​	BINGOGOAL_KARMAFLOWER,
-​	BINGOGOAL_KILL,
-​	BINGOGOAL_MAULTYPES,
-​	BINGOGOAL_MAULX,
-​	BINGOGOAL_NEURONDELIVERY,
-​	BINGOGOAL_NONEEDLETRADING,
-​	BINGOGOAL_NOREGION,
-​	BINGOGOAL_PEARLDELIVERY,
-​	BINGOGOAL_PEARLHOARD,
-​	BINGOGOAL_PIN,
-​	BINGOGOAL_POPCORN,
-​	BINGOGOAL_RIVCELL,
-​	BINGOGOAL_SAINTDELIVERY,
-​	BINGOGOAL_SAINTPOPCORN,
-​	BINGOGOAL_STEAL,
-​	BINGOGOAL_TAME,
-​	BINGOGOAL_TRADE,
-​	BINGOGOAL_TRADETRADED,
-​	BINGOGOAL_TRANSPORT,
-​	BINGOGOAL_UNLOCK,
-​	BINGOGOAL_VISTA
+enum BINGO_GOALS_e {
+​	BINGO_GOAL_CHALLENGE = 0,	//	Default, unused or unimplemented item
+	BINGO_GOAL_ACHIEVEMENT,
+​	BINGO_GOAL_ALLREGIONSEXCEPT,
+​	BINGO_GOAL_BOMBTOLL,
+​	BINGO_GOAL_COLLECTPEARL,
+​	BINGO_GOAL_CRAFT,
+​	BINGO_GOAL_CREATUREGATE,
+​	BINGO_GOAL_CYCLESCORE,
+​	BINGO_GOAL_DAMAGE,
+​	BINGO_GOAL_DEPTHS,
+​	BINGO_GOAL_DODGELEVIATHAN,
+​	BINGO_GOAL_DONTUSEITEM,
+​	BINGO_GOAL_EAT,
+​	BINGO_GOAL_ECHO,
+​	BINGO_GOAL_ENTERREGION,
+​	BINGO_GOAL_GLOBALSCORE,
+​	BINGO_GOAL_GREENNEURON,
+​	BINGO_GOAL_HATCHNOODLE,
+​	BINGO_GOAL_HELL,
+​	BINGO_GOAL_ITEMHOARD,
+​	BINGO_GOAL_KARMAFLOWER,
+​	BINGO_GOAL_KILL,
+​	BINGO_GOAL_MAULTYPES,
+​	BINGO_GOAL_MAULX,
+​	BINGO_GOAL_NEURONDELIVERY,
+​	BINGO_GOAL_NONEEDLETRADING,
+​	BINGO_GOAL_NOREGION,
+​	BINGO_GOAL_PEARLDELIVERY,
+​	BINGO_GOAL_PEARLHOARD,
+​	BINGO_GOAL_PIN,
+​	BINGO_GOAL_POPCORN,
+​	BINGO_GOAL_RIVCELL,
+​	BINGO_GOAL_SAINTDELIVERY,
+​	BINGO_GOAL_SAINTPOPCORN,
+​	BINGO_GOAL_STEAL,
+​	BINGO_GOAL_TAME,
+​	BINGO_GOAL_TRADE,
+​	BINGO_GOAL_TRADETRADED,
+​	BINGO_GOAL_TRANSPORT,
+​	BINGO_GOAL_UNLOCK,
+​	BINGO_GOAL_VISTA,
+	BINGO_GOAL_VISTAEX,
+	BINGO_GOAL_ENTERREGIONFROM,
+	BINGO_GOAL_MOONCLOAK,
+	BINGO_GOAL_BROADCAST,
+	BINGO_GOAL_DAMAGEEX,
+	BINGO_GOAL_TAMEEX,
+	BINGO_GOAL_BOMBTOLLEX,
+	BINGO_GOAL_ECHOEX,
+	BINGO_GOAL_DODGENOOT,
+	BINGO_GOAL_DONTKILL,
+	BINGO_GOAL_GOURMANDCRUSH,
+	BINGO_GOAL_ITERATOR,
+	BINGO_GOAL_ITEMHOARDEX,
+	BINGO_GOAL_LICK
 };
 
 /*	internal enum names  */
@@ -384,51 +444,74 @@ const char* const BINGOGOAL_KEYS[] = {
 ​	"BingoTransportChallenge",
 ​	"BingoUnlockChallenge",
 ​	"BingoVistaChallenge"
+	"BingoVistaExChallenge",
+	"BingoEnterRegionFromChallenge",
+	"BingoMoonCloakChallenge",
+	"BingoBroadcastChallenge",
+	"BingoDamageExChallenge",
+	"BingoTameExChallenge",
+	"BingoBombTollExChallenge",
+	"BingoEchoExChallenge",
+	"BingoDodgeNootChallenge",
+	"BingoDontKillChallenge",
+	"BingoGourmandCrushChallenge",
+	"BingoIteratorChallenge",
+	"BingoItemHoardExChallenge",
+	"BingoLickChallenge"
 };
 
 /*	Challenge display text names / titles (English)  */
 const char* const BINGOGOAL_NAMES[] = {
-​	"Unimplemented challenge",
-	"Obtaining passages",
-​	"BingoAllRegionsExcept",
-​	"BingoBombTollChallenge",
-​	"BingoCollectPearlChallenge",
-​	"BingoCraftChallenge",
-​	"BingoCreatureGateChallenge",
-​	"BingoCycleScoreChallenge",
-​	"BingoDamageChallenge",
-​	"BingoDepthsChallenge",
-​	"BingoDodgeLeviathanChallenge",
-​	"BingoDontUseItemChallenge",
-​	"BingoEatChallenge",
-​	"BingoEchoChallenge",
-​	"BingoEnterRegionChallenge",
-​	"BingoGlobalScoreChallenge",
-​	"BingoGreenNeuronChallenge",
-​	"BingoHatchNoodleChallenge",
-​	"BingoHellChallenge",
-​	"BingoItemHoardChallenge",
-​	"BingoKarmaFlowerChallenge",
-​	"BingoKillChallenge",
-​	"BingoMaulTypesChallenge",
-​	"BingoMaulXChallenge",
-​	"BingoNeuronDeliveryChallenge",
-​	"BingoNoNeedleTradingChallenge",
-​	"BingoNoRegionChallenge",
-​	"BingoPearlDeliveryChallenge",
-​	"BingoPearlHoardChallenge",
-​	"BingoPinChallenge",
-​	"BingoPopcornChallenge",
-​	"BingoRivCellChallenge",
-​	"BingoSaintDeliveryChallenge",
-​	"BingoSaintPopcornChallenge",
-​	"Stealing items",
-​	"Befriending a creature",
-​	"BingoTradeChallenge",
-​	"BingoTradeTradedChallenge",
-​	"BingoTransportChallenge",
-​	"BingoUnlockChallenge",
-​	"Visiting vistas"
+​	"Empty challenge class",
+	"Obtaining Passages",
+	"Entering regions while never visiting one",
+	"Collecting pearls",
+	"Crafting items",
+	"Transporting the same creature through gates",
+	"Scoring cycle points",
+	"Dropping a creature in the depth pit",
+	"Dodging a Leviathan",
+	"Avoiding items",
+	"Eating specific food",
+	"Entering a region",
+	"Scoring global points",
+	"Delivering the Green Neuron",
+	"Hatching noodlefly eggs",
+	"Not dying before completing challenges",
+	"Consuming Karma Flowers",
+	"Killing creatures",
+	"Mauling different types of creatures",
+	"Mauling creatures a certain amount of times",
+	"Gifting neurons",
+	"Avoiding gifting Needles to Scavengers",
+	"Avoiding a region",
+	"Delivering colored pearls to an Iterator",
+	"Putting pearls in shelters",
+	"Pinning creatures to walls",
+	"Popping popcorn plants",
+	"Feeding the Rarefaction Cell to a Leviathan",
+	"Delivering the music pearl to Five Pebbles",
+	"Eating popcorn plant seeds",
+	"Stealing items",
+	"Befriending creatures",
+	"Trading items to Merchants",
+	"Trading already traded items",
+	"Transporting creatures",
+	"Getting Arena Unlocks",
+	"Visiting Vistas",
+	"Entering a region from another region",
+	"Moon's Cloak",
+	"Getting Chat Logs",
+	"Hitting creatures with items",
+	"Befriending creatures",
+	"Throwing grenades at Scavenger tolls",
+	"Visiting echoes",
+	"Dodging Noodlefly attacks",
+	"Avoiding killing creatures",
+	"Crushing creatures",
+	"Visiting Iterators",
+	"Hoarding items in shelters",
+	"Getting licked by lizards"
 };
 
 ---
@@ -437,7 +520,7 @@ Bingo goal `flags`:
 
 A bit vector of flags relevant to the goal.  At this time, only one flag is defined:
 
-enum GOAL_FLAGS {	/*	min size: uint8_t  */
+enum GOAL_FLAGS_e {	/*	min size: uint8_t  */
 	GOALFLAG_HIDDEN    = 0x01,
 	GOALFLAG_RESERVED1 = 0x02,
 	GOALFLAG_RESERVED2 = 0x04,
@@ -446,91 +529,8 @@ enum GOAL_FLAGS {	/*	min size: uint8_t  */
 
 Reserved flags are kept for future use; avoid placing challenge flags here.  The remaining upper nibble is free to use.
 
-The hidden flag functions as it does in Expedition.  What's necessary to reveal goals is up to implementation. (Possible example: complete all other goals in a row/col/diag to reveal the hidden goals in that row/col/diag.)
+The hidden flag functions as it does in Expedition.  What's necessary to reveal goals is up to implementation. (Possible example: complete a goal: reveals adjacent hidden goals; or, complete all other goals in a row/col/diag: reveal hidden goals in same row/col/diag.)
 
 ---
 
-copy pasting, losing enthusiasm for enums here...
-
-/**
- *	Convert region code to display name.
- *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
- */
-const regionCodeToDisplayName = {
-	"CC": "Chimney Canopy",
-	"DM": "Looks to the Moon",
-	"DS": "Drainage System",
-	"GW": "Garbage Wastes",
-	"HI": "Industrial Complex",
-	"LC": "Metropolis",
-	"LF": "Farm Arrays",
-	"LM": "Waterfront Facility",
-	"MS": "Submerged Superstructure",
-	"OE": "Outer Expanse",
-	"RM": "The Rot",
-	"SB": "Subterranean",
-	"SH": "Shaded Citadel",
-	"SI": "Sky Islands",
-	"SL": "Shoreline",
-	"SS": "Five Pebbles",
-	"SU": "Outskirts",
-	"UW": "The Exterior",
-	"VS": "Pipeyard"
-};
-
-/**
- *	Convert region code to display name, Saint world state.
- *	From: https://rainworld.miraheze.org/wiki/User:Alphappy/Region_codes
- */
-const regionCodeToDisplayNameSaint = {
-	"CC": "Solitary Towers",
-	"CL": "Silent Construct",
-	"GW": "Glacial Wasteland",
-	"HI": "Icy Monument",
-	"HR": "Rubicon",
-	"LF": "Desolate Fields",
-	"MS": "Submerged Superstructure",
-	"SB": "Primordial Underground",
-	"SI": "Windswept Spires",
-	"SL": "Frigid Coast",
-	"SU": "Suburban Drifts",
-	"UG": "Undergrowth",
-	"VS": "Barren Conduits"
-};
-
----
-
-Passages enum:
-
-const passageToDisplayNameMap = {
-	//	from game, WinState::PassageDisplayName
-	"Survivor":     "The Survivor",
-	"Hunter":       "The Hunter",
-	"Saint":        "The Saint",
-	"Traveller":    "The Wanderer",
-	"Chieftain":    "The Chieftain",
-	"Monk":         "The Monk",
-	"Outlaw":       "The Outlaw",
-	"DragonSlayer": "The Dragon Slayer",
-	"Scholar":      "The Scholar",
-	"Friend":       "The Friend",
-	"Nomad":        "The Nomad",
-	"Martyr":       "The Martyr",
-	"Pilgrim":      "The Pilgrim",
-	"Mother":       "The Mother"
-};
-
----
-
-STEALABLESTOABLE enum: index returns a string, the internal name of the respective item.  Convert the result to display text with ItemNameToDisplayTextMap
-
-const char* const STEALABLESTOABLE_KEYS[] = {
-	//	ChallengeUtils.stealableStoable
-	"Spear",
-	"Rock",
-	"ScavengerBomb",
-	"Lantern",
-	"GooieDuck",
-	"GlowWeed",
-	"DataPearl"	//	added by GetCorrectListForChallenge()
-};
+An authoritative list of enums and their contents can be found in the bingovista.js `ALL_ENUMS` object.

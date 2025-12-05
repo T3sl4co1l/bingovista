@@ -1,0 +1,95 @@
+.bv-header {
+	border-collapse: collapse;
+	max-width: 550px;
+}
+.bv-header tr td {
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+}
+.bv-header tr:first-child td {
+	font-weight: bold;
+	font-size: large;
+	text-align: center;
+}
+.bv-header tr td:first-child {
+	text-align: right;
+}
+.bv-header tr td:last-child {
+	text-align: left;
+	padding-right: 0.7em;
+}
+.bv-perkslabel {
+	display: inline-block;
+	padding: 0 3px;
+}
+.bv-perkscheck {
+  vertical-align: baseline;
+}
+.bv-headermods {
+	border-collapse: collapse;
+	margin: 2px;
+}
+.bv-board {
+	position: relative;
+	border: 1px solid #404040;
+}
+.bv-boardcanv {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 1;
+}
+.bv-boardcur {
+	margin: 0;
+	border: 4px solid #ff8090;
+	border-radius: 7px;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 2;
+}
+.bv-select {
+	border: 1px solid #404040;
+}
+.bv-desctxt {
+	text-align: left;
+	font: 16px "Segoe UI Semibold", Verdana, sans-serif;
+	padding-left: 0.6em;
+	vertical-align: top;
+	width: 24em;
+}
+.bv-desctxt * {
+	text-align: inherit;
+	margin: 4px 0 0 0;
+}
+.bv-desctxt br {
+	margin: 0 0 6px 0;
+}
+.bv-descch {
+	font: 700 16px "Segoe UI Bold", Verdana, sans-serif;
+}
+.bv-descch {
+	font: 700 16px "Segoe UI Bold", Verdana, sans-serif;
+}
+.bv-desclist {
+	border-collapse: collapse;
+}
+.bv-desclist tbody tr td {
+	font: 14px "Segoe UI", sans-serif;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+}
+.bv-desclist tbody tr :first-child {
+	text-align: right;
+}
+.bv-desclist thead tr td {
+	font: 600 14px "Segoe UI Semibold", sans-serif;
+	text-align: center;
+	padding: 2px 4px;
+	border: 1px solid #484848;
+	border-bottom-color: #a0a0a0;
+}
+.bv-desccomm {
+	font: 14px "Segoe UI", sans-serif;
+}
