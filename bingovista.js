@@ -33,12 +33,12 @@
  *	65535 (unsigned). Somewhere around 30k seems reasonable enough for a
  *	rounded value?
  */
-const INT_MAX    = 30000;
-const CHAR_MAX   =   250;	/**< Same as INT_MAX, but for challenges *very* unlikely to need >1 byte */
-const VERSION_MAJOR =  1, VERSION_MINOR = 30;	/**< Supported mod version */
-const HEADER_LENGTH = 21;	/**< Binary header length, bytes */
-const GOAL_LENGTH   =  3;	/**< Binary goal length, bytes */
-
+const INT_MAX  = 30000;
+const CHAR_MAX =   250;	/**< Same as INT_MAX, but for challenges *very* unlikely to need >1 byte */
+const VERSION_MAJOR   =  1, VERSION_MINOR = 30;	/**< Supported mod version */
+const HEADER_LENGTH   = 21;	/**< Binary header length, bytes */
+const GOAL_LENGTH     =  3;	/**< Binary goal length, bytes */
+const RESP_HEADER_LEN = 34;
 
 /*                           *
  * * *  Class Interface  * * *
@@ -65,6 +65,8 @@ selectCallbacks = []; mouseoverCallbacks = [];
 resourceTimer = 0;
 
 //	Data sources, modding
+/** Response header (binary and decoded) when sourced from shortener URL */
+respHeader;
 /** Modpacks to extend enums, dictionaries and challenges; array of objects which contain a data source (at init), and the structure (after fetch and parse) */
 modpacks = [];
 /** Goal definitions; used to convert to/from internal/abstract format (`board`), binary or text format, and accessory outputs (DOM contents); read only (use modding to modify) */
@@ -199,6 +201,19 @@ static colors = {
 	"nomscpebble":         "#72e6c4",
 	"popcorn_plant":       "#68283a",
 	"EnterFrom":           "#4287ff"
+};
+
+/**
+ *	Example / template shortener response header
+ */
+static respHeader = {
+	action: ["DB_INFO_PREV_AVAILABLE", "DB_INFO_NEXT_AVAILABLE", "DB_INFO_NO_MOVE"],
+	created: new Date(0),
+	error: "",
+	key: "",
+	raw: [],
+	status: ["BIN_RESP_OK", "BIN_RESP_NOT_FOUND", "BIN_RESP_NO_KEY", "BIN_RESP_ERROR", "BIN_RESP_UNKNOWN"],
+	views: 0
 };
 
 
@@ -467,41 +482,41 @@ constructor(params) {
 		{ name: "Mother",       text: "The Mother",        icon: "MotherA"       }
 	];
 	this.maps.pearls = [
-		{ name: "Misc",             text: "Misc",             region: "UNKNOWN", color: "#bebebe" },
-		{ name: "Misc2",            text: "Misc 2",           region: "UNKNOWN", color: "#bebebe" },
-		{ name: "CC",               text: "Gold",             region: "CC",      color: "#f3cc19" },
-		{ name: "SI_west",          text: "Dark Green",       region: "SI",      color: "#0d412c" },
-		{ name: "SI_top",           text: "Dark Blue",        region: "SI",      color: "#0d2c41" },
-		{ name: "LF_west",          text: "Deep Pink",        region: "LF",      color: "#ff2667" },
-		{ name: "LF_bottom",        text: "Bright Red",       region: "LF",      color: "#ff3c3c" },
-		{ name: "HI",               text: "Bright Blue",      region: "HI",      color: "#215bff" },
-		{ name: "SH",               text: "Deep Magenta",     region: "SH",      color: "#851450" },
-		{ name: "DS",               text: "Bright Green",     region: "DS",      color: "#26be3c" },
-		{ name: "SB_filtration",    text: "Teal",             region: "SB",      color: "#3c9393" },
-		{ name: "SB_ravine",        text: "Dark Magenta",     region: "SB",      color: "#410d2c" },
-		{ name: "GW",               text: "Viridian",         region: "GW",      color: "#20c690" },
-		{ name: "SL_bridge",        text: "Bright Purple",    region: "SL",      color: "#9435ee" },
-		{ name: "SL_moon",          text: "Pale Yellow",      region: "SL",      color: "#eaf551" },
-		{ name: "SU",               text: "Light Blue",       region: "SU",      color: "#93a8ea" },
-		{ name: "UW",               text: "Pale Green",       region: "UW",      color: "#7da47d" },
-		{ name: "PebblesPearl",     text: "Active Processes", region: "UNKNOWN", color: "#bebebe" },
-		{ name: "SL_chimney",       text: "Bright Magenta",   region: "SL",      color: "#ff1ab5" },
-		{ name: "Red_stomach",      text: "Aquamarine",       region: "UNKNOWN", color: "#99ffe6" },
-		{ name: "Spearmasterpearl", text: "Dark Red",         region: "UNKNOWN", color: "#7e020a" },
-		{ name: "SU_filt",          text: "Light Pink",       region: "SU",      color: "#ffc9ea" },
-		{ name: "SI_chat3",         text: "Dark Purple",      region: "SI",      color: "#2c0d41" },
-		{ name: "SI_chat4",         text: "Olive Green",      region: "SI",      color: "#2c410d" },
-		{ name: "SI_chat5",         text: "Dark Magenta",     region: "SI",      color: "#410d2c" },
-		{ name: "DM",               text: "Light Yellow",     region: "MS",      color: "#f6ee53" },
-		{ name: "LC",               text: "Deep Green",       region: "LC",      color: "#267d29" },
-		{ name: "OE",               text: "Light Purple",     region: "OE",      color: "#9d76d4" },
-		{ name: "MS",               text: "Dull Yellow",      region: "GW",      color: "#d7e861" },
-		{ name: "RM",               text: "Music",            region: "RM",      color: "#b12ffb" },
-		{ name: "Rivulet_stomach",  text: "Celadon",          region: "UNKNOWN", color: "#a6e3ae" },
-		{ name: "LC_second",        text: "Bronze",           region: "LC",      color: "#c26600" },
-		{ name: "CL",               text: "Music (faded)",    region: "CL",      color: "#bd48ff" },
-		{ name: "VS",               text: "Deep Purple",      region: "VS",      color: "#c30cf5" },
-		{ name: "BroadcastMisc",    text: "Broadcast",        region: "UNKNOWN", color: "#e9c6d2" }
+		{ name: "Misc",             text: "Misc",             region: "UNKNOWN", maincolor: "#b3b3b3", highlight: undefined, color: "#bebebe" },
+		{ name: "Misc2",            text: "Misc 2",           region: "UNKNOWN", maincolor: "#ff99e6", highlight: "#ffffff", color: "#bebebe" },
+		{ name: "CC",               text: "Gold",             region: "CC",      maincolor: "#e69919", highlight: "#ffff00", color: "#f3cc19" },
+		{ name: "SI_west",          text: "Dark Green",       region: "SI",      maincolor: "#020202", highlight: "#199966", color: "#0d412c" },
+		{ name: "SI_top",           text: "Dark Blue",        region: "SI",      maincolor: "#020202", highlight: "#196699", color: "#0d2c41" },
+		{ name: "LF_west",          text: "Deep Pink",        region: "LF",      maincolor: "#ff004c", highlight: undefined, color: "#ff2667" },
+		{ name: "LF_bottom",        text: "Bright Red",       region: "LF",      maincolor: "#ff1919", highlight: undefined, color: "#ff3c3c" },
+		{ name: "HI",               text: "Bright Blue",      region: "HI",      maincolor: "#0232ff", highlight: "#80ccff", color: "#215bff" },
+		{ name: "SH",               text: "Deep Magenta",     region: "SH",      maincolor: "#330019", highlight: "#ff3399", color: "#851450" },
+		{ name: "DS",               text: "Bright Green",     region: "DS",      maincolor: "#00b319", highlight: undefined, color: "#26be3c" },
+		{ name: "SB_filtration",    text: "Teal",             region: "SB",      maincolor: "#198080", highlight: undefined, color: "#3c9393" },
+		{ name: "SB_ravine",        text: "Dark Magenta",     region: "SB",      maincolor: "#020202", highlight: "#991966", color: "#410d2c" },
+		{ name: "GW",               text: "Viridian",         region: "GW",      maincolor: "#00b380", highlight: "#80ff80", color: "#20c690" },
+		{ name: "SL_bridge",        text: "Bright Purple",    region: "SL",      maincolor: "#6619e6", highlight: "#ff66ff", color: "#9435ee" },
+		{ name: "SL_moon",          text: "Pale Yellow",      region: "SL",      maincolor: "#e6f333", highlight: undefined, color: "#eaf551" },
+		{ name: "SU",               text: "Light Blue",       region: "SU",      maincolor: "#8099e6", highlight: undefined, color: "#93a8ea" },
+		{ name: "UW",               text: "Pale Green",       region: "UW",      maincolor: "#669966", highlight: "#ffb3ff", color: "#7da47d" },
+		{ name: "PebblesPearl",     text: "Active Processes", region: "UNKNOWN", maincolor: "#b3b3b3", highlight: undefined, color: "#bebebe" },
+		{ name: "SL_chimney",       text: "Bright Magenta",   region: "SL",      maincolor: "#ff008c", highlight: "#cc4cff", color: "#ff1ab5" },
+		{ name: "Red_stomach",      text: "Aquamarine",       region: "UNKNOWN", maincolor: "#99ffe6", highlight: "#ffffff", color: "#99ffe6" },
+		{ name: "Spearmasterpearl", text: "Dark Red",         region: "UNKNOWN", maincolor: "#0a020a", highlight: "#f30000", color: "#7e020a" },
+		{ name: "SU_filt",          text: "Light Pink",       region: "SU",      maincolor: "#ffc0e6", highlight: undefined, color: "#ffc9ea" },
+		{ name: "SI_chat3",         text: "Dark Purple",      region: "SI",      maincolor: "#020202", highlight: "#661999", color: "#2c0d41" },
+		{ name: "SI_chat4",         text: "Olive Green",      region: "SI",      maincolor: "#020202", highlight: "#669919", color: "#2c410d" },
+		{ name: "SI_chat5",         text: "Dark Magenta",     region: "SI",      maincolor: "#020202", highlight: "#991966", color: "#410d2c" },
+		{ name: "DM",               text: "Light Yellow",     region: "MS",      maincolor: "#f4eb35", highlight: undefined, color: "#f6ee53" },
+		{ name: "LC",               text: "Deep Green",       region: "LC",      maincolor: "#006604", highlight: undefined, color: "#267d29" },
+		{ name: "OE",               text: "Light Purple",     region: "OE",      maincolor: "#8c5ecc", highlight: undefined, color: "#9d76d4" },
+		{ name: "MS",               text: "Dull Yellow",      region: "GW",      maincolor: "#d0e445", highlight: undefined, color: "#d7e861" },
+		{ name: "RM",               text: "Music",            region: "RM",      maincolor: "#622ffb", highlight: "#ff0000", color: "#b12ffb" },
+		{ name: "Rivulet_stomach",  text: "Celadon",          region: "UNKNOWN", maincolor: "#96dea0", highlight: undefined, color: "#a6e3ae" },
+		{ name: "LC_second",        text: "Bronze",           region: "LC",      maincolor: "#990000", highlight: "#cccc00", color: "#c26600" },
+		{ name: "CL",               text: "Music (faded)",    region: "CL",      maincolor: "#7b48ff", highlight: "#ff0000", color: "#bd48ff" },
+		{ name: "VS",               text: "Deep Purple",      region: "VS",      maincolor: "#870ceb", highlight: "#ff00ff", color: "#c30cf5" },
+		{ name: "BroadcastMisc",    text: "Broadcast",        region: "UNKNOWN", maincolor: "#e6b3cc", highlight: "#66e666", color: "#e9c6d2" }
 	];
 	this.maps.regions = [
 		{ code: "Any Region", text: "Any Region",    saintText: undefined           },
@@ -776,19 +791,17 @@ constructor(params) {
 			.concat(this.maps.unlocksred).concat(this.maps.unlocksgreen);
 	this.enums.unlocks = this.enums.unlocksblue.concat(this.enums.unlocksgold)
 			.concat(this.enums.unlocksred).concat(this.enums.unlocksgreen);
-
-	//	Watcher update
-	this.enums.characters.push("Watcher");
-	this.maps.characters.push( { name: "Watcher", text: "Watcher", color: "#17234e", icon: "Kill_Slugcat" } );
-	this.enums.unlocks.push("SeedCob");
-	this.maps.unlocks.push( { type: "blue", unlockColor: Bingovista.colors.AntiGold, name: "SeedCob", text: "Popcorn Plants", icon: "popcorn_plant", color: "#68283a" } );
-	this.enums.vista_code = [];
-	for (var v of this.maps.vistas) {
-		this.enums.vista_code.push(v.region + "><System.String|" + v.room + "|Room|0|vista><" + String(v.x) + "><" + String(v.y));
-	}
+	this.enums.vista_code = this.maps.vistas.map(o => o.region + "><System.String|"
+			+ o.room + "|Room|0|vista><" + String(o.x) + "><" + String(o.y));
 	this.enums.weapons = [ "Any Weapon", "Spear", "Rock", "ScavengerBomb", "JellyFish",
 		"PuffBall", "LillyPuck", "SingularityBomb" ];
 	this.enums.weaponsnojelly = this.enums.weapons.slice(0);
+
+	//	from Watcher update
+	this.maps.characters.push( { name: "Watcher", text: "Watcher", color: "#17234e", icon: "Kill_Slugcat" } );
+	this.enums.characters.push("Watcher");
+	this.maps.unlocks.push( { type: "blue", unlockColor: Bingovista.colors.AntiGold, name: "SeedCob", text: "Popcorn Plants", icon: "popcorn_plant", color: "#68283a" } );
+	this.enums.unlocks.push("SeedCob");
 
 	//this.initGenerateBlacklist();
 
@@ -835,12 +848,11 @@ loadAtlas(atl) {
 		var ctx = canv.getContext("2d");
 		ctx.drawImage(img, 0, 0);
 		atl.canv = canv;
-		console.log("loadAtlas success: image " + atl.img);
 		ard();
 	});
 	img.addEventListener("error", function(e) {
-		atl.imgErr = "Error: load image failed";
-		console.log("loadAtlas error: image \"" + atl.img + "\"");
+		atl.imgErr = "Image load failed; resource \"" + atl.img + "\"";
+		console.log("loadAtlas error: " + atl.imgErr);
 		ard();
 	});
 	img.crossOrigin = "anonymous";
@@ -853,20 +865,20 @@ loadAtlas(atl) {
 				try {
 					atl.frames = JSON.parse(s).frames;
 				} catch (e) {
-					atl.txtErr = "Error: " + e.toString();
-					console.log("loadAtlas error: JSON \"" + atl.txt + "\"");
-					return;
+					atl.txtErr = "Parse error; " + e.toString();
+					console.log("loadAtlas error: " + atl.txtErr);
 				}
-				console.log("loadAtlas success: image " + atl.img);
 				ard();
 			});
 		} else {
-			atl.txtErr = "Error: resource not found";
+			atl.txtErr = "Not found; resource \"" + atl.txt + "\"";
+			console.log("loadAtlas error: " + atl.txtErr);
 			ard();
 		}
 	}, function(r) {
 		//	Request failed
-		atl.txtErr = "Error: connection failed";
+		atl.txtErr = "Connection failed; resource \"" + atl.txt + "\"";
+		console.log("loadAtlas error: " + atl.txtErr);
 		ard();
 	});
 	
@@ -964,7 +976,34 @@ setup(params) {
 						var basetype = r.headers.get("content-type").split(";")[0].toLowerCase();
 						if (basetype === "application/octet-stream") {
 							r.arrayBuffer().then(function(ar) {
-								this.binToBoard(new Uint8Array(ar.slice(1)));
+								this.respHeader = {
+									action: [],
+									created: "",
+									error: "",
+									key: "",
+									raw: [],
+									status: "",
+									views: 0
+								};
+								if (ar.byteLength < RESP_HEADER_LEN) {
+									this.respHeader.error = "Insufficient header received: " + String(ar.byteLength) + " bytes";
+								} else {
+									this.respHeader.raw = new Uint8Array(ar.slice(0, RESP_HEADER_LEN));
+									this.respHeader.status = ([
+										"BIN_RESP_OK", "BIN_RESP_NOT_FOUND", "BIN_RESP_NO_KEY", "BIN_RESP_ERROR"
+									])[this.respHeader.raw[0]] || "BIN_RESP_UNKNOWN";
+									if (this.respHeader.raw[1] & 0x01) this.respHeader.action.push("DB_INFO_PREV_AVAILABLE");
+									if (this.respHeader.raw[1] & 0x02) this.respHeader.action.push("DB_INFO_NEXT_AVAILABLE");
+									if (this.respHeader.raw[1] & 0x08) this.respHeader.action.push("DB_INFO_NO_MOVE");
+									for (var i = 0; i < 16; i++) {
+										if (this.respHeader.raw[2 + i] == 0) break;
+										this.respHeader.key += String.fromCharCode(this.respHeader.raw[2 + i]);
+									}
+									var rawTime = Bingovista.readLong(this.respHeader.raw, 18) + Bingovista.readLong(this.respHeader.raw, 22) * (1 << 16) * (1 << 16);
+									this.respHeader.created = new Date(rawTime * 1000);
+									this.respHeader.views = Bingovista.readLong(this.respHeader.raw, 26) + Bingovista.readLong(this.respHeader.raw, 30) * (1 << 16) * (1 << 16);
+								}
+								this.binToBoard(new Uint8Array(ar.slice(RESP_HEADER_LEN)));
 								this.areResourcesDone();
 								for (var f of this.loadSuccessCallbacks) f.call(this);
 							}.bind(this));
