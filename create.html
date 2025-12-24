@@ -3,7 +3,7 @@
   <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<meta name="viewport" content="width=600, initial-scale=0.7">
-	<title>View | Rain World Bingo Board Viewer/Creator</title>
+	<title>Create | Rain World Bingo Board Viewer/Creator</title>
 	<link rel="preload" as="image" href="atlases/bvicons.png" crossorigin="anonymous">
 	<link rel="preload" as="image" href="atlases/bingoicons.png" crossorigin="anonymous">
 	<link rel="preload" as="image" href="atlases/uiSprites.png" crossorigin="anonymous">
@@ -13,7 +13,7 @@
 	<link rel="preload" as="fetch" href="atlases/uiSprites.txt" crossorigin="anonymous">
 	<link rel="preload" as="fetch" href="atlases/uispritesmsc.txt" crossorigin="anonymous">
 	<link rel="preload" as="script" href="bingovista.js">
-	<link rel="preload" as="script" href="view.js">
+	<link rel="preload" as="script" href="create.js">
 	<link rel="icon" type="image/png" sizes="48x48" href="favicon.ico">
 	<link rel="StyleSheet" href="bv.css" media="all">
 	<link rel="StyleSheet" href="v.css" media="all">
@@ -25,21 +25,35 @@
 	  <form action="tips.html"><button class="rw-ui" id="navtips">TIPS</button></form>
 	  <form action="about.html"><button class="rw-ui" id="navabout">ABOUT</button></form>
 	</div>
-	<h1>Rain World: Bingo Mod<br>Board Viewer/Creator</h1>
+	<h1>Rain World: Bingo Mod<br> Board Viewer/Creator</h1>
 	<div id="header"></div>
 	<div id="boardcontainer" style="width: 456px; height: 456px;" tabindex="0">Canvas support and scripting are required.</div>
 	<table><tr><td style="vertical-align: top;"><div id="descsq" style="width: 92px; height: 92px;"></div></td><td id="desctxt">Select a square to view details.</td></tr></table>
 	<p>&nbsp;</p>
 	<div><label><input type="checkbox" id="kibitzing">Kibitzing</label> (additional hints / full data)</div>
 	<div><label><input type="checkbox" id="transp">Transpose Board</label> (matches &lt;v1.25 visual arrangement)</div>
-	<p id="errorbox" style="display: none">&nbsp;</p>
-	<div><textarea id="textbox" spellcheck="false" disabled="true"></textarea></div>
+	<p>Status: <span id="errorbox">Ready.</span></p>
 	<div class="buttonrow">
-	  <button class="rw-ui" id="copy" style="width: 9em;">COPY TEXT</button>
+	  <button class="rw-ui" id="parse" style="width: 12em;">&wedge; LOAD BOARD</button>
+	  <button class="rw-ui" id="maketext" style="width: 12em;">REFRESH TEXT &vee;</button>
 	</div>
-	<p>Permanent link: <input type="text" size="40" disabled id="permlink"></p>
+	<div><textarea id="textbox" spellcheck="false" autocomplete="off"></textarea></div>
+	<div class="buttonrow">
+	  <button class="rw-ui" id="clear">CLEAR</button>
+	  <button class="rw-ui" id="copy">COPY</button>
+	  <button class="rw-ui" id="link">LINK</button>
+	  <button class="rw-ui" id="short">SHORTEN</button>
+	</div>
+	<dialog id="shortenbox">
+	  <div id="shortenboxt"></div>
+	  <div><input type="text" size="20" id="shortenboxv" disabled style="display: none"></div>
+	  <button class="rw-ui" id="shortenboxb">Copy</button>
+	  <form style="display: inline-block;"><button class="rw-ui" formmethod="dialog">Close</button></form>
+	</dialog>
+	<p>Paste plain board text or a Bingovista URL in the textbox above, or select or drag-and-drop a file below.</p>
+	<table class="droptbl"><tr><td class="drop" id="droptarget"><input type="file" id="fileload" accept=".txt,text/plain"></td></tr></table>
 
 	<script src="bingovista.js"></script>
-	<script src="view.js"></script>
+	<script src="create.js"></script>
   </body>
 </html>

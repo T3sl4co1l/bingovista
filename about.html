@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<meta name="viewport" content="width=600, initial-scale=0.7">
+	<title>About | Rain World Bingo Board Viewer/Creator</title>
+	<link rel="icon" type="image/png" sizes="48x48" href="favicon.ico">
+	<link rel="StyleSheet" href="v.css" media="all">
+  </head>
+  <body>
+	<div class="buttonrow">
+	  <form action="bingovista.html"><button class="rw-ui" id="navview">VIEW</button></form>
+	  <form action="create.html"><button class="rw-ui" id="navcreate">CREATE</button></form>
+	  <form action="tips.html"><button class="rw-ui" id="navtips">TIPS</button></form>
+	  <form action="about.html"><button class="rw-ui" id="navabout">ABOUT</button></form>
+	</div>
+	<h1>Rain World: Bingo Mod<br> Board Viewer/Creator</h1>
+	<p>Bingo Board Viewer, by <a href="https://github.com/T3sl4co1l/bingovista/">T3sl4co1l</a>.  Supports <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3441764924">Rain World Bingo Mod</a> up to version 1.26.</p>
+	<h2>Use</h2>
+	<p>In-game, while configuring the board and selecting challenges, press the "Copy board" button:</p>
+	<p class="pimg"><img src="img/instruction1.png" width="345" height="157"></p>
+	<p>Switch to this browser window.  Click on the CREATE navigation button.  Scroll down to the large textbox.  Press CLEAR.  Focus the large textbox, and Paste into it:
+	<p class="pimg"><img src="img/instruction2.png" width="396" height="370"></p>
+	
+	<p>Copied text can also pasted into chats, discussion boards, forums, etc. for easy sharing, or as a text file (*.TXT) for local storage.  Saved text can be loaded by clicking Choose File/Browse..., or drag-and-dropping a text file into the file-load widget.  Whatever the method, the text content is loaded into the textbox for visual confirmation (and manual editing as needed).</p>
+	<p>Stored board text (in the textbox) can be copied (press the COPY button, or select all and copy), and pasted into any other location, including in-game when configuring the board (press the "Paste board" button).</p>
+	<p>For convenience, pasting into an empty textbox also triggers parsing.  Parsing takes in any valid goals and renders them as goal squares, recreating the in-game view.  Squares can be clicked to view a detailed description.  The board can also be navigated by focusing it, then using arrow keys to move the cursor around.</p>
+	<p>The board view and current URL are updated together.  The board is encoded in the URL, in a shorthand form; a typical board is around 3kB, a typical URL around 300 bytes (yeah, this is still a bit long, but tolerable).  The URL can be copied, and shared anywhere that accepts URLs.  The encoded board can be read anywhere with an internet connection (or a local copy of the viewer).</p>
+	<p>Clicking a square on the board view, shows details for that challenge: full name, a description of the goal, and all parameters and values used in it.</p>
+	<p>"Kibitzing" enables additional commentary: useful details or hints when a goal might not be exactly obvious, or full data of otherwise-hidden goals.</p>
+	<p><em>Review the board before sharing!</em>  Goals may not read properly (particularly likely with customized options, or after mod updates; take note of the current version, and currently supported version!), and error squares take up extra space in the URL.  Doesn't hurt to double-check the URL as well: simply refresh the page, to load it from the encoded data in the URL.  (If you find the URL is ponderously large for a given board size, there are probably errors in it!)  If any squares have changed, or become errors afterwards, a bug report is welcome!</p>
+	<p>Errors show up as a null symbol "<b>&empty;</b>"; read that square's description to see what parameter(s) failed.  If corrections are needed, or manual edits made, do them in the text box, then press PARSE.  (The error also includes the original goal string (or as much as fits), so that the original goal can (probably) be reconstructed manually.)  Parsing also removes extraneous white space, in case you had spaced things out for easier editing.</p>
+	<p>In lieu of a proper board editor (or customizer), using a featureful text editor like <a href="https://notepad-plus-plus.org/">Notepad++</a> is recommended.  First, find-and-replace "bChG" with "&nbsp;bChG\n".  That is, add a space before, and a newline after, these letters.  Use the "Extended" mode that supports escaped characters (like '\n').  Goals are much easier to see and move around this way.  Structure is regular: <span class="code">BingoChallengeName&sim;param1&gt;&lt;param2&gt;&lt;...</span>.  Parameters are (usually) verbose, including metadata related to the selection box (type, title, position on the in-game configure menu, list to choose from).</p>
+	<h2><a name="data">Data Storage</a></h2>
+	<p>On the CREATE page, pressing LINK opens a tab to the viewer, using a long URL that encodes the board data.  This link can be stored and accessed at any time (given one has access to the viewer page).  The basic viewer <em>does not store</em> any data remotely.</p>
+	<p>On the CREATE page, pressing SHORTEN <b>does transmit data</b> to a server.  <b>This service is offered voluntarily</b>; it may become unavailable at any time, due to congestion, outage, maintenance, abuse, or just not being able to support it anymore.  DO NOT rely on shortened links for persistent storage.  Keep backups (the long URL, or text) of anything you want to save.</p>
+	<p>This tool does not use cookies.</p>
+	<h2>Thanks</h2>
+	<p>Videocult and co. for Rain World, Nacu for putting in the work on Bingo, and ICED37 for making it happen; shrubfromtomorrow for continuing the project; Gzethicus and DrekiOrmur for contributions; and alphappy and diedirl for help with assets and tips on inner workings.</p>
+	<h2>Changelog</h2>
+	<ul>
+	  <li>2025/12/24: And here's the major [functional] update!  Separating roles into View and Create; documentation moved to own pages; shorten-link feature.</li>
+	  <li>2025/12/05: Large update finally here! Significant refactoring, (hopefully) making the module more usable in outside projects.  Few functional updates actually, but be on the lookout for bugs and errors.</li>
+	  <li>2025/08/26: Large update taking too long; updating to v1.25 support.</li>
+	  <li>2025/08/10: Testing experimental new feature; large update coming soon(!).</li>
+	  <li>2025/07/30: More commentary tweaks, and a "one of everything" board to easily show all commentary.</li>
+	  <li>2025/07/18: Improved commentary on item hoard, tame and transport goals.</li>
+	  <li>2025/07/01: 1.1 mod support.</li>
+	  <li>2025/06/27: 1.09 mod support.</li>
+	  <li>2025/06/17: 1.08 mod support.</li>
+	  <li>2025/03/13: 1.04 mod support.</li>
+	  <li>2025/03/02: 0.90 mod support.</li>
+	  <li>2025/02/19: First release, 0.85 mod support.</li>
+	</ul>
+  </body>
+</html>

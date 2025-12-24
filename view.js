@@ -20,17 +20,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
 	document.getElementById("kibitzing").addEventListener("input", toggleKibs);
 	document.getElementById("transp").addEventListener("input", toggleTransp);
-	document.getElementById("textbox").addEventListener("paste", pasteText);
-	document.getElementById("clear").addEventListener("click", clearText);
-	document.getElementById("parse").addEventListener("click", parseButton);
 	document.getElementById("copy").addEventListener("click", copyText);
-
-	document.getElementById("fileload").addEventListener("change", (e) => doLoadFile(e.target.files));
-	var d = document.getElementById("droptarget");
-	d.addEventListener("dragenter", dragEnterOver);
-	d.addEventListener("dragover", dragEnterOver);
-	d.addEventListener("dragleave", dragLeave);
-	d.addEventListener("drop", dragDrop);
 
 	var u = new URL(document.URL).searchParams;
 	if (u.has("a")) {
@@ -45,6 +35,27 @@ document.addEventListener("DOMContentLoaded", function() {
 		bv.setup( { dataSrc: u.get("q"), dataType: "short" } );
 	}
 });
+
+/**
+ *	Data loaded callback.
+ */
+function loadSuccess(e) {
+	document.getElementById("errorbox").style.display = "none";
+	document.getElementById("textbox").value = this.board.text;
+	var u = new URL(document.URL);
+	u.searchParams.set("b", Bingovista.binToBase64u(this.board.toBin));
+	u.searchParams.delete("q");
+	document.getElementById("permlink").value = u.href;
+}
+
+/**
+ *	Data load failure callback.
+ */
+function loadFail(e) {
+	var e = document.getElementById("errorbox");
+	e.style.display = "initial";
+	e.innerHTML = "Status: " + this.board.error;
+}
 
 /**
  *	Key input to board container; pare down to arrow keys for navigating squares
@@ -76,55 +87,14 @@ function navSquares(e) {
  *	Kibitzing check toggled.
  */
 function toggleKibs(e) {
-	bv.setup( { tips: e.target.checked } );
+	bv?.setup( { tips: e.target.checked } );
 }
 
 /**
  *	Transpose check toggled.
  */
 function toggleTransp(e) {
-	bv.setup( { transpose: e.target.checked } );
-}
-
-/**
- *	Pasted to textbox.
- */
-function pasteText(e) {
-	//	Let default happen, but trigger a parse in case no edits are required by the user
-	setTimeout(parseButton, 10);
-}
-
-function loadSuccess(e) {
-	document.getElementById("errorbox").innerHTML = "";
-	document.getElementById("textbox").value = this.board.text;
-	var u = new URL(document.URL);
-	u.searchParams.set("b", Bingovista.binToBase64u(this.board.toBin));
-	window.history.pushState(null, "", u.href);
-}
-
-function loadFail(e) {
-	document.getElementById("errorbox").innerHTML = this.board.error;
-}
-
-/**
- * Clicked on Clear.
- */
-function clearText(e) {
-	document.getElementById("textbox").value = "";
-	var u = new URL(document.URL);
-	u.search = "";
-	window.history.pushState(null, "", u.href);
-}
-
-/**
- *	Parse Text button pressed.
- */
-function parseButton(e) {
-	var s = document.getElementById("textbox").value;
-	s = s.replace(/;\n+/, ";");
-	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
-	document.getElementById("textbox").value = s;
-	bv.setup( { dataSrc: s, dataType: "text" } );
+	bv?.setup( { transpose: e.target.checked } );
 }
 
 /**
@@ -132,76 +102,4 @@ function parseButton(e) {
  */
 function copyText(e) {
 	navigator.clipboard.writeText(document.getElementById("textbox").value);
-	setError("Text copied to clipboard.");
-}
-
-function doLoadFile(files) {
-	for (var i = 0; i < files.length; i++) {
-		if (files[i].type.match("^text/plain")) {
-			var fr = new FileReader();
-			fr.onload = function() {
-				document.getElementById("textbox").value = this.result;
-				parseButton();
-			};
-			fr.onerror = function(e) {
-				setError("File read error: " + e.message);
-			};
-			fr.readAsText(files[i]);
-			return;
-		}
-	}
-	setError("Please select a text file.");
-}
-
-/**
- * Element dragged over drop target.
- */
-function dragEnterOver(e) {
-	if (e.dataTransfer.types.includes("text/plain")
-			|| e.dataTransfer.types.includes("Files")) {
-		e.preventDefault();
-		e.target.style.backgroundColor = "#686868";
-	}
-}
-
-/**
- * Element dragged away from drop target.
- */
-function dragLeave(e) {
-	// maybe :-moz-drag-over css pseudoclass will one day be standard...that'd be handy here
-	e.target.style.backgroundColor = "";
-}
-
-/**
- *	Data dropped onto the page.
- */
-function dragDrop(e) {
-	e.preventDefault();
-	e.target.style.backgroundColor = "";
-	var d = e.dataTransfer;
-	setError("");
-	if (d.types.includes("Files")) {
-		doLoadFile(d.files);
-	} else {
-		var s;
-		for (var i = 0; i < d.items.length; i++) {
-			if (d.items[i].type.match("^text/plain")) {
-				d.items[i].getAsString(function(s) {
-					document.getElementById("textbox").value = s;
-					parseButton();
-				});
-				return;
-			}
-		}
-		setError("Please drop a text file.");
-	}
-}
-
-/**
- *	Sets a message in the error box.
- */
-function setError(s) {
-	var mb = document.getElementById("errorbox");
-	while (mb.childNodes.length) mb.removeChild(mb.childNodes[0]);
-	mb.appendChild(document.createTextNode(s));
 }

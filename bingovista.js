@@ -798,10 +798,10 @@ constructor(params) {
 	this.enums.weaponsnojelly = this.enums.weapons.slice(0);
 
 	//	from Watcher update
-	this.maps.characters.push( { name: "Watcher", text: "Watcher", color: "#17234e", icon: "Kill_Slugcat" } );
-	this.enums.characters.push("Watcher");
 	this.maps.unlocks.push( { type: "blue", unlockColor: Bingovista.colors.AntiGold, name: "SeedCob", text: "Popcorn Plants", icon: "popcorn_plant", color: "#68283a" } );
 	this.enums.unlocks.push("SeedCob");
+	//this.maps.characters.push( { name: "Watcher", text: "Watcher", color: "#17234e", icon: "Kill_Slugcat" } );
+	//this.enums.characters.push("Watcher");
 
 	//this.initGenerateBlacklist();
 
@@ -1238,7 +1238,7 @@ refreshHeader() {
 		flag = flag || (rows[names[i]] === undefined);
 		if (flag) break;
 		for (var j in indices[i]) {
-			rows[names[i]] = rows[names[i]].children[j];
+			rows[names[i]] = rows[names[i]].children[indices[i][j]];
 			flag = flag || (rows[names[i]] === undefined);
 			if (flag) break;
 		}
@@ -1345,18 +1345,18 @@ refreshHeader() {
 		return;
 	}
 
-	//	set header elements
-	while (title.childNodes.length) title.removeChild(title.childNodes[0]);
-	title.appendChild(document.createTextNode(this.board.comments || "Untitled"));
-	while (size.childNodes.length) size.removeChild(size.childNodes[0]);
-	size.appendChild(document.createTextNode(String(this.board.width) + " x " + String(this.board.height)));
-	while (char.childNodes.length) char.removeChild(char.childNodes[0]);
-	char.appendChild(document.createTextNode(this.board.character || "Any"));
-	while (shel.childNodes.length) shel.removeChild(shel.childNodes[0]);
+	//	Set header elements
+	while (rows.title.childNodes.length) rows.title.removeChild(rows.title.childNodes[0]);
+	rows.title.appendChild(document.createTextNode(this.board.comments || "Untitled"));
+	while (rows.size.childNodes.length) rows.size.removeChild(rows.size.childNodes[0]);
+	rows.size.appendChild(document.createTextNode(String(this.board.width) + " x " + String(this.board.height)));
+	while (rows.char.childNodes.length) rows.char.removeChild(rows.char.childNodes[0]);
+	rows.char.appendChild(document.createTextNode(this.board.character || "Any"));
+	while (rows.shel.childNodes.length) rows.shel.removeChild(rows.shel.childNodes[0]);
 	if (this.board.shelter)
-		shel.innerHTML = this.getMapLink(this.board.shelter, this.board.character);
+		rows.shel.innerHTML = this.getMapLink(this.board.shelter, this.board.character);
 	else
-		shel.appendChild(document.createTextNode("random"));
+		rows.shel.appendChild(document.createTextNode("random"));
 
 	//	Set perks
 	var p = this.board.perks | 0;
@@ -2547,7 +2547,6 @@ binToBoard(a) {
 		text: "",
 		goals: [],
 		toBin: a,
-		text: "",
 		error: ""
 	};
 	var d = new TextDecoder;
