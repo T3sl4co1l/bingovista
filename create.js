@@ -44,7 +44,6 @@ document.addEventListener("DOMContentLoaded", function() {
  */
 function loadSuccess(e) {
 	setError("Loaded.");
-	document.getElementById("textbox").value = this.board.text;
 }
 
 /**
@@ -114,6 +113,30 @@ function clearText(e) {
  */
 function parseButton(e) {
 	var s = document.getElementById("textbox").value;
+	var u;
+	//	try parsing URL
+	try {
+		u = new URL(s);
+	} catch {
+		u = undefined;
+	}
+	if (u !== undefined) {
+		//	plausible; is it us-flavored?
+		if (u.pathname.search(/\/bingovista\//) >= 0) {
+			var p = u.searchParams;
+			if (p.has("b")) {
+				bv.setup( { dataSrc: p.get("b"), dataType: "base64" } );
+				return;
+			} else if (p.has("q")) {
+				bv.setup( { dataSrc: p.get("q"), dataType: "short" } );
+				return;
+			} else {
+				setError("Unrecognized URL.");
+			}
+		} else {
+			setError("Unrecognized URL.");
+		}
+	}
 	s = s.replace(/;\n+/, ";");
 	s = s.trim().replace(/\s*bChG\s*/g, "bChG");
 	bv.setup( { dataSrc: s, dataType: "text" } );
