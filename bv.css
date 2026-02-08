@@ -93,3 +93,11 @@
 .bv-desccomm {
 	font: 14px "Segoe UI", sans-serif;
 }
+.bv-code {
+	font-family: Courier New, monospace;
+	font-weight: bold;
+	font-size: 100%;
+	white-space: nowrap;
+	background-color: #584800;
+	color: #ffffff;
+}
