@@ -15,6 +15,8 @@ document.addEventListener("DOMContentLoaded", function() {
 		loadFail: loadFail,
 		loadSuccess: loadSuccess,
 	} );
+	
+	bv.selectSquare = mySelectSquare;
 
 	//	Nav, header and file handling buttons
 	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
@@ -110,4 +112,113 @@ function toggleTransp(e) {
  */
 function copyText(e) {
 	navigator.clipboard.writeText(document.getElementById("textbox").value);
+}
+
+function mySelectSquare(col, row) {
+	var ctx, elem, goal, width, height;
+	this.selected = { col: col, row: row };
+	this.setCursor(col, row);
+	if (this.selectId !== undefined) {
+		elem = document.getElementById(this.selectId);
+		if (elem !== null) {
+			var canv = elem.children[0];
+			if (canv === undefined || canv.getContext === undefined) {
+				//	hierarchy not as expected; rip out and start over
+				//	(note: leaks any attached listeners)
+				while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
+				canv = document.createElement("canvas");
+				//	Get size from container element; if unrealistic, set the internal default
+				elem.setAttribute("class", "bv-select");
+				canv.setAttribute("class", "bv-selectcanv");
+				canv.width  = Math.round(elem.getBoundingClientRect().width ) - 2;
+				canv.height = Math.round(elem.getBoundingClientRect().height) - 2;
+				if (canv.width < 32 || canv.height < 32) {
+					//	parent dimensions may be unset; use BV default
+					canv.width = 100; canv.height = 100;
+				}
+				elem.appendChild(canv);
+			}
+			ctx = canv.getContext("2d");
+			ctx.fillStyle = this.square.background;
+			ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+			if (col >= 0 && col < this.board.width && row >= 0 && row <= this.board.height
+					&& this.getGoal(col, row) !== undefined) {
+				this.drawSquare("select", this.getGoal(col, row));
+			}
+		}
+	}
+
+	if (this.detailId === undefined) return;
+	elem = document.getElementById(this.detailId);
+	if (elem === null) return;
+	elem.setAttribute("class", "bv-desctxt");
+	if (!(col >= 0 && row >= 0 && col < this.board.width && row <= this.board.height
+			&& this.getGoal(col, row) !== undefined)) {
+		while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
+		elem.appendChild(document.createTextNode(this.unselectText));
+		return;
+	}
+	goal = this.getGoal(col, row);
+	while (elem.childNodes.length) elem.removeChild(elem.childNodes[0]);
+	var el2 = document.createElement("div");
+	el2.setAttribute("class", "bv-descch");
+	el2.appendChild(document.createTextNode("Challenge: " + goal.category));
+	elem.appendChild(el2);
+	el2 = document.createElement("div");
+	el2.setAttribute("class", "bv-descdesc");
+	//	If content is "trusted", let it use HTML; else, escape it because it contains board text that'll be misinterpreted as HTML
+	if (goal.name === "BingoChallenge")
+		el2.appendChild(document.createTextNode(goal.description));
+	else
+		el2.innerHTML = goal.description;
+	elem.appendChild(el2);
+	el2 = document.createElement("table");
+	el2.setAttribute("class", "bv-desclist");
+	var tbh = document.createElement("thead");
+	var tr = document.createElement("tr");
+	var td = document.createElement("td");
+	td.appendChild(document.createTextNode("Parameter"));
+	tr.appendChild(td);
+	td = document.createElement("td");
+	td.appendChild(document.createTextNode("Value"));
+	tr.appendChild(td);
+	tbh.appendChild(tr);
+	tbh = document.createElement("tbody");
+	if (goal.name === "BingoVistaChallenge") {
+		for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
+			if (goal.items[i].length > 0 && goal.items[i] !== "room" && goal.items[i] !== "x" && goal.items[i] !== "y") {
+				tr = document.createElement("tr");
+				td = document.createElement("td");
+				td.appendChild(document.createTextNode(goal.items[i]));
+				tr.appendChild(td);
+				td = document.createElement("td");
+				td.appendChild(document.createTextNode(goal.values[i]));
+				td.style.wordWrap = "anywhere";
+				tr.appendChild(td);
+				tbh.appendChild(tr);
+			}
+		}
+	} else {
+		for (var i = 0; i < goal.items.length && i < goal.values.length; i++) {
+			if (goal.items[i].length > 0) {
+				tr = document.createElement("tr");
+				td = document.createElement("td");
+				td.appendChild(document.createTextNode(goal.items[i]));
+				tr.appendChild(td);
+				td = document.createElement("td");
+				td.appendChild(document.createTextNode(goal.values[i]));
+				td.style.wordWrap = "anywhere";
+				tr.appendChild(td);
+				tbh.appendChild(tr);
+			}
+		}
+	}
+	el2.appendChild(tbh);
+	elem.appendChild(el2);
+	if (this.tipsEnabled && goal.comments.length > 0) {
+		el2 = document.createElement("div"); el2.setAttribute("class", "bv-desccomm");
+		el2.innerHTML = goal.comments;
+		elem.appendChild(el2);
+	}
+
 }
