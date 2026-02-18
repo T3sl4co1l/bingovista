@@ -1,7 +1,7 @@
 {
 	"name": "Watcher Expeditions",
 	"version": "0.1",
-	"date": "20251206",
+	"date": "20260214",
 	"creator": "T3sl4co1l",
 	"settingsBytes": 1,
 	"mapLink": "https://alduris.github.io/watcher-map/map.html",
@@ -11,10 +11,8 @@
 	],
 	"maps": [
 		{ "target": "characters",   "add": [
-		{ "name": "Watcher", "text": "Watcher", "color": "#17234e", "icon": "Kill_Slugcat" }
+			{ "name": "Watcher", "text": "Watcher", "color": "#17234e", "icon": "Kill_Slugcat" }
 		], "comment": "type: array of objects, .name: <string>, .text: <string>, .color: <string>, .icon: 'Kill_Slugcat'" },
-		{ "target": "chatlogs",     "add": [
-		], "comment": "type: array of objects, .name: <string>, .room: <string>, .region: <string>, .color: <string>" },
 		{ "target": "creatures",    "add": [
 			{ "name": "AltSkyWhale",       "text": "Sky Whales",           "icon": "Kill_SkyWhale",            "color": "#807359" },
  			{ "name": "Angler",            "text": "Anglers",              "icon": "Kill_Angler",              "color": "#ffffff" },
@@ -309,42 +307,149 @@
 		{ "target": "weaponsnojelly", "add": [], "comment": "type: array of strings" }
 	],
 	"challenges": [
-		{"name": "WatcherBingoAchievementChallenge",        "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoAllRegionsExceptChallenge",   "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoBombTollChallenge",           "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoCollectPearlChallenge",       "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoCollectRippleSpawnChallenge", "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoCreaturePortalChallenge",     "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoEatChallenge",                "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoEnterRegionChallenge",        "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoMeetPrinceChallenge",         "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoNoRegionChallenge",           "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoOpenMelonsChallenge",         "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoSpinningTopChallenge",        "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoStealChallenge",              "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoTameChallenge",               "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" },
-		{"name": "WatcherBingoWeaverChallenge",             "category": "", "upgrades": [], "template": [], "toComm": "", "toDesc": "", "toPaint": "", "toBin": "" }
-	],
-	"remove": [
-		{ "target": "challenges", "list": [
-			"BingoCollectPearlChallenge",
-			"BingoPearlDeliveryChallenge",
-			"BingoNeuronDeliveryChallenge",
-			"BingoDepthsChallenge",
-			"BingoEchoChallenge",
-			"BingoIteratorChallenge",
-			"BingoEnterRegionChallenge",
-			"BingoNoRegionChallenge",
-			"BingoEchoChallenge",
-			"BingoEatChallenge",
-			"BingoTameChallenge",
-			"BingoBombTollChallenge",
-			"BingoEnterRegionFromChallenge",
-			"BingoCreatureGateChallenge",
-			"BingoAllRegionsExceptChallenge",
-			"BingoTransportChallenge",
-			"BingoAchievementChallenge",
-			"BingoStealChallenge"
-		], "comment": "from BingoData.cs" }
+		{
+			"name": "WatcherBingoAllRegionsExceptChallenge",
+			"category": "Entering regions without visiting one",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [
+				{
+					"param": "region", "type": "string",
+					"binType": "number", "binOffs": 0, "binSize": 1,
+					"formatter": "regionsreal", "parse": "SettingBox", "parseFmt": {
+						"datatype": "System.String", "name": "Region", "position": "0",
+						"formatter": "regionsreal", "defaultval": "WARF"
+					}
+				},
+				{
+					"param": "regionsToEnter", "type": "list",
+					"binType": "string", "binOffs": 2, "binSize": 0,
+					"formatter": "regionsreal", "parse": "list", "separator": "|", "defaultval": []
+				},
+				{
+					"param": "current", "type": "number",
+					"formatter": "", "parse": "parseInt", "minval": 0, "maxval": 250, "defaultval": 0
+				},
+				{
+					"param": "required", "type": "number",
+					"binType": "number", "binOffs": 1, "binSize": 1,
+					"formatter": "", "parse": "SettingBox", "parseFmt": {
+						"datatype": "System.Int32", "name": "Amount", "position": "1",
+						"formatter": "NULL", "minval": 1, "maxval": 250, "defaultval": 1
+					}
+				},
+				{
+					"param": "completed", "type": "bool",
+					"formatter": "", "parse": "intBool", "defaultval": false
+				},
+				{
+					"param": "revealed", "type": "bool",
+					"formatter": "", "parse": "intBool", "defaultval": false
+				}
+			],
+			"toPaint": "\t\treturn [\n\t\t\t{ type: \"icon\", value: \"TravellerA\", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },\n\t\t\t{ type: \"icon\", value: \"buttonCrossA\", scale: 1, color: Bingovista.colors.Unity_red, rotation: 0 },\n\t\t\t{ type: \"text\", value: p.region, color: Bingovista.colors.Unity_white },\n\t\t\t{ type: \"break\" },\n\t\t\t{ type: \"text\", value: \"[\" + String(p.current) + \"/\" + String(p.amount) + \"]\", color: Bingovista.colors.Unity_white }\n\t\t];\n",
+			"toDesc": "\t\t\treturn \"Enter \" + (((p.amount - p.current) > 1) ? String(p.amount - p.current) + \" more regions\" : (((p.amount - p.current) > 0) ? \"one more region\" : \"no more regions\") ) + \" without entering \" + this.regionToDisplayText(this.board.character, p.region) + \".\";",
+			"toComment": "\t\t\treturn \"This challenge is potentially quite customizable; only regions in the list need to be entered. Normally, the list is populated with all campaign story regions (i.e. corresponding Wanderer pips), so that progress can be checked on the sheltering screen. All that matters towards completion, is <span class=\\\"bv-code\\\">current</span> equaling <span class=\\\"bv-code\\\">required</span>; thus we can set a lower bar and play a \\\"The Wanderer\\\"-lite; or we could set a specific collection of regions to enter, to entice players towards them. Downside: the latter functionality is not currently supported in-game: the region list is something of a mystery unless viewed and manually tracked. (This goal generates with all regions listed, so that all will contribute towards the goal.)\";\n",
+			"toBinary": "\t\t\tvar b = Array(5); b.fill(0);\n\t\t\tb[0] = this.challengeValue(p._name);\n\t\t\tb[3] = this.enumToValue(p.region, \"regionsreal\");\n\t\t\tb[4] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));\n\t\t\tfor (var k = 0; k < p.remaining.length; k++)\n\t\t\t\tb.push(this.enumToValue(p.remaining[k], \"regionsreal\"));\n\t\t\tb[2] = b.length - GOAL_LENGTH;\n\t\t\treturn new Uint8Array(b);\n"
+		},
+		{
+			"name": "WatcherBingoCollectRippleSpawnChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoCreaturePortalChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoEnterRegionChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoHatchMothGrubChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoMeetPrinceChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoNoRegionChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoOpenMelonsChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoSpinningTopChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		},
+		{
+			"name": "WatcherBingoWeaverChallenge",
+			"category": "",
+			"textUpgrade": {},
+			"textDowngrade": {},
+			"template": [],
+			"toPaint": "",
+			"toDesc": "",
+			"toComment": "",
+			"toBinary": ""
+		}
 	]
 }

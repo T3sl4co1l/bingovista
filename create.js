@@ -146,7 +146,8 @@ function parseButton(e) {
  *	Clicked on Refresh Text.
  */
 function makeText(e) {
-	document.getElementById("textbox").value = boardToString(bv.board);
+	bv.boardToText();
+	document.getElementById("textbox").value = bv.board.text;
 	setError("Ready.");
 }
 
@@ -163,7 +164,8 @@ function copyText(e) {
  */
 function viewBoard(e) {
 	var u = new URL("bingovista.html", document.URL);
-	u.searchParams.set("b", Bingovista.binToBase64u(bv.boardToBin()));
+	bv.boardToBin();
+	u.searchParams.set("b", Bingovista.binToBase64u(bv.board.bin));
 	var a = document.createElement("a");
 	a.href = u.href;
 	a.target = "_blank";
@@ -185,11 +187,12 @@ function shortenLink(e) {
 	lnk.value = "";
 	copy.disabled = true;
 
+	bv.boardToBin();
 	fetch(
 		new URL("https://www.seventransistorlabs.com/bserv/BingoServer.dll"),
 		{
 			method: "POST",
-			body: bv.boardToBin(),
+			body: bv.board.bin,
 			headers: { "content-type": "application/octet-stream" }
 		}
 	).then(function(r) {

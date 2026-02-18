@@ -51,7 +51,7 @@ function loadSuccess(e) {
 	document.getElementById("errorbox").style.display = "none";
 	document.getElementById("textbox").value = this.board.text;
 	var u = new URL(document.URL);
-	u.searchParams.set("b", Bingovista.binToBase64u(this.board.toBin));
+	u.searchParams.set("b", Bingovista.binToBase64u(this.board.bin));
 	u.searchParams.delete("q");
 	document.getElementById("permlink").value = u.href;
 }
