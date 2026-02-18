@@ -247,45 +247,12 @@ static respHeader = {
 constructor(params) {
 
 	//	Make methods this'd
-	//Bingovista.applyBool               = Bingovista.applyBool.bind(this);
 	this.areResourcesDone        = this.areResourcesDone.bind(this);
-	//this.binToGoal           = this.binToGoal.bind(this);
-	//this.binToBoard              = this.binToBoard.bind(this);
-	//this.boardToBin              = this.boardToBin.bind(this);
-	//this.challengeTextToAbstract = this.challengeTextToAbstract.bind(this);
-	//this.checkSettingBoxEx       = this.checkSettingBoxEx.bind(this);
 	this.clickBoard              = this.clickBoard.bind(this);
 	this.clickShowPerks          = this.clickShowPerks.bind(this);
-	//this.drawIcon                = this.drawIcon.bind(this);
-	//this.drawSquare              = this.drawSquare.bind(this);
-	//this.entityDisplayText       = this.entityDisplayText.bind(this);
-	//this.entityIconAtlas         = this.entityIconAtlas.bind(this);
-	//this.entityIconColor         = this.entityIconColor.bind(this);
-	//this.entityNameQuantify      = this.entityNameQuantify.bind(this);
-	//this.enumToValue             = this.enumToValue.bind(this);
-	//this.errorBoard              = this.errorBoard.bind(this);
-	//this.getBoardSquareFromCoord = this.getBoardSquareFromCoord.bind(this);
-	//this.getBoardSquareOrigin    = this.getBoardSquareOrigin.bind(this);
-	//this.getBoardSquareOriginIdx = this.getBoardSquareOriginIdx.bind(this);
-	//this.getBoardSquareSize      = this.getBoardSquareSize.bind(this);
-	//this.getGoal                 = this.getGoal.bind(this);
-	//this.getMapLink              = this.getMapLink.bind(this);
-	//this.identifyModpack         = this.identifyModpack.bind(this);
-	//this.loadAtlas               = this.loadAtlas.bind(this);
 	this.mouseBoard              = this.mouseBoard.bind(this);
 	this.mouseEventToSquare      = this.mouseEventToSquare.bind(this);
 	this.mouseleaveBoard         = this.mouseleaveBoard.bind(this);
-	//this.parseText               = this.parseText.bind(this);
-	//this.refresh                 = this.refresh.bind(this);
-	//this.refreshBoard            = this.refreshBoard.bind(this);
-	//this.refreshHeader           = this.refreshHeader.bind(this);
-	//this.regionToDisplayText     = this.regionToDisplayText.bind(this);
-	//this.resourceCallback        = this.resourceCallback.bind(this);
-	//this.selectSquare            = this.selectSquare.bind(this);
-	//this.setCursor               = this.setCursor.bind(this);
-	//this.setup                   = this.setup.bind(this);
-	//this.toString                = this.toString.bind(this);
-	//this.validateQuery           = this.validateQuery.bind(this);
 
 	//	Make all the maps and enums needed in the instance
 	this.maps = {};
@@ -716,8 +683,8 @@ constructor(params) {
 	this.enums.items = this.maps.items.map(o => o.name);
 	/** All visitable Iterators.  v1.2: BingoIteratorChallenge uses a Boolean flag to
 	  * select base options; this seems fragile for expansion, so, anticipating some
-	  * flexibility here and promoting to a String enum.  Hence the odd value of the
-	  * first two entries. */
+	  * flexibility here and promoting to a String enum.  Hence the odd value for the
+	  * first two entries.  See also up/downgrades in BingoIteratorChallenge. */
 	this.enums.iterators = [
 		"true", 	//	Looks To The Moon
 		"false" 	//	Five Pebbles

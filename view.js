@@ -40,16 +40,18 @@ document.addEventListener("DOMContentLoaded", function() {
 		bv.setup( { dataSrc: u.get("q"), dataType: "short" } );
 		flag = true;
 	}
-	//	hack to uppercase perks button consistent with create
-	if (flag)
-		document.getElementById("header").children[0].children[0].children[4]
-				.children[1].children[0].children[0].value = "SHOW/HIDE";
+
 });
 
 /**
  *	Data loaded callback.
  */
 function loadSuccess(e) {
+	//	hack to uppercase perks button consistent with create
+	if (document.getElementById("header") !== null)
+		document.getElementById("header").children[0].children[0].children[4]
+				.children[1].children[0].children[0].value = "SHOW/HIDE";
+
 	document.getElementById("errorbox").style.display = "none";
 	document.getElementById("textbox").value = this.board.text;
 	var u = new URL(document.URL);
@@ -62,6 +64,10 @@ function loadSuccess(e) {
  *	Data load failure callback.
  */
 function loadFail(e) {
+	if (document.getElementById("header") !== null)
+		document.getElementById("header").children[0].children[0].children[4]
+				.children[1].children[0].children[0].value = "SHOW/HIDE";
+
 	var e = document.getElementById("errorbox");
 	e.style.display = "initial";
 	e.innerHTML = "Status: " + this.board.error;
