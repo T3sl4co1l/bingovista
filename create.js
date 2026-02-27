@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		loadSuccess: loadSuccess,
 	} );
 	bv.refreshHeader = createRefreshHeader;
+	bv.loadModpack("mods/watcher.json");
 	bv.setup( { dataSrc: "Any;", dataType: "text" } );
 
 	//	Nav, header and file handling buttons
@@ -324,25 +325,25 @@ function createRefreshHeader() {
 	if (elem === null) return;
 
 	//	Get references to all required elements
-	var rows = {}, checks = [], tb = elem?.children[0]?.children[0];
+	var i, rows = {}, checks = [], modchecks = [], tb = elem?.children[0]?.children[0];
 	var names = ["title", "size", "char", "shel", "perkb", "perks", "mods"];
 	var indices = [
-		[0, 1, 0], [1, 1], [2, 1, 0], [3, 1, 0], [4, 1, 0, 0], [4, 1, 1], [5, 1]
+		[0, 1], [1, 1], [2, 1, 0], [3, 1, 0], [4, 1, 0, 0], [4, 1], [5, 1]
 	];
 	var flag = (tb === undefined);
-	for (var i = 0; i < names.length && !flag; i++) {
+	for (i = 0; i < names.length && !flag; i++) {
 		rows[names[i]] = tb;
 		flag = flag || (rows[names[i]] === undefined);
 		if (flag) break;
 		for (var j in indices[i]) {
-			rows[names[i]] = rows[names[i]]?.children[indices[i][j]];
+			rows[names[i]] = rows[names[i]].children[indices[i][j]];
 			flag = flag || (rows[names[i]] === undefined);
 			if (flag) break;
 		}
 	}
-	for (i = 0; i < this.maps.expflags.length && !flag; i++) {
-		checks.push(rows.perks.children[i]?.children[0]);
-		flag = flag || (checks[i] === undefined);
+	//	check the perks flags container types for now; we'll check content later
+	for (i = 0; !flag && i < rows.perks.children.length; i++) {
+		flag = flag || (rows.perks.children[i].tagName !== "DIV");
 	}
 	if (flag) {
 		//	hierarchy not as expected; rip out and start over
@@ -392,6 +393,7 @@ function createRefreshHeader() {
 			sel.appendChild(opt);
 		}
 		sel.addEventListener("input", function(e) { bv.board.character = e.target.value; } );
+		sel.value = this.board.character;
 		rows.char.appendChild(sel);
 		tr.appendChild(rows.char);
 		tbd.appendChild(tr);
@@ -435,7 +437,7 @@ function createRefreshHeader() {
 		perktd.appendChild(rows.perks);
 		var p = this.board.perks || 0;
 		checks = [];
-		for (var i = 0; i < this.maps.expflags.length; i++) {
+		for (i = 0; i < this.maps.expflags.length; i++) {
 			checks.push(document.createElement("input"));
 			checks[i].setAttribute("type", "checkbox");
 			checks[i].setAttribute("class", "bv-perkscheck");
@@ -454,7 +456,6 @@ function createRefreshHeader() {
 		rows.mods.appendChild(document.createTextNode("Mods"));
 		tr.appendChild(rows.mods);
 		rows.mods = document.createElement("td");
-		rows.mods.setAttribute("class", "bv-perkscheck");
 		tr.appendChild(rows.mods);
 		tbd.appendChild(tr);
 		addModsToElement.call(this, rows.mods);
@@ -467,7 +468,16 @@ function createRefreshHeader() {
 	rows.title.value = this.board.comments || "Untitled";
 	while (rows.size.childNodes.length) rows.size.removeChild(rows.size.childNodes[0]);
 	rows.size.appendChild(document.createTextNode(String(this.board.width) + " x " + String(this.board.height)));
+
+	var opt;
+	while (rows.char.childNodes.length) rows.char.removeChild(rows.char.childNodes[0]);
+	for (var i in bv.maps.characters) {
+		opt = document.createElement("option");
+		opt.appendChild(document.createTextNode(bv.maps.characters[i].text));
+		rows.char.appendChild(opt);
+	}
 	rows.char.value = this.board.character;
+
 	rows.shel.value = this.board.shelter || "random";
 
 	//	Set perks
@@ -495,7 +505,7 @@ function createRefreshHeader() {
 		var tbd = document.createElement("tbody");
 		var tbl = document.createElement("table");
 		tbl.setAttribute("class", "bv-headermods");
-		td.appendChild(document.createTextNode("Number"));
+		td.appendChild(document.createTextNode("#"));
 		tr.appendChild(td);
 		td = document.createElement("td");
 		td.appendChild(document.createTextNode("Hash"));
@@ -506,7 +516,7 @@ function createRefreshHeader() {
 		tbd.appendChild(tr);
 		tbl.appendChild(tbd);
 		el.appendChild(tbl);
-		for (var i = 0; i < this.modpacks.length; i++) {
+		for (var i = 0; i < this.activeMods.length; i++) {
 			tr = document.createElement("tr");
 			tbd.appendChild(tr);
 			td = document.createElement("td");
@@ -514,10 +524,24 @@ function createRefreshHeader() {
 			td.setAttribute("style", "text-align: center;");
 			tr.appendChild(td);
 			td = document.createElement("td");
-			td.appendChild(document.createTextNode(this.modpacks[i].hash.toString(16)));
+			td.appendChild(document.createTextNode(this.modpacks[this.activeMods[i]].hash));
 			tr.appendChild(td);
 			td = document.createElement("td");
-			td.appendChild(document.createTextNode(this.modpacks[i].name));
+			td.appendChild(document.createTextNode(this.modpacks[this.activeMods[i]].pack.name));
+			tr.appendChild(td);
+		}
+		if (this.activeMods.length <= 0) {
+			tr = document.createElement("tr");
+			tbd.appendChild(tr);
+			td = document.createElement("td");
+			td.appendChild(document.createTextNode("-"));
+			td.setAttribute("style", "text-align: center;");
+			tr.appendChild(td);
+			td = document.createElement("td");
+			td.appendChild(document.createTextNode("-"));
+			tr.appendChild(td);
+			td = document.createElement("td");
+			td.appendChild(document.createTextNode("(none)"));
 			tr.appendChild(td);
 		}
 	}

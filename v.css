@@ -178,9 +178,6 @@ span.code {
 table {
 	margin: 0 auto 0 auto;
 }
-body table {
-	margin-left: 6px;
-}
 td div {
 	text-align: left;
 }
@@ -199,7 +196,7 @@ ul li {
 @media (min-width: 830px) {
 	body div {
 		text-align: left;
-		margin-left: 6px;
+		margin-left: 0px;
 		margin-right: initial;
 	}
 	dialog div {
@@ -213,7 +210,7 @@ ul li {
 		text-align: left;
 	}
 	body table {
-		margin: 6px auto 0 calc(1em - 2px);
+		margin: 6px auto 0 0px;
 	}
 	p.pimg {
 		margin: 0.3em auto 0.3em 2.8em;

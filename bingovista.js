@@ -57,7 +57,15 @@ class Bingovista {
 
 //	Configuration and customization
 //	TODO: most of these will eventually be private; exposing for debugging purposes
+
+/** Initial or external source, as provided to setup() */
 dataSrc; dataType;
+/**
+ *	Internal source ultimately parsed (from dataSrc, directly or by
+ *	fetch indirect)
+ *	type: <string> if text source, <Uint8Array> if binary source
+ */
+dataParse;
 headerId; boardId; selectId; detailId;
 cursorEnabled = false;
 /** Flag to reveal full detail on otherwise-hidden challenges (e.g. Vista Points), and extended commentary */
@@ -69,24 +77,57 @@ selectCallbacks = []; mouseoverCallbacks = [];
 resourceTimer = 0;
 
 //	Data sources, modding
+
 /** Response header (binary and decoded) when sourced from shortener URL */
 respHeader;
-/** Modpacks to extend enums, dictionaries and challenges; array of objects which contain a data source (at init), and the structure (after fetch and parse) */
+
+/**
+ *	Modpacks to extend enums, dictionaries and challenges.
+ *	These are installed (available to use), but may not actually
+ *	be applied; application is determined by data source.
+ *	Is an array of objects:
+ *	{
+ *		src:  data source URI
+ *		pack: the parsed JSON object, when loaded
+ *		err:  any errors in request or parse are appended here
+ */
 modpacks = [];
-/** Goal definitions; used to convert to/from internal/abstract format (`board`), binary or text format, and accessory outputs (DOM contents); read only (use modding to modify) */
-goalDefs = [];
+
+/** List of mods currently active after loading a data source; value: indices into modpacks[] */
+activeMods = [];
+
+/**
+ *	Records the initial length of all maps, enums, and CHALLENGE_DEFS in
+ *	the instance.  Used to unwind mod additions back to initial state.
+ *	Properties that modpacks add entirely, will be undefined before
+ *	creation; these are recorded as zero length, at time of mod
+ *	application (instead of in the constructor).  They can then be cleared
+ *	(not fully freed), so that re-applying mods doesn't cause duplication.
+ */
+modUnwind = {
+	mapNames: undefined, 	//	<array<string>> names of this.maps properties
+	mapLens: undefined,  	//	<array<int>> respective lengths of maps[mapNames[i]]
+	enumNames: undefined,	//	<array<string>> names of this.enums properties
+	enumLens: undefined, 	//	<array<int>> respective lengths of enums[enumNames[i]]
+	chalLen: undefined   	//	<number> length of CHALLENGE_DEFS
+};
+
 /** Enums used to parse/produce text; dictionary of arrays of strings; read only (use modding to modify) */
 enums;
+
 /** Maps converting between respectively named enums, and any characteristics they share (descriptive text, icons, colors, etc.) */
 maps;
-/** Dictionary of all items and creatures; values: objects containing display text, icon name, and color; read only (use modding to modify) */
-entities;
+
 /** Board data, as generated from dataSrc/Type; freely read/writable (run refresh() to update document state) */
 board;
+
 /** Base URL of online map viewer, used by getMapLink(); freely read/writable; set to "" to disable linking */
 mapLink = "https://noblecat57.github.io/map.html";
+static baseMapLink = "https://noblecat57.github.io/map.html";
+
 /** Base URL to board shortener server; freely read/writable */
 shortenerLink = "https://www.seventransistorlabs.com/bserv/BingoServer.dll?q=";
+
 /** Description text when no square is selected; freely read/writable */
 unselectText = "Select a square to view details.";
 
@@ -107,6 +148,7 @@ atlases = [
 ];
 
 //	Internal state, or convenient calculations
+
 /**
  *	Current selection cursor on the board (click on board, or focus board 
  *	and use arrow keys).  No selection: undefined; selected: { col: <number>, row: <number> }
@@ -149,12 +191,13 @@ pluralReplacers = [
  *	value: current name
  *	[absent]: no change
  */
-challengeUpgrades = {
+static challengeUpgradesBase = {
 	"BingoMoonCloak":            "BingoMoonCloakChallenge",	//	v1.08
 	"BingoAllRegionsExcept":     "BingoAllRegionsExceptChallenge",	//	v1.27
 	"BingoCycleScoreChallenge":  "BingoScoreChallenge",	//	v1.326
 	"BingoGlobalScoreChallenge": "BingoScoreChallenge" 	//	v1.326
 };
+challengeUpgrades;
 
 /**
  *	List of setup options, for reference.  Do not modify (is
@@ -625,8 +668,10 @@ constructor(params) {
 
 	/**
 	 *	Master list/map of all enums available.
-	 *	Key type: list name, as used in Bingo Mod SettingBox lists, and goalDefs `formatter` properties.
-	 *	Value type: array of strings; set of creature/item internal names, tokens, region codes, etc.
+	 *	Key type: list name, as used in Bingo Mod SettingBox lists, or other
+	 *	CHALLENGE_DEFS[i].template `formatter` properties.
+	 *	Value type: array of strings; set of creature/item internal names, tokens,
+	 *	region codes, etc.
 	 */
 	this.enums = {};
 	this.enums.banitem = [ "DangleFruit", "EggBugEgg", "WaterNut", "SlimeMold", "JellyFish",
@@ -801,15 +846,23 @@ constructor(params) {
 	this.enums.weapons = [ "Any Weapon", "Spear", "Rock", "ScavengerBomb", "JellyFish",
 		"PuffBall", "LillyPuck", "SingularityBomb", "WaterNut" ];
 	this.enums.weaponsnojelly = this.enums.weapons.slice(0);
-
-	//	from Watcher update
+	//	with Watcher update (to base game)
 	var seedCob = { type: "blue", unlockColor: Bingovista.colors.AntiGold, name: "SeedCob", text: "Popcorn Plants", icon: "popcorn_plant", color: "#68283a" };
 	this.maps.unlocks.push(seedCob);
 	this.maps.unlocksblue.push(seedCob);
 	this.enums.unlocks.push(seedCob.name);
 	this.enums.unlocksblue.push(seedCob.name);
-	//this.maps.characters.push( { name: "Watcher", text: "Watcher", color: "#17234e", icon: "Kill_Slugcat" } );
-	//this.enums.characters.push("Watcher");
+
+	this.challengeUpgrades = Object.assign({}, Bingovista.challengeUpgradesBase);
+	this.modUnwind.mapNames = Object.keys(this.maps);
+	this.modUnwind.mapLens = [];
+	for (var i = 0; i < this.modUnwind.mapNames.length; i++)
+		this.modUnwind.mapLens[i] = this.maps[this.modUnwind.mapNames[i]].length;
+	this.modUnwind.enumNames = Object.keys(this.enums);
+	this.modUnwind.enumLens = [];
+	for (var i = 0; i < this.modUnwind.enumNames.length; i++)
+		this.modUnwind.enumLens[i] = this.enums[this.modUnwind.enumNames[i]].length;
+	this.modUnwind.chalLen = this.CHALLENGE_DEFS.length;
 
 	//this.initGenerateBlacklist();
 
@@ -889,7 +942,171 @@ loadAtlas(atl) {
 		console.log("loadAtlas error: " + atl.txtErr);
 		ard();
 	});
+}
 
+/**
+ *	FNV-1a hash, 32 bit.
+ */
+fnv1aHash(msg) {
+	var digest = 0x811c9dc5;
+	for (var i = 0; i < msg.length; i++) {
+		digest = digest ^ (msg.charCodeAt(i) & 0xff);
+		digest = digest * 0x01000193;
+		digest |= 0;
+	}
+	return ("00000000" + (digest >>> 16).toString(16) + (digest & 0xffff).toString(16)).slice(-8);
+}
+
+/**
+ *	Fetches and installs the specified modpack.
+ *	@param s  URL of modpack to add
+ */
+loadModpack(s) {
+	var mp = { src: s, pack: undefined, hash: undefined, settings: undefined, err: "" };
+	this.modpacks.push(mp);
+
+	fetch(mp.src).then(function(r) {
+		//	Request succeeds
+		if (r.status == 200) {
+			r.text().then(function(t) {
+				mp.hash = this.fnv1aHash(t);
+				try {
+					mp.pack = JSON.parse(t);
+				} catch (e) {
+					mp.err = "Parse error; " + e.toString();
+					console.log("loadModpack error: " + mp.err);
+					return;
+				}
+				mp.pack.atlases.forEach(function(o) {
+					this.atlases.push(o);
+					this.loadAtlas(o);
+				}.bind(this));
+				mp.settings = new Uint8Array(mp.pack.settingsBytes);
+				const pars = ["toPaint", "toDesc", "toComment", "toBinary"];
+				for (var i = 0; i < mp.pack.challenges.length; i++) {
+					for (var j = 0; j < pars.length; j++) {
+						try {
+							//	WARNING UNSAFE
+							//	ensure secure and validated modpack source for this reason
+							mp.pack.challenges[i][pars[j]] = new Function("p", mp.pack.challenges[i][pars[j]]);
+						} catch (e) {
+							mp.err += "; " + e.toString() + " parsing challenges[" + String(i) + "]." + pars[j];
+						}
+					}
+				}
+				if (mp.err.length > 0) mp.err.substring(2);
+				this.areResourcesDone();
+			}.bind(this));
+		} else {
+			mp.err = "Not found; resource \"" + mp.src + "\"";
+			console.log("loadModpack error: " + mp.err);
+			this.areResourcesDone();
+		}
+	}.bind(this), function(r) {
+		//	Request failed
+		mp.err = "Connection failed; resource \"" + mp.src + "\"";
+		console.log("loadModpack error: " + mp.err);
+		this.areResourcesDone();
+	}.bind(this));
+}
+
+/**
+ *	Undoes mod additions to maps and enums.
+ */
+resetMods() {
+	this.challengeUpgrades = Object.assign({}, Bingovista.challengeUpgradesBase);
+	this.activeMods = [];
+	for (var i = 0; i < this.modUnwind.mapNames.length; i++)
+		this.maps[this.modUnwind.mapNames[i]].length = this.modUnwind.mapLens[i];
+	for (var i = 0; i < this.modUnwind.enumNames.length; i++)
+		this.enums[this.modUnwind.enumNames[i]].length = this.modUnwind.enumLens[i];
+	this.CHALLENGE_DEFS.length = this.modUnwind.chalLen;
+	this.mapLink = Bingovista.baseMapLink;
+}
+
+/**
+ *	Applies the specified mod, extending maps and enums.
+ *	@param n  index into this.modpacks
+ */
+enableMod(n) {
+	if (n < 0) return;
+	var i, enumadds, pack = this.modpacks[n].pack;
+	//	for each map matching <key>, add to enum <key> and enums ...<value>
+	const combos = {
+		"regions":      ["regionsreal", "nootregions", "popcornregions", "echoes"],
+		"unlocksblue":  ["unlocks"],
+		"unlocksgold":  ["unlocks"],
+		"unlocksred":   ["unlocks"],
+		"unlocksgreen": ["unlocks"],
+		"weapons":      ["weaponsnojelly"]
+	};
+	for (i = 0; i < pack.maps.length; i++) {
+		if (this.maps[pack.maps[i].target] === undefined) {
+			this.modUnwind.mapNames.push(pack.maps[i].target);
+			this.modUnwind.mapLens.push(0);
+			this.maps[pack.maps[i].target] = [];
+		}
+		this.maps[pack.maps[i].target].push(...pack.maps[i].add);
+		enumadds = [];
+		if (pack.maps[i].target === "regions") {
+			//	special value, read from .code
+			enumadds = pack.maps[i].add.map(o => o.code);
+		} else if (pack.maps[i].target === "unlocksblue" ||
+				pack.maps[i].target === "unlocksgold" ||
+				pack.maps[i].target === "unlocksred" ||
+				pack.maps[i].target === "unlocksgreen") {
+			//	add to common map and enum as well
+			this.maps.unlocks.push(...pack.maps[i].add);
+			enumadds = pack.maps[i].add.map(o => o.name);
+			this.enums.unlocks.push(...enumadds);
+		} else if (pack.maps[i].target === "vistas") {
+			//	special special value, populates several lists by property
+			this.enums.vista.push(...pack.maps[i].add.map(o => o.room));
+			pack.maps[i].add.forEach(o => {
+				this.enums.vista_code  .push(o.region + "><System.String|" + o.room + "|0|vista><" + o.x + "><" + o.y);
+				this.enums.vista_region.push(o.region);
+				this.enums.vista_room  .push(o.room  );
+				this.enums.vista_x     .push(o.x     );
+				this.enums.vista_y     .push(o.y     );
+			});
+			continue;	//	skip enumadds path: enum is named "vista", map is "vistas"
+		} else {
+			//	everything else reads from .name
+			enumadds = pack.maps[i].add.map(o => o.name);
+		}
+		this.enums[pack.maps[i].target].push(...enumadds);
+		if (combos[pack.maps[i].target] !== undefined) {
+			combos[pack.maps[i].target].forEach(en => this.enums[en].push(...enumadds) );
+		}
+	}
+	for (i = 0; i < pack.enums.length; i++) {
+		if (pack.enums[i].target !== undefined &&
+				(pack.enums[i].add !== undefined ||
+				pack.enums[i].copy !== undefined)) {
+			if (this.enums[pack.enums[i].target] === undefined) {
+				this.modUnwind.enumNames.push(pack.enums[i].target);
+				this.modUnwind.enumLens.push(0);
+				this.enums[pack.enums[i].target] = [];
+				if (pack.enums[i].copy !== undefined)
+					this.enums[pack.enums[i].target] = this.enums[pack.enums[i].copy].slice(0);
+			}
+			if (pack.enums[i].add !== undefined)
+				this.enums[pack.enums[i].target].push(...pack.enums[i].add);
+		}
+	}
+	this.CHALLENGE_DEFS.push(...pack.challenges);
+	this.mapLink = pack.mapLink;
+	this.challengeUpgrades = Object.assign({}, Bingovista.challengeUpgradesBase);
+	this.activeMods.push(n);
+}
+
+/**
+ *	Looks up a hash code in available / known / installed modpacks.
+ *	@param hash  string; 8-digit hex code to match
+ *	@return index into this.modpacks, or -1 if not found.
+ */
+identifyModpack(hash) {
+	return this.modpacks.findIndex(o => o.hash === hash);
 }
 
 /**
@@ -898,12 +1115,15 @@ loadAtlas(atl) {
  *	startup timeout, targets are painted.
  */
 areResourcesDone() {
-	var done = true;
-	for (var i = 0; i < this.atlases.length; i++) {
+	var i, done = true;
+	for (i = 0; i < this.atlases.length; i++) {
 		done = done && (this.atlases[i].frames !== undefined || this.atlases[i].txtErr > "");
 		done = done && (this.atlases[i].canv !== undefined || this.atlases[i].imgErr > "");
 	}
-	done = done && this.board !== undefined;	//	dataSrc loaded
+	for (i = 0; i < this.modpacks.length; i++) {
+		done = done && (this.modpacks[i].pack !== undefined || this.modpacks[i].err > "");
+	}
+	done = done && this.dataParse !== undefined;	//	dataSrc loaded
 	if (done) {
 		//	got everything in time, cancel the timer
 		if (this.resourceTimer) {
@@ -911,6 +1131,7 @@ areResourcesDone() {
 			this.resourceTimer = 0;
 		}
 		this.refresh();
+		for (var f of this.loadSuccessCallbacks) f.call(this);
 	}
 	return done;
 }
@@ -952,19 +1173,15 @@ setup(params) {
 		if (params.dataType !== undefined && typeof(params.dataType) === "string")
 			this.dataType = params.dataType;
 
+		this.board = undefined;
+
 		if (this.dataType === "text") {
-			this.parseText(this.dataSrc);
-			for (var f of this.loadSuccessCallbacks) f.call(this);
+			this.dataParse = this.dataSrc;
+			this.areResourcesDone();
 		} else if (this.dataType === "base64") {
 			(function() {
-				try {
-					this.binToBoard(Bingovista.base64uToBin(this.dataSrc));
-				} catch (e) {
-					this.board = this.errorBoard("Parsing base64 string failed; " + e.message);
-					for (var f of this.loadFailureCallbacks) f.call(this);
-					return;
-				}
-				for (var f of this.loadSuccessCallbacks) f.call(this);
+				this.dataParse = Bingovista.base64uToBin(this.dataSrc);
+				this.areResourcesDone();
 			}).call(this);
 		} else if (this.dataType === "short" || this.dataType === "url") {
 			var url = undefined;
@@ -1011,15 +1228,13 @@ setup(params) {
 									this.respHeader.created = new Date(rawTime * 1000);
 									this.respHeader.views = Bingovista.readLong(this.respHeader.raw, 26) + Bingovista.readLong(this.respHeader.raw, 30) * (1 << 16) * (1 << 16);
 								}
-								this.binToBoard(new Uint8Array(ar.slice(RESP_HEADER_LEN)));
+								this.dataParse = new Uint8Array(ar.slice(RESP_HEADER_LEN));
 								this.areResourcesDone();
-								for (var f of this.loadSuccessCallbacks) f.call(this);
 							}.bind(this));
 						} else if (basetype === "text/plain") {
 							r.text().then(function(s) {
-								this.parseText(s);
+								this.dataParse = s;
 								this.areResourcesDone();
-								for (var f of this.loadSuccessCallbacks) f.call(this);
 							}.bind(this));
 						} else {
 							this.board = this.errorBoard("Request to URL " + url.toString() + " returned unsupported type " + basetype);
@@ -1097,7 +1312,7 @@ setup(params) {
 		this.detailId = params.detailId;
 	}
 
-	this.refresh();
+	this.areResourcesDone();
 }
 
 validateQuery(s) {
@@ -1131,6 +1346,14 @@ errorBoard(s) {
 }
 
 refresh() {
+	if (this.board === undefined && this.dataParse !== undefined) {
+		//	probably tried loading but didn't have necessary resources, retry?
+		if (typeof(this.dataParse) === "string") {
+			this.parseText(this.dataParse);
+		} else if (this.dataParse instanceof Uint8Array) {
+			this.binToBoard(this.dataParse);
+		}
+	}
 	this.refreshHeader();
 	this.refreshBoard();
 	this.selectSquare(this.selected?.col, this.selected?.row);
@@ -1142,15 +1365,8 @@ toString() {
 		cursor: this.cursorEnabled,
 		tips: this.tipsEnabled,
 		transpose: this.transposeEnabled,
-		mods: this.modpacks
+		mods: this.modpacks.map(o => ({ name: o.pack?.name, src: o.src, hash: o.hash }))
 	});
-}
-
-/**
- *	Looks up a hash code in available / known / installed modpacks.
- */
-identifyModpack(hash) {
-	return "Unknown Modpack 0x" + ("00000000" + hash.toString(16)).slice(-8);
 }
 
 
@@ -1162,7 +1378,8 @@ identifyModpack(hash) {
  *	Resource timeout
  */
 resourceCallback() {
-	this.refresh();
+	//this.refresh();
+	this.areResourcesDone();
 	this.resourceTimer = 0;
 }
 
@@ -1237,13 +1454,13 @@ refreshHeader() {
 	if (elem === null) return;
 
 	//	Get references to all required elements
-	var rows = {}, checks = [], tb = elem?.children[0]?.children[0];
+	var i, rows = {}, checks = [], modchecks = [], tb = elem?.children[0]?.children[0];
 	var names = ["title", "size", "char", "shel", "perkb", "perks", "mods"];
 	var indices = [
-		[0, 1], [1, 1], [2, 1], [3, 1], [4, 1, 0, 0], [4, 1, 1], [5, 1]
+		[0, 1], [1, 1], [2, 1], [3, 1], [4, 1, 0, 0], [4, 1], [5, 1]
 	];
 	var flag = (tb === undefined);
-	for (var i = 0; i < names.length && !flag; i++) {
+	for (i = 0; i < names.length && !flag; i++) {
 		rows[names[i]] = tb;
 		flag = flag || (rows[names[i]] === undefined);
 		if (flag) break;
@@ -1253,10 +1470,9 @@ refreshHeader() {
 			if (flag) break;
 		}
 	}
-	for (i = 0; i < this.enums.expflags.length && !flag; i++) {
-		checks.push(rows.perks.children[i].children[0]);
-		flag = flag || (checks[i] === undefined);
-		if (flag) break;
+	//	check the perks flags container types for now; we'll check content later
+	for (i = 0; !flag && i < rows.perks.children.length; i++) {
+		flag = flag || (rows.perks.children[i].tagName !== "DIV");
 	}
 	if (flag) {
 		//	hierarchy not as expected; rip out and start over
@@ -1326,7 +1542,7 @@ refreshHeader() {
 		perktd.appendChild(rows.perks);
 		var p = this.board.perks | 0;
 		checks = [];
-		for (var i = 0; i < this.maps.expflags.length; i++) {
+		for (i = 0; i < this.maps.expflags.length; i++) {
 			checks.push(document.createElement("input"));
 			checks[i].setAttribute("type", "checkbox");
 			checks[i].setAttribute("class", "bv-perkscheck");
@@ -1341,12 +1557,47 @@ refreshHeader() {
 		}
 		tbd.appendChild(tr);
 
+//		for (i = 0; i < this.modpacks.length; i++) {
+//			if (this.modpacks[i].pack !== undefined) {
+//				var head = document.createElement("div");
+//				head.appendChild(document.createTextNode("Modpack: " + this.modpacks[i].pack.name));
+//				perktd.appendChild(head);
+//				perktd.appendChild(document.createElement("div"));
+//			}
+//		}
+//		rows.perks.children[0]   "show/hide" button container
+//		rows.perks.children[1]   base perks container (label(checkbox), ...)
+//		rows.perks.children[2+]  (optional) mod perks container(s), one pair for each mod in loading order:
+//		even index (2, 4, etc.)  class="bv-modsep" title bar/hr/separator
+//		odd index (3, 5, etc.)   mod perks container(s)
+//		for (i = 0; i < this.enums.expflags.length; i++) {
+//			checks.push(rows.perks.children[1].children[i]?.children[0]);
+//			flag = flag || (checks[i] === undefined);
+//		}
+//		for (k = 0; k < this.modpacks.length; k++) {
+//			for (i = 0; i < this.enums.expflags.length && !flag; i++) {
+//				modchecks.push(rows.perks.children[2 * k + 3].children[i]?.children[0]);
+//				flag = flag || (modchecks[i] === undefined);
+//			}
+//		}
+//		tr = document.createElement("tr");
+//		tbd.appendChild(tr);
+//		td = document.createElement("td");
+//		td.appendChild(document.createTextNode(String(i + 1)));
+//		td.setAttribute("style", "text-align: center;");
+//		tr.appendChild(td);
+//		td = document.createElement("td");
+//		td.appendChild(document.createTextNode(this.modpacks[this.activeMods[i]].hash));
+//		tr.appendChild(td);
+//		td = document.createElement("td");
+//		td.appendChild(document.createTextNode(this.modpacks[this.activeMods[i]].pack.name || ("(error loading " + this.modpacks[this.activeMods[i]].src + ")")));
+//		tr.appendChild(td);
+
 		tr = document.createElement("tr");
 		rows.mods = document.createElement("td");
 		rows.mods.appendChild(document.createTextNode("Mods"));
 		tr.appendChild(rows.mods);
 		rows.mods = document.createElement("td");
-		rows.mods.setAttribute("class", "bv-perkscheck");
 		tr.appendChild(rows.mods);
 		tbd.appendChild(tr);
 		addModsToElement.call(this, rows.mods);
@@ -1369,8 +1620,8 @@ refreshHeader() {
 		rows.shel.appendChild(document.createTextNode("random"));
 
 	//	Set perks
-	var p = this.board.perks | 0;
-	for (var i = 0; i < checks.length; i++) {
+	var p = this.board.perks || 0;
+	for (i = 0; i < checks.length; i++) {
 		if (p & this.maps.expflags[i].value)
 			checks[i].setAttribute("checked", "");
 		else
@@ -1393,7 +1644,7 @@ refreshHeader() {
 		var tbd = document.createElement("tbody");
 		var tbl = document.createElement("table");
 		tbl.setAttribute("class", "bv-headermods");
-		td.appendChild(document.createTextNode("Number"));
+		td.appendChild(document.createTextNode("#"));
 		tr.appendChild(td);
 		td = document.createElement("td");
 		td.appendChild(document.createTextNode("Hash"));
@@ -1404,7 +1655,7 @@ refreshHeader() {
 		tbd.appendChild(tr);
 		tbl.appendChild(tbd);
 		el.appendChild(tbl);
-		for (var i = 0; i < this.modpacks.length; i++) {
+		for (var i = 0; i < this.activeMods.length; i++) {
 			tr = document.createElement("tr");
 			tbd.appendChild(tr);
 			td = document.createElement("td");
@@ -1412,10 +1663,24 @@ refreshHeader() {
 			td.setAttribute("style", "text-align: center;");
 			tr.appendChild(td);
 			td = document.createElement("td");
-			td.appendChild(document.createTextNode(this.modpacks[i].hash.toString(16)));
+			td.appendChild(document.createTextNode(this.modpacks[this.activeMods[i]].hash));
 			tr.appendChild(td);
 			td = document.createElement("td");
-			td.appendChild(document.createTextNode(this.modpacks[i].name));
+			td.appendChild(document.createTextNode(this.modpacks[this.activeMods[i]].pack.name));
+			tr.appendChild(td);
+		}
+		if (this.activeMods.length <= 0) {
+			tr = document.createElement("tr");
+			tbd.appendChild(tr);
+			td = document.createElement("td");
+			td.appendChild(document.createTextNode("-"));
+			td.setAttribute("style", "text-align: center;");
+			tr.appendChild(td);
+			td = document.createElement("td");
+			td.appendChild(document.createTextNode("-"));
+			tr.appendChild(td);
+			td = document.createElement("td");
+			td.appendChild(document.createTextNode("(none)"));
 			tr.appendChild(td);
 		}
 	}
@@ -2084,7 +2349,7 @@ static regionOfRoom(r) {
  *				//	d.unshift(...data)
  *				{ op: "unshift", data: ["new first string"] },
  *				//	d[offs] = d[offs].replace(find, replace)
- *				{ op: "replace", offs: 2, find: "insert string", replace: "added text" }
+ *				{ op: "replace", offs: 2, find: "regex body", replace: "added text" }
  *				//	d[offs] = before + d[offs] + after
  *				{ op: "intFormat", offs: 3, before: "prefix ", after: " suffix" }
  *			]
@@ -2117,7 +2382,7 @@ static upgradeDescriptor(d, upg) {
 				} else if (step.op === "unshift") {
 					d.unshift(...step.data);
 				} else if (step.op === "replace") {
-					d[step.offs] = d[step.offs].replace(step.find, step.replace);
+					d[step.offs] = d[step.offs].replace(RegExp(step.find), step.replace);
 				} else if (step.op === "move") {
 					var tmp = d.splice(step.from, 1)[0];
 					d.splice(step.to, 0, tmp);
@@ -2208,7 +2473,9 @@ checkSettingBoxEx(s, template) {
 		} else if (ar[4] !== template.formatter && ar[4] !== template.altformatter) {
 			rr.error.push("unexpected list \"" + ar[4] + "\"");
 		} else {
-			rr.index = (this.enums[template.formatter].indexOf(template.defaultval) >= 0) ? (this.enums[template.formatter].indexOf(template.defaultval)) : (this.enums[template.altformatter]?.indexOf(template.defaultval) + (template.altthreshold || 0));
+			rr.index = (this.enums[template.formatter].indexOf(template.defaultval) >= 0) ?
+					(this.enums[template.formatter].indexOf(template.defaultval)) :
+					(this.enums[template.altformatter]?.indexOf(template.defaultval) + (template.altthreshold || 0));
 			var idx1 = this.enums[template.formatter].indexOf(ar[1]);
 			var idx2 = this.enums[template.altformatter]?.indexOf(ar[1]) || -1;
 			if (idx1 < 0 && idx2 < 0) {
@@ -2451,7 +2718,38 @@ parseText(s) {
 			this.board.character = goals[0].substring(0, underscore);
 			goals[0] = goals[0].substring(underscore + 1);
 		}
-		this.board.character = this.maps.characters.find(o => o.name === this.board.character)?.text || "";
+
+		/*	Determine mods if any:
+		 *	Text format is not well defined for mod selection purposes;
+		 *	perhaps the whole board could be scanned, looking for keywords
+		 *	from various mods, enabling them as needed.  That's hard, and
+		 *	still ill-defined (modpacks may contain overlapping elements),
+		 *	so for now, let the user select an initial set.
+		 *	We'll at the minimum, add to that selection based on character
+		 *	name (if needed) for convenience.
+		 */
+		//this.resetMods();
+		var newChar = this.maps.characters.find(o => o.name === this.board.character);
+		if (newChar) {
+			//	check includes active mods
+			this.board.character = newChar.text;
+		} else {
+			//	check all installed mods for a match; take first greedily
+			for (var i = 0; i < this.modpacks.length; i++) {
+				if (this.modpacks[i].pack !== undefined) {
+					newChar = this.modpacks[i].pack.maps?.find(o => o.target === "characters")
+							.add.find(o => o.name === this.board.character);
+					if (newChar !== undefined) {
+						this.board.character = newChar.text;
+						this.enableMod(i);
+						break;
+					}
+				}
+			}
+			if (!newChar) {
+				this.board.character = "";
+			}
+		}
 	} else {
 		this.board.version = "0.85";
 	}
@@ -2520,12 +2818,13 @@ boardToBin() {
 	};
 	var a = [];
 	var enc = new TextEncoder();
-	for (var i = 0; i < this.modpacks.length; i++) {
+	for (var i = 0; i < this.activeMods.length; i++) {
 		a.push(MODPACK.PACK);
-		a.push(this.modpacks[i].data.length);
+		a.push(this.modpacks[this.activeMods[i]].settings.length);
+		var h = parseInt("0x" + this.modpacks[this.activeMods[i]].hash);
 		for (var j = 0; j < 32; j += 8)
-			a.push((this.modpacks[i].hash >> j) & 0xff);
-		a.push(...this.modpacks[i].data);
+			a.push((h >> j) & 0xff);
+		a.push(...this.modpacks[this.activeMods[i]].settings);
 	}
 	a.push(MODPACK.END);
 	var mods = new Uint8Array(a);
@@ -2545,7 +2844,7 @@ boardToBin() {
 	//	uint16_t goals;
 	Bingovista.applyShort(hdr, 15, hdr.length + comm.length + shelter.length + mods.length);
 	//	uint16_t mods;
-	Bingovista.applyShort(hdr, 17, ((this.modpacks.length > 0) ? hdr.length + comm.length + shelter.length : 0));
+	Bingovista.applyShort(hdr, 17, ((this.activeMods.length > 0) ? hdr.length + comm.length + shelter.length : 0));
 	//	uint16_t reserved;
 	Bingovista.applyShort(hdr, 19, 0);
 	//	uint8_t[] comments;
@@ -2572,13 +2871,13 @@ boardToBin() {
  *	Converts binary format to an abstract board object.
  */
 binToBoard(a) {
-	//	Minimum size to read full header
-	if (a.length < HEADER_LENGTH)
-		throw new TypeError("binToBoard: insufficient data, found " + String(a.length) + ", expected: " + String(HEADER_LENGTH) + " bytes");
-	//	[0] uint32_t magicNumber;
-	if (Bingovista.readLong(a, 0) != 0x69427752)
-		throw new TypeError("binToBoard: unknown magic number: 0x" + Bingovista.readLong(a, 0).toString(16) + ", expected: 0x69427752");
-	//	[6, 7] uint8_t boardWidth; uint8_t boardHeight;
+	const setErrorGoal = (function(s) {
+		this.board.size = 1;
+		this.board.width = 1;
+		this.board.height = 1;
+		this.board.goals.push(this.textToGoal("BingoChallenge~" + s));
+	}).bind(this);
+
 	this.board = {
 		comments: "",
 		character: "",
@@ -2595,54 +2894,85 @@ binToBoard(a) {
 		error: ""
 	};
 	var d = new TextDecoder;
+	//	Minimum size to read full header
+	if (a.length < HEADER_LENGTH) {
+		setErrorGoal("binToBoard: insufficient data, found " + String(a.length) + ", expected: " + String(HEADER_LENGTH) + " bytes");
+		return;
+	}
+	//	[0] uint32_t magicNumber;
+	if (Bingovista.readLong(a, 0) != 0x69427752) {
+		setErrorGoal("binToBoard: unknown magic number: 0x" + Bingovista.readLong(a, 0).toString(16) + ", expected: 0x69427752");
+		return;
+	}
+	//	[6, 7] uint8_t boardWidth; uint8_t boardHeight;
 	//	[4, 5] uint8_t version_major; uint8_t version_minor;
 	if (((a[4] << 8) + a[5]) > (VERSION_MAJOR << 8) + VERSION_MINOR)
 		this.board.error = "Warning: board version " + String(a[4]) + "." + String(a[5])
 				+ " is newer than viewer v" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR)
 				+ "; some goals or features may be unsupported.";
-	//	[8] uint8_t character;
-	this.board.character = (a[8] <= 0) ? "Any" : this.maps.characters[a[8] - 1].text;
 
 	//	[15] = uint16_t goals;	//	out of order as we need these sooner
 	var goalOffs = Bingovista.readShort(a, 15);
-	if (goalOffs < HEADER_LENGTH || goalOffs >= a.length)
-		throw new TypeError("binToBoard: goals pointer 0x" + goalOffs.toString(16) + " out of bounds");
+	if (goalOffs < HEADER_LENGTH || goalOffs >= a.length) {
+		setErrorGoal("binToBoard: goals pointer 0x" + goalOffs.toString(16) + " out of bounds");
+		return;
+	}
 
 	//	[17] = uint16_t mods;
 	var modOffs = Bingovista.readShort(a, 17);
 	if (modOffs != 0) {
-		if (modOffs < HEADER_LENGTH)
-			throw new TypeError("binToBoard: mods pointer 0x" + modOffs.toString(16) + " inside header");
-		if (modOffs >= a.length)
-			throw new TypeError("binToBoard: mods pointer 0x" + modOffs.toString(16) + " out of bounds");
-		if (modOffs >= goalOffs)
-			throw new TypeError("binToBoard: mods pointer 0x" + modOffs.toString(16) + " inside goals list");
+		if (modOffs < HEADER_LENGTH) {
+			setErrorGoal("binToBoard: mods pointer 0x" + modOffs.toString(16) + " inside header");
+			return;
+		}
+		if (modOffs >= a.length) {
+			setErrorGoal("binToBoard: mods pointer 0x" + modOffs.toString(16) + " out of bounds");
+			return;
+		}
+		if (modOffs >= goalOffs) {
+			setErrorGoal("binToBoard: mods pointer 0x" + modOffs.toString(16) + " inside goals list");
+			return;
+		}
 	}
 
 	//	[9] uint16_t shelter;
 	var shelOffs = Bingovista.readShort(a, 9);
 	if (shelOffs > 0) {
-		if (shelOffs < HEADER_LENGTH)
-			throw new TypeError("binToBoard: shelter pointer 0x" + shelOffs.toString(16) + " inside header");
-		if (shelOffs >= a.length)
-			throw new TypeError("binToBoard: shelter pointer 0x" + shelOffs.toString(16) + " out of bounds");
+		if (shelOffs < HEADER_LENGTH) {
+			setErrorGoal("binToBoard: shelter pointer 0x" + shelOffs.toString(16) + " inside header");
+			return;
+		}
+		if (shelOffs >= a.length) {
+			setErrorGoal("binToBoard: shelter pointer 0x" + shelOffs.toString(16) + " out of bounds");
+			return;
+		}
 		var shlEnd = a.indexOf(0, shelOffs);
-		if (shlEnd < 0)
-			throw new TypeError("binToBoard: shelter string missing terminator");
-		if (shlEnd >= goalOffs)
-			throw new TypeError("binToBoard: shelter string overlapping goals");
-		if (modOffs > 0 && shlEnd >= modOffs)
-			throw new TypeError("binToBoard: shelter string overlapping mods");
+		if (shlEnd < 0) {
+			setErrorGoal("binToBoard: shelter string missing terminator");
+			return;
+		}
+		if (shlEnd >= goalOffs) {
+			setErrorGoal("binToBoard: shelter string overlapping goals");
+			return;
+		}
+		if (modOffs > 0 && shlEnd >= modOffs) {
+			setErrorGoal("binToBoard: shelter string overlapping mods");
+			return;
+		}
 		this.board.shelter = d.decode(a.subarray(shelOffs, a.indexOf(0, shelOffs)));
 	}
 	//	[11] uint32_t perks;
 	this.board.perks = Bingovista.readLong(a, 11);
 	//	[19] uint16_t reserved;
-	if (Bingovista.readShort(a, 19) != 0)
-		throw new TypeError("binToBoard: reserved: 0x" + Bingovista.readShort(a, 19).toString(16) + ", expected: 0x0");
+	if (Bingovista.readShort(a, 19) != 0) {
+		setErrorGoal("binToBoard: reserved: 0x" + Bingovista.readShort(a, 19).toString(16) + ", expected: 0x0");
+		return;
+	}
 	//	(21) uint8_t[] comments;
-	if (a.indexOf(0, HEADER_LENGTH) < 0 || a.indexOf(0, HEADER_LENGTH) >= (modOffs || goalOffs))
-		throw new TypeError("binToBoard: comments missing terminator");
+	if (a.indexOf(0, HEADER_LENGTH) < 0 || a.indexOf(0, HEADER_LENGTH) >= (modOffs || goalOffs)) {
+		setErrorGoal("binToBoard: comments missing terminator");
+		return;
+	}
 	this.board.comments = d.decode(a.subarray(HEADER_LENGTH, a.indexOf(0, HEADER_LENGTH)));
 
 	if (modOffs > 0) {
@@ -2651,35 +2981,48 @@ binToBoard(a) {
 			PACK: 1
 		};
 		var modNum = 0;
-		this.modpacks = [];
+		this.resetMods();
 		for (; modOffs < goalOffs;) {
 			if (a[modOffs] == MODPACK.END) {
 				if (modOffs == Bingovista.readShort(a, 17)) {
-					throw new TypeError("binToBoard: empty modpack at offset 0x" + modOffs.toString(16));
+					setErrorGoal("binToBoard: empty modpack at offset 0x" + modOffs.toString(16));
+					return;
 				}
 				break;
 			} else if (a[modOffs] > MODPACK.PACK) {
-				throw new TypeError("binToBoard: unknown modpack type " + a[modOffs] + " at offset 0x" + modOffs.toString(16) + ", modpack " + modNum);
+				setErrorGoal("binToBoard: unknown modpack type " + String(a[modOffs]) + " at offset 0x" + modOffs.toString(16) + ", modpack " + String(modNum));
+				return;
 			}
 			if (modOffs + 6 > goalOffs) {
-				throw new TypeError("binToBoard: unexpected EOL in modpack header at offset 0x" + modOffs.toString(16) + ", modpack " + modNum);
+				setErrorGoal("binToBoard: unexpected EOL in modpack header at offset 0x" + modOffs.toString(16) + ", modpack " + String(modNum));
+				return;
 			}
 			if (modOffs + 6 + a[modOffs + 1] > goalOffs) {
-				throw new TypeError("binToBoard: unexpected EOL in modpack body at offset 0x" + modOffs.toString(16) + ", modpack " + modNum);
+				setErrorGoal("binToBoard: unexpected EOL in modpack body at offset 0x" + modOffs.toString(16) + ", modpack " + String(modNum));
+				return;
 			}
-			var modpack = { hash: Bingovista.readLong(a, modOffs + 2), data: a.subarray(modOffs + 6, modOffs + 6 + a[modOffs + 1]) };
-			modpack.name = this.identifyModpack(modpack.hash);
-			this.modpacks.push(modpack);
+			var hash = ("00000000" + Bingovista.readLong(a, modOffs + 2).toString(16)).slice(-8);
+			console.log("modpack hash " + this.modpacks[0].hash);
+			var idx = this.identifyModpack(hash);
+			if (idx < 0) {
+				setErrorGoal("binToBoard: board requests unknown modpack 0x" + hash + ", modpack " + String(modNum));
+				return;
+			}
+			this.enableMod(idx);
+			this.modpacks[idx].settings.set(a.subarray(modOffs + 6, modOffs + 6 + a[modOffs + 1]));
+
 			modNum++;
 			modOffs += 6 + a[modOffs + 1];
 		}
-
-		//	load mods here
 	}
 
 	//	do mod-dependent validation checks here
-	if (a[8] > this.maps.characters.length)
-		throw new TypeError("binToBoard: character " + a[8] + " out of bounds");
+	if (a[8] > this.maps.characters.length) {
+		setErrorGoal("binToBoard: character " + a[8] + " out of bounds");
+		return;
+	}
+	//	[8] uint8_t character;
+	this.board.character = (a[8] <= 0) ? "Any" : this.maps.characters[a[8] - 1].text;
 
 	var goal, type, desc;
 	for (var i = 0; i < this.board.width * this.board.height && goalOffs < a.length; i++) {
@@ -2769,12 +3112,16 @@ textToGoal(s) {
 		tildeSplit[0] = this.challengeUpgrades[tildeSplit[0]];
 	type = this.challengeValue(tildeSplit[0]);
 	if (type < 0)
-		throw new TypeError("Unknown goal, " + tildeSplit[0]);
+		throw new TypeError("Unknown goal");
 	desc = tildeSplit[1].split("><");
 	var def = this.CHALLENGE_DEFS[type];
 	//	def properties: name, category, super, textUpgrade, template, toPaint, toDesc, toComment, toBinary
 	if (def.super !== undefined) {
 		//	is a subclass; refer to parent for template and methods
+
+		//	real quick, apply upgrades -- allows "-Ex" mechanism to
+		//	update/replace challnge name and desc contents; used by mods
+		desc = Bingovista.upgradeDescriptor(desc, def.textUpgrade);
 		type = this.challengeValue(def.super);
 		if (type < 0)
 			throw new TypeError("Unknown superclass in " + def.name + ": " + def.super);
@@ -2936,106 +3283,6 @@ binToGoal(c) {
 	};
 	goal.text = this.goalToText(goal);
 	return goal;
-}
-
-/**
- *	Reads the given [sub]array as a binary challenge:
- *	struct bingo_goal_s {
- *		uint8_t type;   	//	BINGO_GOALS index
- *		uint8_t flags;  	//	GOAL_FLAGS bit vector
- *		uint8_t length; 	//	Length of data[]
- *		uint8_t[] data; 	//	defined by the goal
- *	};
- *	and outputs the corresponding text formatted goal.
- */
-binToGoalOld(c) {
-	var s, p, j, k, outputs, stringtype, maxIdx, replacer, tmp;
-	var d = new TextDecoder;
-
-	if (c[0] >= this.BINARY_TO_STRING_DEFINITIONS.length)
-		throw new TypeError("binToGoal: unknown challenge type " + String(c[0]));
-	//	ignore flags, not supported in 0.90 text
-	//c[1]
-	s = this.BINARY_TO_STRING_DEFINITIONS[c[0]].desc;
-	p = this.BINARY_TO_STRING_DEFINITIONS[c[0]].params;
-	//	extract parameters and make replacements in s
-	for (j = 0; j < p.length; j++) {
-		stringtype = false;
-
-		if (p[j].type === "number") {
-			//	Plain number: writes a decimal integer into its replacement template site(s)
-			outputs = [0];
-			for (k = 0; k < p[j].size; k++) {
-				//	little-endian, variable byte length, unsigned integer
-				outputs[0] += c[GOAL_LENGTH + p[j].offset + k] * (1 << (8 * k));
-			}
-			if (p[j].signed && p[j].formatter == "" && outputs[0] >= (2 ** (k * 8 - 1)))
-				outputs[0] = outputs[0] - (2 ** (k * 8));
-
-		} else if (p[j].type === "bool") {
-			//	Boolean: reads one bit at the specified offset and position
-			//	Note: offset includes goal's hidden flag for better packing when few flags are needed
-			outputs = [(c[1 + p[j].offset] >> p[j].bit) & 0x01];
-			if (p[j].formatter !== "")
-				outputs[0]++;	//	hack for formatter offset below
-
-		} else if (p[j].type === "string") {
-			//	Plain string: copies a fixed-length or zero-terminated string into its replacement template site(s)
-			stringtype = true;
-			if (p[j].size == 0) {
-				maxIdx = c.indexOf(0, GOAL_LENGTH + p[j].offset);
-				if (maxIdx == -1)
-					maxIdx = c.length;
-			} else
-				maxIdx = p[j].size + GOAL_LENGTH + p[j].offset;
-			outputs = c.subarray(GOAL_LENGTH + p[j].offset, maxIdx);
-
-		} else if (p[j].type === "pstr") {
-			//	Pointer to string: reads a (byte) offset from target location, then copies from that offset
-			stringtype = true;
-			if (p[j].size == 0) {
-				maxIdx = c.indexOf(0, GOAL_LENGTH + c[p[j].offset + GOAL_LENGTH]);
-				if (maxIdx == -1)
-					maxIdx = c.length;
-			} else
-				maxIdx = p[j].size + GOAL_LENGTH + c[p[j].offset + GOAL_LENGTH];
-			outputs = c.subarray(GOAL_LENGTH + c[p[j].offset + GOAL_LENGTH], maxIdx);
-		}
-
-		var f = p[j].formatter;
-		if (f === "") {
-			if (stringtype) {
-				//	Unformatted string, decode bytes into utf-8
-				replacer = d.decode(outputs);
-			} else {
-				//	single number, toString it
-				replacer = String(outputs[0]);
-			}
-		} else {
-			//	Formatted number/array, convert it and join
-			if (this.enums[f] === undefined)
-				throw new TypeError("binToGoal: formatter \"" + f + "\" not found");
-			tmp = [];
-			for (k = 0; k < outputs.length; k++) {
-				if (p[j].altthreshold === undefined || outputs[k] < p[j].altthreshold) {
-					if (this.enums[f][outputs[k] - 1] === undefined)
-						throw new TypeError("binToGoal: formatter \"" + f + "\", value out of range: " + String(outputs[k]));
-					tmp.push(this.enums[f][outputs[k] - 1]);
-				} else {
-					if (this.enums[p[j].altformatter][outputs[k] - p[j].altthreshold] === undefined)
-						throw new TypeError("binToGoal: alternative formatter \"" + p[j].altformatter + "\", value out of range: " + String(outputs[k]));
-					tmp.push(this.enums[p[j].altformatter][outputs[k] - p[j].altthreshold]);
-				}
-			}
-			replacer = tmp.join(p[j].joiner || "");
-		}
-		s = s.replace(RegExp("\\{" + String(j) + "\\}", "g"), replacer);
-	}
-	s =
-			(this.challengeUpgrades[this.BINARY_TO_STRING_DEFINITIONS[c[0]].name]
-			|| this.BINARY_TO_STRING_DEFINITIONS[c[0]].name)
-			+ "~" + s;
-	return s;
 }
 
 
@@ -3422,7 +3669,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toPaint: function(p) {
 			var r = [
 				{ type: "icon", value: this.entityIconAtlas("ScavengerBomb"), scale: 1, color: this.entityIconColor("ScavengerBomb"), rotation: 0 },
-				{ type: "icon", value: "scavtoll", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },
+				{ type: "icon", value: "scavtoll", scale: 0.8, color: Bingovista.colors.Unity_white, rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: p.specific ? p.roomName.toUpperCase() : ("[" + String(p.current) + "/" + String(p.amount) + "]"), color: Bingovista.colors.Unity_white }
 			];
@@ -3659,7 +3906,9 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				}
 			},
 			{
-				param: "current", type: "number", formatter: "", parse: "parseInt", minval: 0, maxval: CHAR_MAX, defaultval: 0 },
+				param: "current", type: "number",
+				formatter: "", parse: "parseInt", minval: 0, maxval: CHAR_MAX, defaultval: 0
+			},
 			{
 				param: "amount", type: "number",
 				binType: "number", binOffs: 1, binSize: 1,
@@ -3740,7 +3989,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				{ op: "splice", offs: 6, rem: 0, data: ["System.String|Any Subregion|Subregion|5|subregions"] }
 			],
 			9: [	//	Bingovista-native format; one typo cleanup, then return the .length = 9
-				{ op: "replace", offs: 6, find: "Journey\\'s End", replace: "Journey's End" }
+				{ op: "replace", offs: 6, find: "Journey\\\\'s End", replace: "Journey's End" }
 			]
 		},
 		textDowngrade: {
@@ -4145,7 +4394,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			},
 			{
 				param: "visited", type: "list",
-				formatter: "echoes", parse: "list", separator: "|", defaultval: []
+				formatter: "regionsreal", parse: "list", separator: "|", defaultval: []
 			}
 		],
 		toPaint: function(p) {
@@ -4177,7 +4426,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				b[0] = this.challengeValue("BingoEchoExChallenge");
 				b.push(p.amount);
 				for (var k = 0; k < p.visited.length; k++)
-					b.push(this.enumToValue(p.visited[k], "regions"));
+					b.push(this.enumToValue(p.visited[k], "regionsreal"));
 				b.push(0);	//	zero terminator
 			}
 			b[2] = b.length - GOAL_LENGTH;
@@ -4386,7 +4635,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				param: "oneCycle", type: "bool",
 				binType: "bool", binOffs: 0, bit: 4,
 				formatter: "", parse: "SettingBox", parseFmt: {
-					datatype: "System.Boolean", name: "At Once", position: "3",
+					datatype: "System.Boolean", name: "At once", position: "3",
 					formatter: "NULL", defaultval: false
 				}
 			},
@@ -4460,7 +4709,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				b[3] = p.amount;
 				Bingovista.applyBool(b, 1, 4, p.oneCycle);
 				Bingovista.applyBool(b, 1, 5, p.differentRegions);
-				b[4] = this.enumToValue(p.region, "regionsreal");
+				b[4] = this.enumToValue(p.region, "nootregions");
 				for (var k = 0; k < p.hatchRegions.length; k++)
 					b.push(this.enumToValue(p.hatchRegions[k], "regionsreal"));
 				b.push(0);	//	zero terminator
@@ -5526,7 +5775,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				Bingovista.applyShort(b, 3, p.amount);
 				b[5] = this.enumToValue(p.region, "popcornregions");
 				for (var k = 0; k < p.popRegions.length; k++)
-					b.push(this.enumToValue(p.popRegions[k], "popcornregions"));
+					b.push(this.enumToValue(p.popRegions[k], "regionsreal"));
 				b.push(0);	//	zero terminator
 				b[2] = b.length - GOAL_LENGTH;
 				return new Uint8Array(b);
@@ -6106,12 +6355,12 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		//	desc of format ["CC", "System.String|CC_A10|Room|0|vista", "734", "506", "0", "0"]
 		textUpgrade: {
 			6: [	//	Hack to use arbitrary string template
-				{ op: "replace", offs: 1, find: /\|vista$/, replace: "|NULL" }
+				{ op: "replace", offs: 1, find: "\\|vista$", replace: "|NULL" }
 			]
 		},
 		textDowngrade: {
 			6: [	//	and unhack...
-				{ op: "replace", offs: 1, find: /\|NULL$/, replace: "|vista" }
+				{ op: "replace", offs: 1, find: "\\|NULL$", replace: "|vista" }
 			]
 		},
 		template: [
@@ -6638,14 +6887,14 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		//	desc of format ["System.Boolean|false|Looks to the Moon|0|NULL", "0", "0"]
 		textUpgrade: {
 			3: [	//	Transform boolean to string SettingBox; futureproofing for expanded iterator selection
-				{ op: "replace", offs: 0, find: /^System\.Boolean\|/, replace: "System.String|" },
-				{ op: "replace", offs: 0, find: /\|NULL$/, replace: "|iterators" }
+				{ op: "replace", offs: 0, find: "^System\\.Boolean\\|", replace: "System.String|" },
+				{ op: "replace", offs: 0, find: "\\|NULL$", replace: "|iterators" }
 			]
 		},
 		textDowngrade: {
 			3: [	//	unhack
-				{ op: "replace", offs: 0, find: /^System\.String\|/, replace: "System.Boolean|" },
-				{ op: "replace", offs: 0, find: /\|iterators$/, replace: "|NULL" }
+				{ op: "replace", offs: 0, find: "^System\\.String\\|", replace: "System.Boolean|" },
+				{ op: "replace", offs: 0, find: "\\|iterators$/", replace: "|NULL" }
 			]
 		},
 		template: [

@@ -101,3 +101,22 @@
 	background-color: #584800;
 	color: #ffffff;
 }
+.bv-modsep {
+	margin-top: 2px;
+	margin-bottom: 2px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+.bv-modsep::before, .bv-modsep::after {
+	background-color: #686868;
+	content: "";
+	display: inline-block;
+	height: 2px;
+	vertical-align: middle;
+	width: 1.5em;
+	margin-right: 4px;
+	margin-left: 4px;
+}
+.bv-modsep::after {
+	width: 100%;
+}

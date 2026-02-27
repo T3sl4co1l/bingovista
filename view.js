@@ -15,8 +15,8 @@ document.addEventListener("DOMContentLoaded", function() {
 		loadFail: loadFail,
 		loadSuccess: loadSuccess,
 	} );
-	
-	bv.selectSquare = mySelectSquare;
+	bv.loadModpack("mods/watcher.json");
+	bv.selectSquare = viewSelectSquare;
 
 	//	Nav, header and file handling buttons
 	document.getElementById("boardcontainer").addEventListener("keydown", navSquares);
@@ -120,7 +120,7 @@ function copyText(e) {
 	navigator.clipboard.writeText(document.getElementById("textbox").value);
 }
 
-function mySelectSquare(col, row) {
+function viewSelectSquare(col, row) {
 	var ctx, elem, goal, width, height;
 	this.selected = { col: col, row: row };
 	this.setCursor(col, row);
