@@ -1135,7 +1135,24 @@ areResourcesDone() {
 	}
 	return done;
 }
-
+/**
+ * Asynchronously setup a Bingovista object.  
+ * optional parameters:
+ * @param {function} params.loadFail callback(s) if loading Bingovista failed.
+ * @param {function} params.loadSuccess callback(s) if loading Bingovista succeeded.
+ * @param {function} params.selectCB callback(s) when selected square has changed.
+ * @param {function} params.mouseCB callback(s) when mouse hovers or leaves board canvas.
+ * @param {object} params.selection object with `row` and `col` properties indicating which square to select.
+ * @param {boolean} params.cursor whether or not to outline currently selected square.
+ * @param {boolean} params.transpose whether or not to transpose the board (<v1.25 visual arrangement).
+ * @param {boolean} params.tips whether or not to display additional tips and full data.
+ * @param {string} params.dataSrc the source data to parse the board from. Requires `params.dataType`.
+ * @param {string} params.dataType describe `dataSrc`. "text", "base64", "short" or "url".
+ * @param {string} params.headerId the id of the html div to use as board header.
+ * @param {string} params.boardId the id of the html div to use as board canvas.
+ * @param {string} params.selectId the id of the html div to use as selected square's magnifying glass.
+ * @param {string} params.detailId the id of the html div to use as selected square's text explanation.
+ */
 setup(params) {
 
 	if (params.loadFail !== undefined && typeof(params.loadFail) === "function") {
