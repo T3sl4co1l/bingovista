@@ -2496,7 +2496,22 @@ checkSettingBoxEx(s, template) {
 			var idx1 = this.enums[template.formatter].indexOf(ar[1]);
 			var idx2 = this.enums[template.altformatter]?.indexOf(ar[1]) || -1;
 			if (idx1 < 0 && idx2 < 0) {
-				rr.error.push("value not found in list, using default");
+				if (ar[1] === "Moxie") {
+					rr.value = "CyanLizard";
+					rr.index = this.enums[template.formatter].indexOf(rr.value);
+					rr.error.push("value " + ar[1] + " not found in list, using default");
+				} else if (ar[1] === "Shrub") {
+					idx1 = this.enums[template.formatter].indexOf("PeachLizard");
+					if (idx1 >= 0) {
+						rr.value = "PeachLizard"; rr.index = idx1;
+					} else {
+						rr.value = "PinkLizard";
+						this.enums[template.formatter].indexOf(rr.value);
+					}
+					rr.error.push("value " + ar[1] + " not found in list, using default");
+				} else {
+					rr.error.push("value not found in list, using default");
+				}
 			} else {
 				rr.value = ar[1];
 				rr.index = (idx1 >= 0) ? idx1 : (idx2 + (template.altthreshold || 0));
@@ -2545,7 +2560,7 @@ checkSettingBoxEx(s, template) {
  *		          	cannot be parsed, or for initialization
  *		minval    	int: minimum clamping value; list: if less than this many
  *		          	elements, use defaultval instead
- *		maxval    	maximum clamping value of int type
+ *		maxval    	maximum clamping value of int type, or length of list type
  *	additional properties depend on type:
  *		parseFmt 	for SettingBox parser; object is passed to checkSettingBoxEx
  *		         	(see its comment for more information)
@@ -5143,6 +5158,10 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			paint.push( { type: "icon", value: "Multiplayer_Bones", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 } );
 			if (p.crit !== "Any Creature") {
 				paint.push( { type: "icon", value: this.entityIconAtlas(p.crit), scale: 1, color: this.entityIconColor(p.crit), rotation: 0 } );
+				if (p._error.crit[0]?.search("Moxie") == 6) {
+					paint[paint.length - 1].value = "Moxie";
+					paint[paint.length - 1].color = Bingovista.colors.Unity_white;
+				}
 			}
 			paint.push( { type: "break" } );
 			if (/* p.subregion !== "Any Subregion" && */ p.region !== "Any Region") {
@@ -5162,6 +5181,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		},
 		toDesc: function(p) {
 			var c = this.entityNameQuantify(p.amount, ((p.crit !== "Any Creature") ? this.entityDisplayText(p.crit) : "creatures"));
+			if (p._error.crit[0]?.search("Moxie") == 6) c = "Moxie";
 			var r = this.regionToDisplayText(this.board.character, p.region /*, p.subregion */);
 			if (r > "") r = " in " + r;
 			var w = ", with a death pit";
@@ -6074,14 +6094,27 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				{ type: "break" },
 				{ type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: Bingovista.colors.Unity_white }
 			];
-			if (p.specific)
+			if (p.specific) {
 				paint.splice(1, 0, { type: "icon", value: this.entityIconAtlas(p.crit), scale: 1, color: this.entityIconColor(p.crit), rotation: 0 } );
+				if (p._error.crit[0]?.search("Shrub") == 6) {
+					paint[1].value = "Bush";
+					paint[1].color = Bingovista.colors.Unity_white;
+				}
+			}
 			return paint;
 		},
 		toDesc: function(p) {
-			return p.specific ?
-					("Befriend " + this.entityNameQuantify(p.amount, this.entityDisplayText(p.crit)) + ".") :
-					("Befriend " + ((p.amount == 1) ? " a creature." : String(p.amount) + " unique creature types."));
+			var c;
+			if (p.specific) {
+				c = this.entityNameQuantify(p.amount, this.entityDisplayText(p.crit));
+				if (p._error.crit[0]?.search("Shrub") == 6) c = "shrubfromtomorrow";
+			} else {
+				if (p.amount == 1)
+					c = "a creature"
+				else
+					c = String(p.amount) + " unique creature types"
+			}
+			return "Befriend " + c + ".";
 		},
 		toComment: function(p) {
 			return "Taming occurs when a creature has been fed or rescued enough times to increase the player's reputation above some threshold, starting from a default depending on species, and the global and regional reputation of the player.<br>" +
