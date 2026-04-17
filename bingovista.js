@@ -976,8 +976,7 @@ loadModpack(s) {
 					console.log("loadModpack error: " + mp.err);
 					return;
 				}
-				if (mp.hash === undefined)
-					mp.hash = this.fnv1aHash(t);
+				mp.hash = mp.pack.hash || this.fnv1aHash(t);
 				mp.pack.atlases.forEach(function(o) {
 					this.atlases.push(o);
 					this.loadAtlas(o);
@@ -1098,6 +1097,7 @@ enableMod(n) {
 	this.CHALLENGE_DEFS.push(...pack.challenges);
 	this.mapLink = pack.mapLink;
 	this.challengeUpgrades = Object.assign({}, Bingovista.challengeUpgradesBase);
+	this.challengeUpgrades = Object.assign(this.challengeUpgrades, pack.challengeUpgrades);
 	this.activeMods.push(n);
 }
 
