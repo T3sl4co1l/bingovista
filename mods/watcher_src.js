@@ -90,48 +90,19 @@ function refresh(e) {
 //	possible fixups:
 //	AllRegionsExcept: was briefly (in beta) non-Watcher version --> add to challengeUpgrades?
 //	any W- enums (Wfood, Wfriend, Wpassage, Wpearls, Wpoms, Wtheft, Wtolls, Wtransport, WweaverRooms)
+//	--> solved by upgrade(replace) or ignoring (logs parse error, uses template list)
 
 //	need enums:
 //	additions to: banitem, expobject,
 //	food, friend, iterators, pinnable, theft, transport, weapons
-//	new: weaverrooms
+//	new: weaverrooms --> temporarily solved with embedded general string; can shorten with -Ex later
 //	spinners, pomegranateregions --> copy from regions
-
-//	other challenges in sample
-//	"BingoAchievementChallenge",
-//	"BingoAllRegionsExceptChallenge",
-//	"BingoBombTollChallenge",
-//	"BingoCollectPearlChallenge",
-//	"BingoCycleScoreChallenge",
-//	"BingoDamageChallenge",
-//	"BingoDodgeLeviathanChallenge",
-//	"BingoDodgeNootChallenge",
-//	"BingoDontKillChallenge",
-//	"BingoDontUseItemChallenge",
-//	"BingoEatChallenge",
-//	"BingoEnterRegionFromChallenge",
-//	"BingoGlobalScoreChallenge",
-//	"BingoHatchNoodleChallenge",
-//	"BingoItemHoardChallenge",
-//	"BingoKarmaFlowerChallenge",
-//	"BingoKillChallenge",
-//	"BingoLickChallenge",
-//	"BingoPearlHoardChallenge",
-//	"BingoPinChallenge",
-//	"BingoPopcornChallenge",
-//	"BingoScoreChallenge",
-//	"BingoStealChallenge",
-//	"BingoTameChallenge",
-//	"BingoTradeChallenge",
-//	"BingoTradeTradedChallenge",
-//	"BingoTransportChallenge",
-//	"BingoUnlockChallenge",
-//	"BingoVistaChallenge",
 
 const pack = {
 	"name": "Watcher Expeditions",
-	"version": "1.0",
-	"date": "20260227",
+	"version": "1.1",
+	"hash": "db5d5bd8",
+	"date": "20260302",
 	"creator": "T3sl4co1l",
 	"settingsBytes": 1,
 	"mapLink": "https://alduris.github.io/watcher-map/map.html",
@@ -462,9 +433,9 @@ const pack = {
 			"Boomerang"
 		], "comment": "type: array of strings" },
 		{ "target": "tolls",          "add": [
-			"warf_g01",
-			"wbla_f01",
-			"wskd_b41"
+			"WARF_G01",
+			"WBLA_F01",
+			"WSKD_B41"
 		], "comment": "type: array of strings" },
 //		{ "target": "tolls_bombed",   "add": [], "comment": "type: array of strings" },	//	auto filled from enums.tolls
 		{ "target": "transport",      "add": [], "comment": "type: array of strings" },
@@ -680,7 +651,7 @@ const pack = {
 				return paint;
 			},
 			toDesc: function(p) {
-				return "Transport the same " + this.entityNameQuantify(1, p.crit, false) + " through " + this.entityNameQuantify(p.amount, "portals") + ".";
+				return "Transport the same " + this.entityNameQuantify(1, this.entityDisplayText(p.crit), false) + " through " + this.entityNameQuantify(p.amount, "portals") + ".";
 			},
 			toComment: function(p) {
 				return "";
@@ -1078,7 +1049,7 @@ const pack = {
 				return paint;
 			},
 			toDesc: function(p) {
-				return "Visit Spinning Top " + (p.specific ? ("in " + this.regionToDisplayText(this.board.character, p.spinner) + " Echo") : (p.amount <= 1 ? "once" : String(p.amount) + " times")) + (p.starve ? ", while starving." : ".");
+				return "Visit Spinning Top " + (p.specific ? ("in " + this.regionToDisplayText(this.board.character, p.spinner)) : (p.amount <= 1 ? "once" : String(p.amount) + " times")) + (p.starve ? ", while starving." : ".");
 			},
 			toComment: function(p) {
 				return "";
@@ -1124,7 +1095,7 @@ const pack = {
 					binType: "string", binOffs: 1, binSize: 0,
 					formatter: "", parse: "SettingBox", parseFmt: {
 						datatype: "System.String", name: "Portal Room", position: "0",
-						formatter: "NULL", defaultval: "WARA_P22"
+						ucase: true, formatter: "NULL", defaultval: "WARA_P22"
 					}
 				},
 				{

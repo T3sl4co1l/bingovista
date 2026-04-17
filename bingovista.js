@@ -782,18 +782,18 @@ constructor(params) {
 	"lc_stripmallnew", "lf_j01", "oe_tower04", "sb_topside" ];
 	this.enums.tolls_bombed = [ "empty", "SU_C02|0,0", "GW_C05|0,0", "GW_C11|0,0",
 		"LF_E03|0,0", "UG_TOLL|0,0", "CL_A34|0,0", "CL_B27|0,0", "LC_C10|0,0",
-		"LC_longslum|0,0", "LC_rooftophop|0,0", "LC_templetoll|0,0",
-		"LC_stripmallNEW|0,0", "LF_J01|0,0", "OE_TOWER04|0,0", "SB_TOPSIDE|0,0",
+		"LC_LONGSLUM|0,0", "LC_ROOFTOPHOP|0,0", "LC_TEMPLETOLL|0,0",
+		"LC_STRIPMALLNEW|0,0", "LF_J01|0,0", "OE_TOWER04|0,0", "SB_TOPSIDE|0,0",
 		"SU_C02|0,1", "GW_C05|0,1", "GW_C11|0,1", "LF_E03|0,1", "UG_TOLL|0,1",
-		"CL_A34|0,1", "CL_B27|0,1", "LC_C10|0,1", "LC_longslum|0,1",
-		"LC_rooftophop|0,1", "LC_templetoll|0,1", "LC_stripmallNEW|0,1", "LF_J01|0,1",
+		"CL_A34|0,1", "CL_B27|0,1", "LC_C10|0,1", "LC_LONGSLUM|0,1",
+		"LC_ROOFTOPHOP|0,1", "LC_TEMPLETOLL|0,1", "LC_STRIPMALLNEW|0,1", "LF_J01|0,1",
 		"OE_TOWER04|0,1", "SB_TOPSIDE|0,1", "SU_C02|1,0", "GW_C05|1,0", "GW_C11|1,0",
 		"LF_E03|1,0", "UG_TOLL|1,0", "CL_A34|1,0", "CL_B27|1,0", "LC_C10|1,0",
-		"LC_longslum|1,0", "LC_rooftophop|1,0", "LC_templetoll|1,0",
-		"LC_stripmallNEW|1,0", "LF_J01|1,0", "OE_TOWER04|1,0", "SB_TOPSIDE|1,0",
+		"LC_LONGSLUM|1,0", "LC_ROOFTOPHOP|1,0", "LC_TEMPLETOLL|1,0",
+		"LC_STRIPMALLNEW|1,0", "LF_J01|1,0", "OE_TOWER04|1,0", "SB_TOPSIDE|1,0",
 		"SU_C02|1,1", "GW_C05|1,1", "GW_C11|1,1", "LF_E03|1,1", "UG_TOLL|1,1",
-		"CL_A34|1,1", "CL_B27|1,1", "LC_C10|1,1", "LC_longslum|1,1",
-		"LC_rooftophop|1,1", "LC_templetoll|1,1", "LC_stripmallNEW|1,1", "LF_J01|1,1",
+		"CL_A34|1,1", "CL_B27|1,1", "LC_C10|1,1", "LC_LONGSLUM|1,1",
+		"LC_ROOFTOPHOP|1,1", "LC_TEMPLETOLL|1,1", "LC_STRIPMALLNEW|1,1", "LF_J01|1,1",
 		"OE_TOWER04|1,1", "SB_TOPSIDE|1,1" ];
 	this.enums.transport = [ "JetFish", "Hazer", "VultureGrub", "CicadaA", "CicadaB",
 		"Yeek" ];
@@ -969,7 +969,6 @@ loadModpack(s) {
 		//	Request succeeds
 		if (r.status == 200) {
 			r.text().then(function(t) {
-				mp.hash = this.fnv1aHash(t);
 				try {
 					mp.pack = JSON.parse(t);
 				} catch (e) {
@@ -977,6 +976,8 @@ loadModpack(s) {
 					console.log("loadModpack error: " + mp.err);
 					return;
 				}
+				if (mp.hash === undefined)
+					mp.hash = this.fnv1aHash(t);
 				mp.pack.atlases.forEach(function(o) {
 					this.atlases.push(o);
 					this.loadAtlas(o);
@@ -2210,10 +2211,12 @@ entityNameQuantify(n, s, article = true) {
 			return s;
 		} );
 	}
-	if (/^[AEIOU]/i.test(s))
-		s = "an " + s;
-	else
-		s = "a " + s;
+	if (article) {
+		if (/^[AEIOU]/i.test(s))
+			s = "an " + s;
+		else
+			s = "a " + s;
+	}
 	return s;
 }
 
@@ -3665,7 +3668,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				binType: "number", binOffs: 0, binSize: 1,
 				formatter: "tolls", parse: "SettingBox", parseFmt: {
 					datatype: "System.String", name: "Scavenger Toll", position: "3",
-					formatter: "tolls", lcase: true, defaultval: "su_c02"
+					formatter: "tolls", ucase: true, defaultval: "SU_C02"
 				}
 			},
 			{
@@ -3714,9 +3717,9 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			if (p.specific) {
 				var regi = Bingovista.regionOfRoom(p.roomName).toUpperCase();
 				var r = this.regionToDisplayText(this.board.character, regi);
-				if (p.roomName === "gw_c11")
+				if (p.roomName === "GW_C11")
 					r += " underground";
-				if (p.roomName === "gw_c05")
+				if (p.roomName === "GW_C05")
 					r += " surface";
 				d = "Throw a grenade at the " + this.getMapLink(p.roomName.toUpperCase(), this.board.character, r) + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
 			} else {
@@ -4791,7 +4794,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				{ type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: Bingovista.colors.Unity_white },
 				{ type: "break" },
 				{ type: "icon", value: "buttonCrossA", scale: 1, color: Bingovista.colors.Unity_red, rotation: 0 },
-				{ type: "icon", value: "MartyrB", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 }
+				{ type: "icon", value: "Multiplayer_Death", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 }
 			];
 		},
 		toDesc: function(p) {
@@ -6424,7 +6427,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				binType: "string", binOffs: 5, binSize: 0,
 				formatter: "", parse: "SettingBox", parseFmt: {
 					datatype: "System.String", name: "Room", position: "0",
-					formatter: "NULL", defaultval: "SU_A04"
+					formatter: "NULL", /*ucase: true,*/ defaultval: "SU_A04"
 				}
 			},
 			{
@@ -6454,7 +6457,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			];
 		},
 		toDesc: function(p) {
-			return "Collect the vista in " + this.regionToDisplayText(this.board.character, Bingovista.regionOfRoom(p.room)) + ".";
+			return "Collect the Vista in " + this.regionToDisplayText(this.board.character, Bingovista.regionOfRoom(p.room)) + ".";
 		},
 		toComment: function(p) {
 			var idx = this.maps.vistas.findIndex(o => o.room === p.room && o.x == p.x && o.y == p.y);
@@ -7223,21 +7226,8 @@ setMeta() {
 	);
 }
 
-enumeratePerks() {
-	var a = [];
-	for (var i = 0, el; i < this.maps.expflags.length; i++) {
-		el = document.getElementById("perkscheck" + String(i));
-		if (el !== null) {
-			if (el.checked)
-				a.push(i);
-		} else
-			break;
-	}
-	return a;
-}
-
 compressionRatio() {
-	return Math.round(1000 - 1000 * board.bin.length / document.getElementById("textbox").value.length) / 10;
+	return Math.round(1000 - 1000 * this.board.bin.length / this.board.text.length) / 10;
 }
 
 /**	approx. room count in Downpour, adding up Wiki region room counts */
