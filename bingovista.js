@@ -780,21 +780,21 @@ constructor(params) {
 	this.enums.tolls = [ "su_c02", "gw_c05", "gw_c11", "lf_e03", "ug_toll",
 	"cl_a34", "cl_b27", "lc_c10", "lc_longslum", "lc_rooftophop", "lc_templetoll",
 	"lc_stripmallnew", "lf_j01", "oe_tower04", "sb_topside" ];
-	this.enums.tolls_bombed = [ "empty", "SU_C02|0,0", "GW_C05|0,0", "GW_C11|0,0",
-		"LF_E03|0,0", "UG_TOLL|0,0", "CL_A34|0,0", "CL_B27|0,0", "LC_C10|0,0",
-		"LC_LONGSLUM|0,0", "LC_ROOFTOPHOP|0,0", "LC_TEMPLETOLL|0,0",
-		"LC_STRIPMALLNEW|0,0", "LF_J01|0,0", "OE_TOWER04|0,0", "SB_TOPSIDE|0,0",
-		"SU_C02|0,1", "GW_C05|0,1", "GW_C11|0,1", "LF_E03|0,1", "UG_TOLL|0,1",
-		"CL_A34|0,1", "CL_B27|0,1", "LC_C10|0,1", "LC_LONGSLUM|0,1",
-		"LC_ROOFTOPHOP|0,1", "LC_TEMPLETOLL|0,1", "LC_STRIPMALLNEW|0,1", "LF_J01|0,1",
-		"OE_TOWER04|0,1", "SB_TOPSIDE|0,1", "SU_C02|1,0", "GW_C05|1,0", "GW_C11|1,0",
-		"LF_E03|1,0", "UG_TOLL|1,0", "CL_A34|1,0", "CL_B27|1,0", "LC_C10|1,0",
-		"LC_LONGSLUM|1,0", "LC_ROOFTOPHOP|1,0", "LC_TEMPLETOLL|1,0",
-		"LC_STRIPMALLNEW|1,0", "LF_J01|1,0", "OE_TOWER04|1,0", "SB_TOPSIDE|1,0",
-		"SU_C02|1,1", "GW_C05|1,1", "GW_C11|1,1", "LF_E03|1,1", "UG_TOLL|1,1",
-		"CL_A34|1,1", "CL_B27|1,1", "LC_C10|1,1", "LC_LONGSLUM|1,1",
-		"LC_ROOFTOPHOP|1,1", "LC_TEMPLETOLL|1,1", "LC_STRIPMALLNEW|1,1", "LF_J01|1,1",
-		"OE_TOWER04|1,1", "SB_TOPSIDE|1,1" ];
+	this.enums.tolls_bombed = [ "empty", "su_c02|0,0", "gw_c05|0,0", "gw_c11|0,0",
+		"lf_e03|0,0", "ug_toll|0,0", "cl_a34|0,0", "cl_b27|0,0", "lc_c10|0,0",
+		"lc_longslum|0,0", "lc_rooftophop|0,0", "lc_templetoll|0,0",
+		"lc_stripmallnew|0,0", "lf_j01|0,0", "oe_tower04|0,0", "sb_topside|0,0",
+		"su_c02|0,1", "gw_c05|0,1", "gw_c11|0,1", "lf_e03|0,1", "ug_toll|0,1",
+		"cl_a34|0,1", "cl_b27|0,1", "lc_c10|0,1", "lc_longslum|0,1",
+		"lc_rooftophop|0,1", "lc_templetoll|0,1", "lc_stripmallnew|0,1", "lf_j01|0,1",
+		"oe_tower04|0,1", "sb_topside|0,1", "su_c02|1,0", "gw_c05|1,0", "gw_c11|1,0",
+		"lf_e03|1,0", "ug_toll|1,0", "cl_a34|1,0", "cl_b27|1,0", "lc_c10|1,0",
+		"lc_longslum|1,0", "lc_rooftophop|1,0", "lc_templetoll|1,0",
+		"lc_stripmallnew|1,0", "lf_j01|1,0", "oe_tower04|1,0", "sb_topside|1,0",
+		"su_c02|1,1", "gw_c05|1,1", "gw_c11|1,1", "lf_e03|1,1", "ug_toll|1,1",
+		"cl_a34|1,1", "cl_b27|1,1", "lc_c10|1,1", "lc_longslum|1,1",
+		"lc_rooftophop|1,1", "lc_templetoll|1,1", "lc_stripmallnew|1,1", "lf_j01|1,1",
+		"oe_tower04|1,1", "sb_topside|1,1" ];
 	this.enums.transport = [ "JetFish", "Hazer", "VultureGrub", "CicadaA", "CicadaB",
 		"Yeek" ];
 	this.enums.unlocksblue = this.maps.creatures.map(o => o.name)
@@ -3668,7 +3668,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				binType: "number", binOffs: 0, binSize: 1,
 				formatter: "tolls", parse: "SettingBox", parseFmt: {
 					datatype: "System.String", name: "Scavenger Toll", position: "3",
-					formatter: "tolls", ucase: true, defaultval: "SU_C02"
+					formatter: "tolls", lcase: true, defaultval: "su_c02"
 				}
 			},
 			{
@@ -3717,9 +3717,9 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			if (p.specific) {
 				var regi = Bingovista.regionOfRoom(p.roomName).toUpperCase();
 				var r = this.regionToDisplayText(this.board.character, regi);
-				if (p.roomName === "GW_C11")
+				if (p.roomName === "gw_c11")
 					r += " underground";
-				if (p.roomName === "GW_C05")
+				if (p.roomName === "gw_c05")
 					r += " surface";
 				d = "Throw a grenade at the " + this.getMapLink(p.roomName.toUpperCase(), this.board.character, r) + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
 			} else {
