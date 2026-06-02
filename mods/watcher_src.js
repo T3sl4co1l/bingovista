@@ -433,9 +433,9 @@ const pack = {
 			"Boomerang"
 		], "comment": "type: array of strings" },
 		{ "target": "tolls",          "add": [
-			"WARF_G01",
-			"WBLA_F01",
-			"WSKD_B41"
+			"warf_g01",
+			"wbla_f01",
+			"wskd_b41"
 		], "comment": "type: array of strings" },
 //		{ "target": "tolls_bombed",   "add": [], "comment": "type: array of strings" },	//	auto filled from enums.tolls
 		{ "target": "transport",      "add": [], "comment": "type: array of strings" },
