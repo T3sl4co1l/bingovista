@@ -6,7 +6,26 @@
 	<title>Tips | Rain World Bingo Board Viewer/Creator</title>
 	<link rel="icon" type="image/png" sizes="48x48" href="favicon.ico">
 	<link rel="StyleSheet" href="v.css" media="all">
-  </head>
+	<style media="all"><!--
+body div table tr {
+	text-align: left;
+}
+body div table tr td, body div table tr th {
+	border: solid 1px #484848;
+	padding: 2px 4px;
+}
+body div table {
+	margin-left: auto;
+	margin-right: auto;
+	border-collapse: collapse;
+}
+@media (min-width: 830px) {
+	body div table {
+		margin-left: 2.6em;
+	}
+}
+	 --></style>
+	</head>
   <body>
 	<div class="buttonrow">
 	  <form action="bingovista.html"><button class="rw-ui" id="navview">VIEW</button></form>
@@ -39,6 +58,18 @@
 	<p>(As of v1.08, the customized vista points are disabled by default; they are planned to become available <em>as an option</em> in a future version.  If you liked them, they can always be entered manually; see the <span class="code">bv.maps.vistas</span> or <span class="code">bv.enums.vista_code</span> arrays for suggested rooms and coordinates.)</p>
 	<p>Speaking of variables, if you find a goal has changed silently on loading, check the <span class="code">bv.board.error</span> string.  This should probably be put into a status bar, eventually...</p>
 	<p><a href="https://noblecat57.github.io/">Rain World Downpour Map | noblecat57</a> interactive map viewer is recommended, and is also linked by room-specific goal commentary where possible.</p>
-	<p>There is also <a href="https://alduris.github.io/watcher-map/index.html">Rain World Watcher Map | alduris</a> for The Watcher DLC.  (Watcher Expedition vista points are even included!)  You may find a <a href="worldmaps/WatcherMap.png">Watcher Region Connections</a> map helpful as well.</p>
+	<p>There is also <a href="https://alduris.github.io/watcher-map/index.html">Rain World Watcher Map | alduris</a> for The Watcher DLC.  (Watcher Expedition vista points are even included!)  You may find a <a href="worldmaps/WatcherMap2.png">Watcher Region Connections</a> map helpful as well.</p>
+	<p><b>Gourmand Watcher Mode:</b> The <a href="worldmaps/WatcherGourCrafts.png">crafting matrix</a> has been expanded.  Items have also been added to the regurgitation list:</p>
+	<div><table>
+	  <tr><th>Item</th>             <th>Probability</th></tr>
+	  <tr><td>(Base Items)</td>     <td>Reduced by 60%</td></tr>
+	  <tr><td>Boomerang</td>        <td>9%</td></tr>
+	  <tr><td>Graffiti Bomb</td>    <td>9%</td></tr>
+	  <tr><td>Tardigrade</td>       <td>6%</td></tr>
+	  <tr><td>Fire Sprite Larva</td><td>5%</td></tr>
+	  <tr><td>Sand Grub</td>        <td>5%</td></tr>
+	  <tr><td>Frog</td>             <td>3%</td></tr>
+	  <tr><td>Rat</td>              <td>3%</td></tr>
+	</table></div>
   </body>
 </html>
