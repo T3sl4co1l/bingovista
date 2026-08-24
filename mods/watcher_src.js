@@ -73,18 +73,26 @@ function refresh(e) {
 	});
 	var obj = JSON.parse(s);
 	//	Add them back in in string format
-	const toFuncs = ["toPaint", "toDesc", "toComment", "toBinary"];
+	var toFuncs = ["detect", "configure", "update"];
+	for (var i = 0; i < toFuncs.length; i++) {
+		if (pack[toFuncs[i]] !== undefined)
+			obj[toFuncs[i]] = funcToString(pack[toFuncs[i]]);
+	}
+	toFuncs = ["toPaint", "toDesc", "toComment", "toBinary"];
 	for (var i = 0; i < pack.challenges.length; i++) {
 		for (var j = 0; j < toFuncs.length; j++) {
 			if (pack.challenges[i][toFuncs[j]] !== undefined)
-				obj.challenges[i][toFuncs[j]] = 
-						pack.challenges[i][toFuncs[j]].toString()
-						.replace(/^function\(\p\) \{\r\n/, "")
-						.replace(/\r\n\t+\}$/, "");
+				obj.challenges[i][toFuncs[j]] = funcToString(pack.challenges[i][toFuncs[j]]);
 		}
 	}
 	s = JSON.stringify(obj);
 	document.getElementById("challenges").value = s;
+	
+	function funcToString(f) {
+		return f.toString()
+				.replace(/^function\s*\([bp]\) \{\r\n/, "")
+				.replace(/\r\n\t+\}$/, "");
+	}
 }
 
 //	possible fixups:
@@ -100,9 +108,9 @@ function refresh(e) {
 
 const pack = {
 	"name": "Watcher Expeditions",
-	"version": "1.1",
+	"version": "2.5",
 	"hash": "db5d5bd8",
-	"date": "20260302",
+	"date": "20260824",
 	"creator": "T3sl4co1l",
 	"settingsBytes": 1,
 	"mapLink": "https://alduris.github.io/watcher-map/map.html",
@@ -110,6 +118,26 @@ const pack = {
 		{ "imgOrig": "watchericons.png", "img": "", "txtOrig": "watchericons.txt", "txt": "" },
 		{ "imgOrig": "watcheruisprites.png", "img": "", "txtOrig": "watcheruisprites.txt", "txt": "" }
 	],
+	"detect": function(b) {
+		if (b.character === "Watcher") return true;
+		if (b.modifiers.length > 0 && b.modifiers[0] === "1") return true;
+		return false;
+	},
+	"configure": function(b) {
+		var ef = this.pack.maps.find(o => o.target === "expflags").add.find(o => o.name === "WATCHER");
+		this.settings[ef.byte] &= ~ef.value;
+		if (b.modifiers.length > 0 && b.modifiers[0] === "1") {
+			this.settings[ef.byte] |= ef.value;
+		}
+		return true;
+	},
+	"update": function(b) {
+		//	Watcher Mode always takes 1st modifier; add or overwrite it
+		b.modifiers[0] = "0";
+		var ef = this.pack.maps.find(o => o.target === "expflags").add.find(o => o.name === "WATCHER");
+		if (this.settings[ef.byte] & ef.value) b.modifiers[0] = "1";
+		return true;
+	},
 	"challengeUpgrades": {
 		//	Renamed or obsoleted challenges; check that desc is identical/compatible
 		//	key: challenge name to replace; value: name to replace it with
@@ -164,7 +192,8 @@ const pack = {
 			{ "name": "WA_RANG",   "byte": 0, "value":  4, "title": "Perk: Permanent Warps", "group": "unl-watcher-permwarp"    },
 			{ "name": "WA_POISON", "byte": 0, "value":  8, "title": "Perk: Poison Spear",    "group": "unl-watcher-PoisonSpear" },
 			{ "name": "WA_WARP",   "byte": 0, "value": 16, "title": "Perk: Boomerang Fever", "group": "unl-watcher-boomerang"   },
-			{ "name": "WA_ROTTED", "byte": 0, "value": 32, "title": "Burden: Rotten",        "group": "bur-watcher_rot"         }
+			{ "name": "WA_ROTTED", "byte": 0, "value": 32, "title": "Burden: Rotten",        "group": "bur-watcher_rot"         },
+			{ "name": "WATCHER",   "byte": 0, "value": 64, "title": "Watcher Mode",          "group": ""                        }
 		], "comment": "type: array of objects, .name: <string>, .byte: <number>, .value: <number>, .title: <string>, .group: <string>; bit flags stored in activeMods[idx].settings[.byte] & (.value); from Bingo and Watcher Expeditions mods" },
 		{ "target": "items",        "add": [
 			{ "name": "RotDangleFruit",  "text": "Rot Fruits",          "icon": "Symbol_RotFruit",         "color": "#4c00ff" },
@@ -316,7 +345,7 @@ const pack = {
 			{ "region": "WARD", "room": "WARD_E28", "x":  590, "y":  290 },
 			{ "region": "WRFA", "room": "WRFA_F06", "x": 1290, "y": 1525 },
 			{ "region": "WRFA", "room": "WRFA_E02", "x": 1488, "y":  300 },
-			{ "region": "WRFA", "room": "WRFA_SK0", "x":   25, "y":  250 },
+			{ "region": "WRFA", "room": "WRFA_SK04","x":   25, "y":  250 },
 			{ "region": "WTDB", "room": "WTDB_A08", "x":  475, "y":  634 },
 			{ "region": "WTDB", "room": "WTDB_A22", "x": 1545, "y":  660 },
 			{ "region": "WTDB", "room": "WTDB_A38", "x":  950, "y":  610 },
@@ -373,7 +402,22 @@ const pack = {
 			{ "region": "WARA", "room": "WARA_P06", "x":  430, "y":  155 },
 			{ "region": "WAUA", "room": "WAUA_A03B","x":  491, "y":  420 },
 			{ "region": "WAUA", "room": "WAUA_SHOP","x": 1020, "y":  450 },
-			{ "region": "WAUA", "room": "WAUA_E02", "x": 1450, "y":  320 }
+			{ "region": "WAUA", "room": "WAUA_E02", "x": 1450, "y":  320 },
+			{ "region": "WARF", "room": "WARF_B17", "x": 1733, "y":  205 },
+			{ "region": "WARF", "room": "WARF_C02", "x": 2110, "y":  280 },
+			{ "region": "WBLA", "room": "WBLA_F02", "x": 3850, "y":  460 },
+			{ "region": "WRFA", "room": "WRFA_SK04","x":   60, "y":  300 },
+			{ "region": "WTDB", "room": "WTDB_A38", "x":  950, "y":  480 },
+			{ "region": "WARC", "room": "WARC_A01", "x":  252, "y":  360 },
+			{ "region": "WARC", "room": "WARC_A05", "x": 2330, "y":  470 },
+			{ "region": "WVWB", "room": "WVWB_C01", "x": 2410, "y":  440 },
+			{ "region": "WMPA", "room": "WMPA_D07", "x":  780, "y":  510 },
+			{ "region": "WMPA", "room": "WMPA_A08", "x":  810, "y":  370 },
+			{ "region": "WPTA", "room": "WPTA_C02", "x":  752, "y":  585 },
+			{ "region": "WSKA", "room": "WSKA_D20", "x":  527, "y":  300 },
+			{ "region": "WTDA", "room": "WTDA_Z16", "x": 4202, "y":  350 },
+			{ "region": "WVWA", "room": "WVWA_B06", "x":  702, "y":  430 },
+			{ "region": "WARA", "room": "WARA_P06", "x":  611, "y":  210 }
 		], "comment": "type: array of objects, .region: <string>, .room: <string>, .x: <number>, .y: <number>" }
 	],
 	"enums": [
@@ -427,15 +471,16 @@ const pack = {
 //		{ "target": "nootregions",    "add": [], "comment": "type: array of strings" },	//	auto filled from maps.regions
 //		{ "target": "popcornregions", "add": [], "comment": "type: array of strings" },	//	auto filled from maps.regions
 //		{ "target": "echoes",         "add": [], "comment": "type: array of strings" },	//	auto filled from maps.regions
+//		{ "target": "shelterregions", "add": [], "comment": "type: array of strings" },	//	auto filled from maps.regions
 //		{ "target": "subregions",     "add": [], "comment": "type: array of strings" },	//	deprecated
 		{ "target": "theft",          "add": [
 			"GraffitiBomb",
 			"Boomerang"
 		], "comment": "type: array of strings" },
 		{ "target": "tolls",          "add": [
-			"warf_g01",
-			"wbla_f01",
-			"wskd_b41"
+			"WARF_G01",
+			"WBLA_F01",
+			"WSKD_B41"
 		], "comment": "type: array of strings" },
 //		{ "target": "tolls_bombed",   "add": [], "comment": "type: array of strings" },	//	auto filled from enums.tolls
 		{ "target": "transport",      "add": [], "comment": "type: array of strings" },
@@ -458,7 +503,12 @@ const pack = {
 		], "comment": "type: array of strings" },
 //		{ "target": "weaponsnojelly", "add": [], "comment": "type: array of strings" },	//	auto filled from weapons
 		{ "target": "pomegranateregions", "copy": "regions" },
-		{ "target": "spinners",           "copy": "regions" },
+		{ "target": "spinners",       "copy": "regions" },
+		{ "target": "daemon",         "add": [
+			"Hazer",
+			"VultureGrub",
+			"Tardigrade"
+		], "comment": "type: array of strings" }
 	],
 	challenges: [
 		{
@@ -651,7 +701,7 @@ const pack = {
 				return paint;
 			},
 			toDesc: function(p) {
-				return "Transport the same " + this.entityNameQuantify(1, this.entityDisplayText(p.crit), false) + " through " + this.entityNameQuantify(p.amount, "portals") + ".";
+				return "Transport " + (p.amount > 1 ? "a " : "the same ") + this.entityNameQuantify(1, this.entityDisplayText(p.crit), false) + " through " + this.entityNameQuantify(p.amount, "portals") + ".";
 			},
 			toComment: function(p) {
 				return "";
@@ -1129,6 +1179,216 @@ const pack = {
 				return new Uint8Array(b);
 			}
 		},
+		{
+			name: "WatcherBingoDaemonDropChallenge",
+			category: "Dropping a creature in the bottom of Daemon",
+			super: undefined,
+			//	desc of format ["System.String|Hazer|Creature Type|0|daemon", "0", "0"]
+			textUpgrade: {},
+			textDowngrade: {},
+			template: [
+				{
+					param: "crit", type: "string",
+					binType: "number", binOffs: 0,  binSize: 1,
+					formatter: "daemon", parse: "SettingBox", parseFmt: {
+						datatype: "System.String", name: "Creature Type", position: "0",
+						formatter: "daemon", defaultval: "Hazer"
+					}
+				},
+				{
+					param: "completed", type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				},
+				{
+					param: "revealed",  type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				}
+			],
+			toPaint: function(p) {
+				return [
+					{ type: "icon", value: this.entityIconAtlas(p.crit), scale: 1, color: this.entityIconColor(p.crit), rotation: 0 },
+					{ type: "break" },
+					{ type: "icon", value: "deathpiticon", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },
+					{ type: "break" },
+					{ type: "text", value: "WRSA", color: Bingovista.colors.Unity_white }
+				];
+			},
+			toDesc: function(p) {
+				return "Drop " + this.entityNameQuantify(1, this.entityDisplayText(p.crit)) + " in the bottom of Daemon";
+			},
+			toComment: function(p) {
+				return "";
+			},
+			toBinary: function(p) {
+				var b = Array(4); b.fill(0);
+				b[0] = this.challengeValue(p._name);
+				b[3] = this.enumToValue(p.crit, "daemon");
+				b[2] = b.length - GOAL_LENGTH;
+				return new Uint8Array(b);
+			}
+		},
+		{
+			name: "WatcherBingoPearlDeliveryChallenge",
+			category: "Delivering pearls to the pearl reader",
+			super: undefined,
+			//	desc of format ["System.String|WARD_TEXT_STARDUST|Pearl|0|pearls", "System.Boolean|true|Common|1|NULL", "0", "0"]
+			textUpgrade: {},
+			textDowngrade: {},
+			template: [
+				{
+					param: "pearl", type: "string",
+					binType: "number", binOffs: 0,  binSize: 1,
+					formatter: "pearls", parse: "SettingBox", parseFmt: {
+						datatype: "System.String", name: "Pearl", position: "0",
+						formatter: "pearls", defaultval: "WAUA_WAUA"
+					}
+				},
+				{
+					param: "common", type: "bool",
+					binType: "bool", binOffs: 0, bit: 4,
+					formatter: "", parse: "SettingBox", parseFmt: {
+						datatype: "System.Boolean", name: "Common", position: "1",
+						formatter: "NULL", defaultval: false
+					}
+				},
+				{
+					param: "completed", type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				},
+				{
+					param: "revealed",  type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				}
+			],
+			toPaint: function(p) {
+				var paint = [
+					{ type: "icon", value: "Symbol_Pearl", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },
+					{ type: "break" },
+					{ type: "icon", value: "keyShiftA", scale: 1, color: Bingovista.colors.Unity_white, rotation: 180 },
+					{ type: "break" },
+					{ type: "icon", value: "pearlreader", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 }
+				];
+				if (!p.common) {
+					var pearl = this.maps.pearls.find(o => o.name === p.pearl);
+					paint[0].color = pearl.color;
+					paint[0].background = { type: "icon", value: "radialgradient", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 };
+					paint.unshift( { type: "text", value: pearl.region, color: Bingovista.colors.Unity_white } );
+				}
+				return paint;
+			},
+			toDesc: function(p) {
+				var pearl = this.maps.pearls.find(o => o.name === p.pearl);
+				var reg = "the " + this.maps.regions.find(o => o.code === pearl.region)?.name;
+				return "Deliver " + ((p.common) ? "a common" : reg.name) + " pearl to the pearl reader in Ancient Urban";
+			},
+			toComment: function(p) {
+				return "";
+			},
+			toBinary: function(p) {
+				var b = Array(4); b.fill(0);
+				b[0] = this.challengeValue(p._name);
+				Bingovista.applyBool(b, 1, 4, p.common);
+				b[3] = this.enumToValue(p.pearl, "pearls");
+				b[2] = b.length - GOAL_LENGTH;
+				return new Uint8Array(b);
+			}
+		},
+		{
+			name: "WatcherBingoRivCellChallenge",
+			category: "Feeding the Rarefaction Cell to an Angler",
+			super: undefined,
+			//	desc of format ["0", "0"]
+			textUpgrade: {},
+			textDowngrade: {},
+			template: [
+				{
+					param: "completed", type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				},
+				{
+					param: "revealed",  type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				}
+			],
+			toPaint: function(p) {
+				return [
+					{ type: "icon", value: "Symbol_EnergyCell", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },
+					{ type: "icon", value: "Kill_Angler", scale: 1, color: this.entityIconColor("BigEel"), rotation: 0 }
+				];
+			},
+			toDesc: function(p) {
+				return "Feed the Rarefaction Cell to an Angler (completes if you die).";
+			},
+			toComment: function(p) {
+				return "";
+			},
+			toBinary: function(p) {
+				var b = Array(3); b.fill(0);
+				b[0] = this.challengeValue(p._name);
+				b[2] = b.length - GOAL_LENGTH;
+				return new Uint8Array(b);
+			}
+		},
+		{
+			name: "WatcherBingoToysChallenge",
+			category: "Touching Watcher toys",
+			super: undefined,
+			//	desc of format ["0", "0"]
+			textUpgrade: {
+				2: [	//	Goal has extra internal variables; we can represent them for live viewing, but exclude them on serialization
+					{ op: "splice", offs: 0, rem: 0, data: [ "System.Boolean|true|In One Cycle|0|NULL", "0" ] }
+				]
+			},
+			textDowngrade: {
+				4: [
+					{ op: "splice", offs: 0, rem: 2, data: [] }
+				]
+			},
+			template: [
+				{
+					param: "oneCycle", type: "bool",
+					formatter: "", parse: "SettingBox", parseFmt: {
+						datatype: "System.Boolean", name: "In One Cycle", position: "0",
+						formatter: "NULL", defaultval: true
+					}
+				},
+				{
+					param: "current", type: "number",
+					formatter: "", parse: "parseInt", minval: 0, maxval: CHAR_MAX, defaultval: 0
+				},
+				{
+					param: "completed", type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				},
+				{
+					param: "revealed",  type: "bool",
+					formatter: "", parse: "intBool", defaultval: false
+				}
+			],
+			toPaint: function(p) {
+				return [
+					{ type: "icon", value: "Symbol_BallToy", scale: 1, color: this.entityIconColor("BallToy"), rotation: 0 },
+					{ type: "icon", value: "Symbol_WeirdToy", scale: 1, color: this.entityIconColor("WeirdToy"), rotation: 0 },
+					{ type: "break" },
+					{ type: "text", value: "[" + String(p.current) + "/4]", color: Bingovista.colors.Unity_white },
+					{ type: "break" },
+					{ type: "icon", value: "Symbol_SpinToy", scale: 1, color: this.entityIconColor("SpinToy"), rotation: 0 },
+					{ type: "icon", value: "Symbol_SoftToy", scale: 1, color: this.entityIconColor("SoftToy"), rotation: 0 }
+				];
+			},
+			toDesc: function(p) {
+				return "Touch all the Watcher toys in one cycle.";
+			},
+			toComment: function(p) {
+				return "";
+			},
+			toBinary: function(p) {
+				var b = Array(3); b.fill(0);
+				b[0] = this.challengeValue(p._name);
+				b[2] = b.length - GOAL_LENGTH;
+				return new Uint8Array(b);
+			}
+		},
 /*
 		{
 			name: "WatcherBingoTemplateMakingChallenge",
@@ -1146,8 +1406,8 @@ const pack = {
 				]
 			},
 			textDowngrade: {},
-			};
-			const template = [
+			},
+			template: [
 				{
 					param: "weapon", type: "string",
 					binType: "number", binOffs: 0,  binSize: 1,
@@ -1210,7 +1470,7 @@ const pack = {
 					param: "revealed",  type: "bool",
 					formatter: "", parse: "intBool", defaultval: false
 				}
-			];
+			],
 			toPaint: function(p) {
 				return [
 					{ type: "icon", value: "foodSymbol", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },
@@ -1230,7 +1490,7 @@ const pack = {
 				b[2] = b.length - GOAL_LENGTH;
 				return new Uint8Array(b);
 			}
-		}
+		},
 */
 
 		//	Challenge updates via -Ex mechanism

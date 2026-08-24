@@ -39,7 +39,7 @@
  */
 const INT_MAX  = 30000;
 const CHAR_MAX =   250;	/**< Same as INT_MAX, but for challenges *very* unlikely to need >1 byte */
-const VERSION_MAJOR   =  2, VERSION_MINOR = 0;	/**< Supported mod version */
+const VERSION_MAJOR   =  2, VERSION_MINOR = 5;	/**< Supported mod version */
 const HEADER_LENGTH   = 21;	/**< Binary header length, bytes */
 const GOAL_LENGTH     =  3;	/**< Binary goal length, bytes */
 const RESP_HEADER_LEN = 34;
@@ -80,6 +80,8 @@ resourceTimer = 0;
 
 /** Response header (binary and decoded) when sourced from shortener URL */
 respHeader;
+
+autodetectMods = true;
 
 /**
  *	Modpacks to extend enums, dictionaries and challenges.
@@ -476,8 +478,8 @@ constructor(params) {
 		{ name: "ElectricSpear",    text: "Electric Spears",    icon: "Symbol_ElectricSpear",  color: "#0000ff" },
 		{ name: "FireSpear",        text: "Fire Spears",        icon: "Symbol_FireSpear",      color: "#e60e0e" },
 		{ name: "Pearl",            text: "Pearls",             icon: "Symbol_Pearl",          color: "#b3b3b3" },
-		{ name: "SLOracleSwarmer",  text: "Neuron Flies",       icon: "Symbol_Neuron",         color: "#a9a4b2" },
-		{ name: "SSOracleSwarmer",  text: "Neuron Flies",       icon: "Symbol_Neuron",         color: "#ffffff" },
+		{ name: "SLOracleSwarmer",  text: "Moon's Neurons",     icon: "Symbol_Neuron",         color: "#a9a4b2" },
+		{ name: "SSOracleSwarmer",  text: "Pebbles' Neurons",   icon: "Symbol_Neuron",         color: "#ffffff" },
 		{ name: "NSHSwarmer",       text: "Green Neuron Flies", icon: "Symbol_Neuron",         color: "#00ff4c" },
 		{ name: "PebblesPearl",     text: "Pearls",             icon: "Symbol_Pearl",          color: "#0074a3" },
 		{ name: "HalcyonPearl",     text: "Pearls",             icon: "Symbol_Pearl",          color: "#b3b3b3" },
@@ -740,9 +742,10 @@ constructor(params) {
 		"PinkLizard", "BlueLizard", "YellowLizard", "WhiteLizard", "GreenLizard",
 		"Salamander", "Dropbug", "Snail", "Centipede", "Centiwing", "LanternMouse" ];
 	this.enums.regions = this.maps.regions.map(o => o.code);
-	this.enums.regionsreal = this.enums.regions.slice(0);
 	this.enums.nootregions = this.enums.regions.slice(0);
 	this.enums.popcornregions = this.enums.regions.slice(0);
+	this.enums.regionsreal = this.enums.regions.slice(0);
+	this.enums.shelterregions = this.enums.regions.slice(0);
 	this.enums.echoes = this.enums.regions.slice(0);
 	/** Subregions; used by BingoDamageChallenge and BingoKillChallenge for legacy support */
 	this.enums.subregions = [
@@ -777,24 +780,24 @@ constructor(params) {
 		"ExplosiveSpear", "ElectricSpear", "PuffBall", "FlareBomb", "KarmaFlower",
 		"Mushroom", "VultureMask", "OverseerCarcass", "FirecrackerPlant",
 		"JellyFish", "FlyLure", "SporePlant", "LillyPuck", "SingularityBomb" ];
-	this.enums.tolls = [ "su_c02", "gw_c05", "gw_c11", "lf_e03", "ug_toll",
-	"cl_a34", "cl_b27", "lc_c10", "lc_longslum", "lc_rooftophop", "lc_templetoll",
-	"lc_stripmallnew", "lf_j01", "oe_tower04", "sb_topside" ];
-	this.enums.tolls_bombed = [ "empty", "su_c02|0,0", "gw_c05|0,0", "gw_c11|0,0",
-		"lf_e03|0,0", "ug_toll|0,0", "cl_a34|0,0", "cl_b27|0,0", "lc_c10|0,0",
-		"lc_longslum|0,0", "lc_rooftophop|0,0", "lc_templetoll|0,0",
-		"lc_stripmallnew|0,0", "lf_j01|0,0", "oe_tower04|0,0", "sb_topside|0,0",
-		"su_c02|0,1", "gw_c05|0,1", "gw_c11|0,1", "lf_e03|0,1", "ug_toll|0,1",
-		"cl_a34|0,1", "cl_b27|0,1", "lc_c10|0,1", "lc_longslum|0,1",
-		"lc_rooftophop|0,1", "lc_templetoll|0,1", "lc_stripmallnew|0,1", "lf_j01|0,1",
-		"oe_tower04|0,1", "sb_topside|0,1", "su_c02|1,0", "gw_c05|1,0", "gw_c11|1,0",
-		"lf_e03|1,0", "ug_toll|1,0", "cl_a34|1,0", "cl_b27|1,0", "lc_c10|1,0",
-		"lc_longslum|1,0", "lc_rooftophop|1,0", "lc_templetoll|1,0",
-		"lc_stripmallnew|1,0", "lf_j01|1,0", "oe_tower04|1,0", "sb_topside|1,0",
-		"su_c02|1,1", "gw_c05|1,1", "gw_c11|1,1", "lf_e03|1,1", "ug_toll|1,1",
-		"cl_a34|1,1", "cl_b27|1,1", "lc_c10|1,1", "lc_longslum|1,1",
-		"lc_rooftophop|1,1", "lc_templetoll|1,1", "lc_stripmallnew|1,1", "lf_j01|1,1",
-		"oe_tower04|1,1", "sb_topside|1,1" ];
+	this.enums.tolls = [ "SU_C02", "GW_C05", "GW_C11", "LF_E03", "UG_TOLL",
+	"CL_A34", "CL_B27", "LC_C10", "LC_LONGSLUM", "LC_ROOFTOPHOP", "LC_TEMPLETOLL",
+	"LC_STRIPMALLNEW", "LF_J01", "OE_TOWER04", "SB_TOPSIDE" ];
+	this.enums.tolls_bombed = [ "empty", "SU_C02|0,0", "GW_C05|0,0", "GW_C11|0,0",
+		"LF_E03|0,0", "UG_TOLL|0,0", "CL_A34|0,0", "CL_B27|0,0", "LC_C10|0,0",
+		"LC_LONGSLUM|0,0", "LC_ROOFTOPHOP|0,0", "LC_TEMPLETOLL|0,0",
+		"LC_STRIPMALLNEW|0,0", "LF_J01|0,0", "OE_TOWER04|0,0", "SB_TOPSIDE|0,0",
+		"SU_C02|0,1", "GW_C05|0,1", "GW_C11|0,1", "LF_E03|0,1", "UG_TOLL|0,1",
+		"CL_A34|0,1", "CL_B27|0,1", "LC_C10|0,1", "LC_LONGSLUM|0,1",
+		"LC_ROOFTOPHOP|0,1", "LC_TEMPLETOLL|0,1", "LC_STRIPMALLNEW|0,1", "LF_J01|0,1",
+		"OE_TOWER04|0,1", "SB_TOPSIDE|0,1", "SU_C02|1,0", "GW_C05|1,0", "GW_C11|1,0",
+		"LF_E03|1,0", "UG_TOLL|1,0", "CL_A34|1,0", "CL_B27|1,0", "LC_C10|1,0",
+		"LC_LONGSLUM|1,0", "LC_ROOFTOPHOP|1,0", "LC_TEMPLETOLL|1,0",
+		"LC_STRIPMALLNEW|1,0", "LF_J01|1,0", "OE_TOWER04|1,0", "SB_TOPSIDE|1,0",
+		"SU_C02|1,1", "GW_C05|1,1", "GW_C11|1,1", "LF_E03|1,1", "UG_TOLL|1,1",
+		"CL_A34|1,1", "CL_B27|1,1", "LC_C10|1,1", "LC_LONGSLUM|1,1",
+		"LC_ROOFTOPHOP|1,1", "LC_TEMPLETOLL|1,1", "LC_STRIPMALLNEW|1,1", "LF_J01|1,1",
+		"OE_TOWER04|1,1", "SB_TOPSIDE|1,1" ];
 	this.enums.transport = [ "JetFish", "Hazer", "VultureGrub", "CicadaA", "CicadaB",
 		"Yeek" ];
 	this.enums.unlocksblue = this.maps.creatures.map(o => o.name)
@@ -981,16 +984,24 @@ loadModpack(s) {
 					this.atlases.push(o);
 					this.loadAtlas(o);
 				}.bind(this));
+				//	WARNING UNSAFE
+				//	we're making functions from data here; ensure secure and validated modpack source!
+				var pars = ["detect", "configure", "update"];
+				for (var i = 0; i < pars.length; i++) {
+					try {
+						mp[pars[i]] = new Function("b", mp.pack[pars[i]]);
+					} catch (e) {
+						mp.err += "; " + e.toString() + ", parsing " + pars[i] + "()";
+					}
+				}
 				mp.settings = new Uint8Array(mp.pack.settingsBytes);
-				const pars = ["toPaint", "toDesc", "toComment", "toBinary"];
+				pars = ["toPaint", "toDesc", "toComment", "toBinary"];
 				for (var i = 0; i < mp.pack.challenges.length; i++) {
 					for (var j = 0; j < pars.length; j++) {
 						try {
-							//	WARNING UNSAFE
-							//	ensure secure and validated modpack source for this reason
 							mp.pack.challenges[i][pars[j]] = new Function("p", mp.pack.challenges[i][pars[j]]);
 						} catch (e) {
-							mp.err += "; " + e.toString() + " parsing challenges[" + String(i) + "]." + pars[j];
+							mp.err += "; " + e.toString() + ", parsing challenges[" + String(i) + "]." + pars[j] + "()";
 						}
 					}
 				}
@@ -1025,15 +1036,16 @@ resetMods() {
 }
 
 /**
- *	Applies the specified mod, extending maps and enums.
+ *	If it's not already enabled, applies the specified mod, extending maps and enums.
  *	@param n  index into this.modpacks
  */
 enableMod(n) {
 	if (n < 0) return;
+	if (this.activeMods.includes(n)) return;
 	var i, enumadds, pack = this.modpacks[n].pack;
 	//	for each map matching <key>, add to enum <key> and enums ...<value>
 	const combos = {
-		"regions":      ["regionsreal", "nootregions", "popcornregions", "echoes"],
+		"regions":      ["regionsreal", "nootregions", "popcornregions", "echoes", "shelterregions"],
 		"unlocksblue":  ["unlocks"],
 		"unlocksgold":  ["unlocks"],
 		"unlocksred":   ["unlocks"],
@@ -1136,23 +1148,25 @@ areResourcesDone() {
 	}
 	return done;
 }
+
 /**
- * Asynchronously setup a Bingovista object.  
- * optional parameters:
- * @param {function} params.loadFail callback(s) if loading Bingovista failed.
- * @param {function} params.loadSuccess callback(s) if loading Bingovista succeeded.
- * @param {function} params.selectCB callback(s) when selected square has changed.
- * @param {function} params.mouseCB callback(s) when mouse hovers or leaves board canvas.
- * @param {object} params.selection object with `row` and `col` properties indicating which square to select.
- * @param {boolean} params.cursor whether or not to outline currently selected square.
- * @param {boolean} params.transpose whether or not to transpose the board (<v1.25 visual arrangement).
- * @param {boolean} params.tips whether or not to display additional tips and full data.
- * @param {string} params.dataSrc the source data to parse the board from. Requires `params.dataType`.
- * @param {string} params.dataType describe `dataSrc`. "text", "base64", "short" or "url".
- * @param {string} params.headerId the id of the html div to use as board header.
- * @param {string} params.boardId the id of the html div to use as board canvas.
- * @param {string} params.selectId the id of the html div to use as selected square's magnifying glass.
- * @param {string} params.detailId the id of the html div to use as selected square's text explanation.
+ *	Asynchronously set up a Bingovista object.  
+ *	params is an object collecting any number of optional properties:
+ *	@param {function} params.loadFail        Add a callback for if loading of resources fails
+ *	@param {function} params.loadSuccess     Add a callback for when loading of resources and board parsing succeeds
+ *	@param {function} params.selectCB        Add a callback for when selection cursor is changed
+ *	@param {function} params.mouseCB         Add a callback for when mouse hovers/leaves board canvas
+ *	@param {object}   params.selection       {row: {int}, col: {int}} object specifying a square to select
+ *	@param {boolean}  params.autodetectMods  true: detect and load mods on board parse (on top of current mod configuration)
+ *	@param {boolean}  params.cursor          true: outline currently-selected square
+ *	@param {boolean}  params.transpose       true: transpose the board (<v1.25 visual arrangement)
+ *	@param {boolean}  params.tips            true: display additional tips and full data in description
+ *	@param {string}   params.dataSrc         Source data to parse the board from (requires `params.dataType`)
+ *	@param {string}   params.dataType        Type of `dataSrc`; one of: "text", "base64", "short" or "url" (requires `params.dataSrc`)
+ *	@param {string}   params.headerId        Id of HTML div; displays board header/settings info
+ *	@param {string}   params.boardId         Id of HTML div; where to draw the overall board canvas and selection cursor
+ *	@param {string}   params.selectId        Id of HTML div; displays the selected square by itself
+ *	@param {string}   params.detailId        Id of HTML div; displays a text description for the selected square
  */
 setup(params) {
 
@@ -1172,6 +1186,9 @@ setup(params) {
 		this.selected = {col: parseInt(params.selection.col), row: parseInt(params.selection.row)};
 		if (isNaN(this.selected.col)) this.selected.col = -1;
 		if (isNaN(this.selected.row)) this.selected.row = -1;
+	}
+	if (params.autodetectMods !== undefined) {
+		this.autodetectMods = !!params.autodetectMods;
 	}
 	if (params.cursor !== undefined) {
 		this.cursorEnabled = !!params.cursor;
@@ -1333,6 +1350,9 @@ setup(params) {
 	this.areResourcesDone();
 }
 
+/**
+ *	Validates the given query string is suitable for use in a BingoServer request.
+ */
 validateQuery(s) {
 	if (s.length < 4 || s.length > 13) return false;
 	for (var i = 0; i < s.length; i++) {
@@ -1344,12 +1364,15 @@ validateQuery(s) {
 	return true;
 }
 
-/** Creates a default-value board object with specified error string. */
+/**
+ *	Creates a default-value board object with specified error string.
+ */
 errorBoard(s) {
 	return {
 		comments: "",
 		character: "",
-		perks: undefined,
+		modifiers: [],
+		perks: 0,
 		shelter: "",
 		size: 1,
 		width: 1,
@@ -1363,6 +1386,9 @@ errorBoard(s) {
 	};
 }
 
+/**
+ *	Refreshes HTML/display objects.
+ */
 refresh() {
 	if (this.board === undefined && this.dataParse !== undefined) {
 		//	probably tried loading but didn't have necessary resources, retry?
@@ -1377,6 +1403,9 @@ refresh() {
 	this.selectSquare(this.selected?.col, this.selected?.row);
 }
 
+/**
+ *	Summarizes most of the object's internal state (is not a full serialization).
+ */
 toString() {
 	return JSON.stringify({
 		data: Bingovista.binToBase64u(this.board.bin),
@@ -2220,14 +2249,23 @@ entityNameQuantify(n, s, article = true) {
 	return s;
 }
 
+/**
+ *	Returns the display text associated with the given creature or item.
+ */
 entityDisplayText(e) {
 	return this.maps.creatures.find(o => o.name === e)?.text || this.maps.items.find(o => o.name === e)?.text || e;
 }
 
+/**
+ *	Returns the icon name associated with the given creature or item.
+ */
 entityIconAtlas(e) {
 	return this.maps.creatures.find(o => o.name === e)?.icon || this.maps.items.find(o => o.name === e)?.icon || e;
 }
 
+/**
+ *	Returns the icon color associated with the given creature or item.
+ */
 entityIconColor(e) {
 	return this.maps.creatures.find(o => o.name === e)?.color || this.maps.items.find(o => o.name === e)?.color || this.maps.items.find(o => o.name === "Default").color;
 }
@@ -2490,9 +2528,9 @@ checkSettingBoxEx(s, template) {
 		if (template.formatter === "NULL") {
 			rr.value = ar[1];	//	raw string
 			rr.index = -1;
-		} else if (ar[4] !== template.formatter && ar[4] !== template.altformatter) {
-			rr.error.push("unexpected list \"" + ar[4] + "\"");
 		} else {
+			if (ar[4] !== template.formatter && ar[4] !== template.altformatter)
+				rr.error.push("unexpected list \"" + ar[4] + "\"");
 			rr.index = (this.enums[template.formatter].indexOf(template.defaultval) >= 0) ?
 					(this.enums[template.formatter].indexOf(template.defaultval)) :
 					(this.enums[template.altformatter]?.indexOf(template.defaultval) + (template.altthreshold || 0));
@@ -2663,7 +2701,8 @@ challengeTextToAbstract(desc, template) {
  *	Sets this.board = {
  *		comments: <string>, 	//	board title (undefined if absent)
  *		character: <string>,	//	one of this.enums.characters[].text
- *		perks: <int>,       	//	bitmask of BingoEnum_PERKS (undefined if absent)
+ *		modifiers: <array>, 	//	array of strings; used for settings/flags and mods
+ *		perks: <int>,       	//	bitmask of BingoEnum_PERKS
  *		shelter: <string>,  	//	starting shelter (undefined if absent)
  *		size: <int>,
  *		width: <int>,       	//	for now, width = height = size, but this allows
@@ -2711,7 +2750,8 @@ parseText(s) {
 	this.board = {
 		comments: "",
 		character: "",
-		perks: undefined,
+		modifiers: [],
+		perks: 0,
 		shelter: "",
 		size: size,
 		width: size,
@@ -2725,7 +2765,7 @@ parseText(s) {
 	};
 
 	//	Detect board version:
-	//	assertion: no challenge names are shorter than 14 chars (true as of 1.25)
+	//	assertion: no challenge names are shorter than 14 chars (true as of 2.5)
 	//	assertion: no character names are longer than 10 chars (true of base game + Downpour + Watcher)
 	//	1.27+: character prefix, ";" delimited --> check within first 12 chars
 	//	0.90: character prefix, ";" delimited --> check within first 12 chars
@@ -2743,6 +2783,11 @@ parseText(s) {
 				this.board.shelter = header[1];
 				goals[0] = header[header.length - 1];
 				// future up-version checks here: perks, etc.
+				if (header.length > 3) {
+					this.board.version = "2.5";
+					this.board.shelter = header[header.length - 2];
+					this.board.modifiers = header.slice(1, header.length - 2);
+				}
 			} else {
 				this.board.version = "0.90";
 				this.board.character = goals[0].substring(0, semicolon);
@@ -2753,41 +2798,22 @@ parseText(s) {
 			this.board.character = goals[0].substring(0, underscore);
 			goals[0] = goals[0].substring(underscore + 1);
 		}
-
-		/*	Determine mods if any:
-		 *	Text format is not well defined for mod selection purposes;
-		 *	perhaps the whole board could be scanned, looking for keywords
-		 *	from various mods, enabling them as needed.  That's hard, and
-		 *	still ill-defined (modpacks may contain overlapping elements),
-		 *	so for now, let the user select an initial set.
-		 *	We'll at the minimum, add to that selection based on character
-		 *	name (if needed) for convenience.
-		 */
-		//this.resetMods();
-		var newChar = this.maps.characters.find(o => o.name === this.board.character);
-		if (newChar) {
-			//	check includes active mods
-			this.board.character = newChar.text;
-		} else {
-			//	check all installed mods for a match; take first greedily
-			for (var i = 0; i < this.modpacks.length; i++) {
-				if (this.modpacks[i].pack !== undefined) {
-					newChar = this.modpacks[i].pack.maps?.find(o => o.target === "characters")
-							.add.find(o => o.name === this.board.character);
-					if (newChar !== undefined) {
-						this.board.character = newChar.text;
-						this.enableMod(i);
-						break;
-					}
-				}
-			}
-			if (!newChar) {
-				this.board.character = "";
-			}
-		}
 	} else {
 		this.board.version = "0.85";
 	}
+
+	//	Determine mods to add, if any; configure all active mods
+	if (this.autodetectMods) {
+		for (var i = 0; i < this.modpacks.length; i++) {
+			if (this.modpacks[i].detect(this.board))
+				this.enableMod(i);
+		}
+	}
+	for (var i = 0; i < this.activeMods.length; i++) {
+		this.modpacks[this.activeMods[i]].configure(this.board);
+	}
+
+	this.board.character = this.maps.characters.find(o => o.name === this.board.character)?.text || "";
 
 	if (goals.length == 1 && goals[0].length == 0) {
 		this.board.goals.push(this.textToGoal("BingoChallenge~Empty board"));
@@ -2916,6 +2942,7 @@ binToBoard(a) {
 	this.board = {
 		comments: "",
 		character: "",
+		modifiers: [],
 		perks: 0,
 		shelter: "",
 		size: a[6],	//	for now, width = height = size, so the source of this assignment doesn't matter
@@ -3075,13 +3102,24 @@ binToBoard(a) {
 			this.board.error += "\nGoal " + String(i) + ", " + er;
 	}
 	this.board.error = this.board.error.substring(1);
+	for (var idx = 0; idx < this.activeMods.length; idx++)
+		this.modpacks[this.activeMods[idx]].update(this.board);
 	//	Regenerate the binary and text formats and we're done
 	this.boardToBin();
 	this.boardToText();
 }
 
+/**
+ *	Updates .board.text from current values of header and goal text.
+ */
 boardToText() {
 	this.board.text = (this.maps.characters.find(o => o.text === this.board.character)?.name || "Any") + ";";
+	//	Let mods update their modifier fields or whatever
+	for (var i = 0; i < this.activeMods.length; i++) {
+		this.modpacks[this.activeMods[i]].update(this.board);
+	}
+	//	and glue it all together
+	this.board.text += this.board.modifiers.join(";") + ";";
 	this.board.text += (this.board.shelter === "" ? "random" : this.board.shelter) + ";";
 	for (var i = 0; i < this.board.goals.length; i++) {
 		this.board.text += this.board.goals[i].text + "bChG";
@@ -3089,22 +3127,47 @@ boardToText() {
 	this.board.text = this.board.text.replace(/bChG$/, "");
 }
 
+/**
+ *	Executes the challenge-specific toPaint function.
+ *	@param g  an abstract goal object to read from, as returned from binToGoal() / textToGoal()
+ *	@returns  array of paint objects, as used in drawSquare()
+ */
 goalToPaint(g) {
 	return this.CHALLENGE_DEFS[this.challengeValue(g.name)].toPaint.call(this, g.params);
 }
 
+/**
+ *	Executes the challenge-specific toDesc function.
+ *	@param g  an abstract goal object to read from, as returned from binToGoal() / textToGoal()
+ *	@returns  {string} descriptive text, formatted as an HTML fragment (as used by selectSquare())
+ */
 goalToDesc(g) {
 	return this.CHALLENGE_DEFS[this.challengeValue(g.name)].toDesc.call(this, g.params);
 }
 
+/**
+ *	Executes the challenge-specific toComment function.
+ *	@param g  an abstract goal object to read from, as returned from binToGoal() / textToGoal()
+ *	@returns {string} plain text
+ */
 goalToComment(g) {
 	return this.CHALLENGE_DEFS[this.challengeValue(g.name)].toComment.call(this, g.params);
 }
 
+/**
+ *	Executes the challenge-specific toBinary function.
+ *	@param g  an abstract goal object to read from, as returned from binToGoal() / textToGoal()
+ *	@returns {Uint8Array} goal in binary format
+ */
 goalToBinary(g) {
 	return this.CHALLENGE_DEFS[this.challengeValue(g.name)].toBinary.call(this, g.params);
 }
 
+/**
+ *	Generates text from a goal.
+ *	@param g  an abstract goal object to read from, as returned from binToGoal() / textToGoal()
+ *	@returns {string} goal in text format
+ */
 goalToText(g) {
 	var def = this.CHALLENGE_DEFS[this.challengeValue(g.name)];
 	var t = def.template;
@@ -3138,6 +3201,9 @@ goalToText(g) {
 	return def.name + "~" + desc.join("><");
 }
 
+/**
+ *	Converts a goal in text format, into an abstract object.
+ */
 textToGoal(s) {
 	var type, desc;
 	var tildeSplit = s.split("~");
@@ -3155,7 +3221,7 @@ textToGoal(s) {
 		//	is a subclass; refer to parent for template and methods
 
 		//	real quick, apply upgrades -- allows "-Ex" mechanism to
-		//	update/replace challnge name and desc contents; used by mods
+		//	update/replace challenge name and desc contents; used by mods
 		desc = Bingovista.upgradeDescriptor(desc, def.textUpgrade);
 		type = this.challengeValue(def.super);
 		if (type < 0)
@@ -3668,7 +3734,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				binType: "number", binOffs: 0, binSize: 1,
 				formatter: "tolls", parse: "SettingBox", parseFmt: {
 					datatype: "System.String", name: "Scavenger Toll", position: "3",
-					formatter: "tolls", lcase: true, defaultval: "su_c02"
+					formatter: "tolls", ucase: true, defaultval: "SU_C02"
 				}
 			},
 			{
@@ -3702,24 +3768,24 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			}
 		],
 		toPaint: function(p) {
-			var r = [
+			var paint = [
 				{ type: "icon", value: this.entityIconAtlas("ScavengerBomb"), scale: 1, color: this.entityIconColor("ScavengerBomb"), rotation: 0 },
 				{ type: "icon", value: "scavtoll", scale: 0.8, color: Bingovista.colors.Unity_white, rotation: 0 },
 				{ type: "break" },
 				{ type: "text", value: p.specific ? p.roomName.toUpperCase() : ("[" + String(p.current) + "/" + String(p.amount) + "]"), color: Bingovista.colors.Unity_white }
 			];
 			if (p.pass)
-				r.splice(2, 0, { type: "icon", value: "keyShiftA", scale: 1, color: Bingovista.colors.Unity_white, rotation: 90 } );
-			return r;
+				paint.splice(2, 0, { type: "icon", value: "keyShiftA", scale: 1, color: Bingovista.colors.Unity_white, rotation: 90 } );
+			return paint;
 		},
 		toDesc: function(p) {
 			var d;
 			if (p.specific) {
 				var regi = Bingovista.regionOfRoom(p.roomName).toUpperCase();
 				var r = this.regionToDisplayText(this.board.character, regi);
-				if (p.roomName === "gw_c11")
+				if (p.roomName === "GW_C11")
 					r += " underground";
-				if (p.roomName === "gw_c05")
+				if (p.roomName === "GW_C05")
 					r += " surface";
 				d = "Throw a grenade at the " + this.getMapLink(p.roomName.toUpperCase(), this.board.character, r) + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
 			} else {
@@ -3744,7 +3810,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				Bingovista.applyBool(b, 1, 4, p.pass);
 				Bingovista.applyBool(b, 1, 5, p.specific);
 				b[3] = this.enumToValue(p.roomName, "tolls");
-				b[4] = p.amount;
+				b[4] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 				for (var k = 0; k < p.bombed.length; k++)
 					b.push(this.enumToValue(p.bombed[k], "tolls_bombed"));
 				b.push(0);	//	zero terminator
@@ -3762,7 +3828,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 	},
 	{
 		name: "BingoCollectPearlChallenge",
-		category: "Collecting pearls",
+		category: "Touching pearls",
 		super: undefined,
 		//	desc of format ["System.Boolean|true|Specific Pearl|0|NULL", "System.String|LF_bottom|Pearl|1|pearls", "0", "System.Int32|1|Amount|3|NULL", "0", "0", ""]
 		textUpgrade: {},
@@ -3859,7 +3925,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			b[0] = this.challengeValue(p._name);
 			Bingovista.applyBool(b, 1, 4, p.specific);
 			b[3] = this.enumToValue(p.pearl, "pearls");
-			Bingovista.applyShort(b, 4, p.amount);
+			Bingovista.applyShort(b, 4, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -3868,16 +3934,25 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		name: "BingoCraftChallenge",
 		category: "Crafting items",
 		super: undefined,
-		//	desc of format ["System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
-		textUpgrade: {},
+		//	desc of format (< v2.5 6/29/2026) ["System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
+		//	or (>= 2.5) ["0", "System.String|JellyFish|Item to Craft|0|craft", "System.Int32|5|Amount|1|NULL", "0", "0", "0"]
+		textUpgrade: {
+			5: [	//	<= v2.5
+				{ op: "unshift", data: ["0"] }
+			],
+		},
 		textDowngrade: {},
 		template: [
+			{
+				param: "isCreature", type: "bool",
+				formatter: "", parse: "intBool", defaultval: false
+			},
 			{
 				param: "craftee", type: "string",
 				binType: "number", binOffs: 0,  binSize: 1,
 				formatter: "craft", parse: "SettingBox", parseFmt: {
 					datatype: "System.String", name: "Item to Craft", position: "0",
-					formatter: "craft", defaultval: "SU"
+					formatter: "craft", defaultval: "FlareBomb"
 				}
 			},
 			{
@@ -3895,7 +3970,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			{
 				param: "completed", type: "bool",
 				formatter: "", parse: "intBool", defaultval: false
-				},
+			},
 			{
 				param: "revealed",  type: "bool",
 				formatter: "", parse: "intBool", defaultval: false
@@ -3919,7 +3994,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			var b = Array(6); b.fill(0);
 			b[0] = this.challengeValue(p._name);
 			b[3] = this.enumToValue(p.craftee, "craft");
-			Bingovista.applyShort(b, 4, p.amount);
+			Bingovista.applyShort(b, 4, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -3985,7 +4060,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				b[3] = this.enumToValue(p.crit, "transport");
 			else
 				b[3] = this.enumToValue(p.crit, "creatures") + 64 - 1;	//	crit template altthreshold
-			b[4] = p.amount;
+			b[4] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -4062,7 +4137,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				}
 			},
 			{
-				param: "inOneCycle", type: "bool",
+				param: "oneCycle", type: "bool",
 				formatter: "", parse: "SettingBox", parseFmt: {
 					datatype: "System.Boolean", name: "In One Cycle", position: "3",
 					formatter: "NULL", defaultval: false
@@ -4114,7 +4189,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				{ type: "break" },
 				{ type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: Bingovista.colors.Unity_white }
 			);
-			if (p.inOneCycle)
+			if (p.oneCycle)
 				paint.push( { type: "icon", value: "cycle_limit", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 } );
 			return paint;
 		},
@@ -4123,7 +4198,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			if (r > "") r = ", in " + r;
 			var d = "Hit " + this.entityDisplayText(p.victim) + " with " + this.entityDisplayText(p.weapon);
 			d += " " + String(p.amount) + ((p.amount > 1) ? " times" : " time") + r;
-			if (p.inOneCycle) d += ", in one cycle";
+			if (p.oneCycle) d += ", in one cycle";
 			return d + ".";
 		},
 		toComment: function(p) {
@@ -4136,11 +4211,11 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			b[0] = this.challengeValue(p._name);
 			b[3] = this.enumToValue(p.weapon, "weapons");
 			b[4] = this.enumToValue(p.victim, "creatures");
-			Bingovista.applyShort(b, 5, p.amount);
-			if (p.inOneCycle || p.region !== "Any Region" || p.subregion !== "Any Subregion") {
+			Bingovista.applyShort(b, 5, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
+			if (p.oneCycle || p.region !== "Any Region" || p.subregion !== "Any Subregion") {
 				//	...have to use expanded form
 				b[0] = this.challengeValue("BingoDamageExChallenge");
-				Bingovista.applyBool(b, 1, 4, p.inOneCycle);
+				Bingovista.applyBool(b, 1, 4, p.oneCycle);
 				b.push(this.enumToValue(p.region, "regions"));
 				b.push(this.enumToValue(p.subregion, "subregions"));
 			}
@@ -4362,7 +4437,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(6); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amountRequired);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amountRequired - p.currentEated, INT_MAX)));
 			Bingovista.applyBool(b, 1, 4, p.isCreature);
 			Bingovista.applyBool(b, 1, 5, p.starve);
 			b[5] = this.enumToValue(p.foodType, "food");
@@ -4459,7 +4534,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			b[2] = b.length - GOAL_LENGTH;
 			if (!p.specific) {
 				b[0] = this.challengeValue("BingoEchoExChallenge");
-				b.push(p.amount);
+				b.push(Math.max(1, Math.min(p.amount - p.current, CHAR_MAX)));
 				for (var k = 0; k < p.visited.length; k++)
 					b.push(this.enumToValue(p.visited[k], "regionsreal"));
 				b.push(0);	//	zero terminator
@@ -4741,7 +4816,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			if (p.region !== "Any Region" || p.differentRegions) {
 				var b = Array(5); b.fill(0);
 				b[0] = this.challengeValue("BingoHatchNoodleExChallenge");
-				b[3] = p.amount;
+				b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 				Bingovista.applyBool(b, 1, 4, p.oneCycle);
 				Bingovista.applyBool(b, 1, 5, p.differentRegions);
 				b[4] = this.enumToValue(p.region, "nootregions");
@@ -4753,7 +4828,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			}
 			var b = Array(4); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			b[3] = p.amount;
+			b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			Bingovista.applyBool(b, 1, 4, p.oneCycle);
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
@@ -4806,7 +4881,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(4); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			b[3] = p.amount;
+			b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -4921,7 +4996,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
 			Bingovista.applyBool(b, 1, 4, p.anyShelter);
-			b[3] = p.amount;
+			b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			b[4] = this.enumToValue(p.target, "expobject");
 			if (p.region !== "Any Region") {
 				b[0] = this.challengeValue("BingoItemHoardExChallenge");
@@ -5030,7 +5105,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				b[0] = this.challengeValue("BingoKarmaFlowerExChallenge");
 				Bingovista.applyBool(b, 1, 4, p.oneCycle);
 				Bingovista.applyBool(b, 1, 5, p.differentRegions);
-				Bingovista.applyShort(b, 3, p.amount);
+				Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 				b[5] = this.enumToValue(p.region, "regions");
 				for (var k = 0; k < p.eatRegions.length; k++)
 					b.push(this.enumToValue(p.eatRegions[k], "regions"));
@@ -5041,7 +5116,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
 			Bingovista.applyBool(b, 1, 4, p.oneCycle);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -5215,7 +5290,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			Bingovista.applyBool(b, 1, 7, p.shrooms);
 			b[3] = this.enumToValue(p.crit, "creatures");
 			b[4] = this.enumToValue(p.weapon, "weaponsnojelly");
-			Bingovista.applyShort(b, 5, p.amount);
+			Bingovista.applyShort(b, 5, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[7] = this.enumToValue(p.region, "regions");
 			b[8] = this.enumToValue(p.subregion, "subregions");
 			b[2] = b.length - GOAL_LENGTH;
@@ -5271,7 +5346,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(4); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			b[3] = p.amount;
+			b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -5321,7 +5396,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -5624,7 +5699,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			b[0] = this.challengeValue(p._name);
 			Bingovista.applyBool(b, 1, 4, p.common);
 			Bingovista.applyBool(b, 1, 5, p.anyShelter);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[5] = this.enumToValue(p.region, "regions");
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
@@ -5706,7 +5781,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(7); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[5] = this.enumToValue(p.crit, "creatures");
 			b[6] = this.enumToValue(p.region, "regions");
 			b[2] = b.length - GOAL_LENGTH;
@@ -5812,7 +5887,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				b[0] = this.challengeValue("BingoPopcornExChallenge");
 				Bingovista.applyBool(b, 1, 4, p.oneCycle);
 				Bingovista.applyBool(b, 1, 5, p.differentRegions);
-				Bingovista.applyShort(b, 3, p.amount);
+				Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 				b[5] = this.enumToValue(p.region, "popcornregions");
 				for (var k = 0; k < p.popRegions.length; k++)
 					b.push(this.enumToValue(p.popRegions[k], "regionsreal"));
@@ -5823,7 +5898,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
 			Bingovista.applyBool(b, 1, 4, p.oneCycle);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -5950,7 +6025,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -6024,7 +6099,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			b[0] = this.challengeValue(p._name);
 			b[3] = this.enumToValue(p.subject, "theft");
 			Bingovista.applyBool(b, 1, 4, p.toll);
-			Bingovista.applyShort(b, 4, p.amount);
+			Bingovista.applyShort(b, 4, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -6134,7 +6209,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				//	...have to use expanded form
 				b[0] = this.challengeValue("BingoTameExChallenge");
 				Bingovista.applyBool(b, 1, 4, p.specific);
-				b.push(p.amount);
+				b.push(Math.max(1, Math.min(p.amount - p.current, CHAR_MAX)));
 			}
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
@@ -6186,7 +6261,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -6245,7 +6320,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -6824,7 +6899,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(5); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			Bingovista.applyShort(b, 3, p.amount);
+			Bingovista.applyShort(b, 3, Math.max(1, Math.min(p.amount - p.current, INT_MAX)));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -6928,7 +7003,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(4); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			b[3] = p.amount;
+			b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -7062,7 +7137,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toBinary: function(p) {
 			var b = Array(4); b.fill(0);
 			b[0] = this.challengeValue(p._name);
-			b[3] = p.amount;
+			b[3] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
 			b[2] = b.length - GOAL_LENGTH;
 			return new Uint8Array(b);
 		}
@@ -7151,8 +7226,111 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toDesc: undefined,
 		toComment: undefined,
 		toBinary: undefined
+	},
+	{
+		name: "BingoShelterChallenge",
+		category: "Resting in shelters",
+		super: undefined,
+		//	desc of format ["System.String|SH|Region|0|shelterregions", "System.Boolean|true|Unique shelters|1|NULL", "System.Boolean|false|Different regions|2|NULL", "0", "System.Int32|2|Amount|3|NULL", "", "0", "0"]
+		textUpgrade: {},
+		textDowngrade: {},
+		template: [
+			{
+				param: "region", type: "string",
+				binType: "number", binOffs: 0, binSize: 1,
+				formatter: "shelterregions", parse: "SettingBox", parseFmt: {
+					datatype: "System.String", name: "Region", position: "0",
+					formatter: "shelterregions", defaultval: "SU"
+				}
+			},
+			{
+				param: "unique", type: "bool",
+				binType: "bool", binOffs: 0, bit: 4,
+				formatter: "", parse: "SettingBox", parseFmt: {
+					datatype: "System.Boolean", name: "Unique shelters", position: "1",
+					formatter: "NULL", defaultval: false
+				}
+			},
+			{
+				param: "differentRegions", type: "bool",
+				binType: "bool", binOffs: 0, bit: 5,
+				formatter: "", parse: "SettingBox", parseFmt: {
+					datatype: "System.Boolean", name: "Different regions", position: "2",
+					formatter: "NULL", defaultval: false
+				}
+			},
+			{
+				param: "current", type: "number",
+				formatter: "", parse: "parseInt", minval: 0, maxval: CHAR_MAX, defaultval: 0
+			},
+			{
+				param: "amount", type: "number",
+				binType: "number", binOffs: 1, binSize: 1,
+				formatter: "", parse: "SettingBox", parseFmt: {
+					datatype: "System.Int32", name: "Amount", position: "3",
+					formatter: "NULL", minval: 1, maxval: CHAR_MAX, defaultval: 1
+				}
+			},
+			{
+				param: "shelters", type: "list",
+				binType: "string", binOffs: 2, binSize: 0,
+				formatter: "", parse: "string", minval: 0, maxval: 252, defaultval: ""
+			},
+			{
+				param: "completed", type: "bool",
+				formatter: "", parse: "intBool", defaultval: false
+			},
+			{
+				param: "revealed",  type: "bool",
+				formatter: "", parse: "intBool", defaultval: false
+			}
+		],
+		toPaint: function(p) {
+			var paint = [
+				{ type: "icon", value: "keyShiftA", scale: 1, color: Bingovista.colors.Unity_green, rotation: 90 },
+				{ type: "icon", value: "ShelterMarker", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 },
+				{ type: "break" },
+				{ type: "text", value: "[" + String(p.current) + "/" + String(p.amount) + "]", color: Bingovista.colors.Unity_white }
+			];
+			if (p.differentRegions) {
+				paint.splice(2, 0, { type: "icon", value: "TravellerA", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 } );
+			} else {
+				if (!p.unique) paint[1].value = "doubleshelter";
+				if (p.region !== "Any Region") {
+					paint.splice(2, 0,
+						{ type: "break" },
+						{ type: "text", value: p.region, color: Bingovista.colors.Unity_white }
+					);
+				}
+			}
+			return paint;
+		},
+		toDesc: function(p) {
+			var r = "";
+			if (p.differentRegions || p.region !== "Any Region") {
+				if (p.differentRegions)
+					r = " in different regions";
+				else
+					r = " in " + this.regionToDisplayText(this.board.character, p.region);
+			}
+			return "Rest " + ((p.amount > 1) ? (String(p.amount) + " times in" + " unique shelters") : " a shelter") + r + ".";
+		},
+		toComment: function(p) {
+			return "";
+		},
+		toBinary: function(p) {
+			var b = Array(5); b.fill(0);
+			b[0] = this.challengeValue(p._name);
+			Bingovista.applyBool(b, 1, 4, p.unique);
+			Bingovista.applyBool(b, 1, 5, p.differentRegions);
+			b[3] = this.enumToValue(p.region, "shelterregions");
+			b[4] = Math.max(1, Math.min(p.amount - p.current, CHAR_MAX));
+			b = b.concat([...new TextEncoder().encode(p.shelters)]);
+			b[2] = b.length - GOAL_LENGTH;
+			return new Uint8Array(b);
+		}
 	}
-];
+];	//	CHALLENGE_DEFS
 
 
 /*                           *
@@ -7523,5 +7701,4 @@ generateOneOfEverything() {
 	parseButton();
 }
 
-/* * * End of class * * */
-}
+}	//	class Bingovista

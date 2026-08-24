@@ -328,7 +328,7 @@ function createRefreshHeader() {
 	var i, rows = {}, checks = [], modchecks = [], tb = elem?.children[0]?.children[0];
 	var names = ["title", "size", "char", "shel", "perkb", "perks", "mods"];
 	var indices = [
-		[0, 1], [1, 1], [2, 1, 0], [3, 1, 0], [4, 1, 0, 0], [4, 1], [5, 1]
+		[0, 1, 0], [1, 1], [2, 1, 0], [3, 1, 0], [4, 1, 0, 0], [4, 1], [5, 1]
 	];
 	var flag = (tb === undefined);
 	for (i = 0; i < names.length && !flag; i++) {
