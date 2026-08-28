@@ -2878,7 +2878,6 @@ boardToBin() {
 		PACK: 1
 	};
 	var a = [];
-	var enc = new TextEncoder();
 	for (var i = 0; i < this.activeMods.length; i++) {
 		a.push(MODPACK.PACK);
 		a.push(this.modpacks[this.activeMods[i]].settings.length);
@@ -5456,7 +5455,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		}
 	},
 	{
-		name: "BingoNoNeedleTradingCheallenge",
+		name: "BingoNoNeedleTradingChallenge",
 		category: "Avoiding giving Needles to Scavengers",
 		//	desc of format ["0", "0"]
 		textUpgrade: {},
