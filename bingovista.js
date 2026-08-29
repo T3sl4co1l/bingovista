@@ -6760,7 +6760,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 				param: "amount", binType: "number", binOffs: 2,  binSize: 2
 			},
 			{
-				param: "inOneCycle", binType: "bool", binOffs: 0, bit: 4
+				param: "oneCycle", binType: "bool", binOffs: 0, bit: 4
 			},
 			{
 				param: "region", binType: "number", binOffs: 4, binSize: 1, formatter: "regions"
