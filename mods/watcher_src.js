@@ -125,7 +125,7 @@ const pack = {
 	},
 	"configure": function(b) {
 		var ef = this.pack.maps.find(o => o.target === "expflags").add.find(o => o.name === "WATCHER");
-		this.settings[ef.byte] &= ~ef.value;
+		this.settings[ef.byte] = 0;
 		if (b.modifiers.length > 0 && b.modifiers[0] === "1") {
 			this.settings[ef.byte] |= ef.value;
 		}
@@ -929,6 +929,7 @@ const pack = {
 			template: [
 				{
 					param: "region", type: "string",
+					binType: "number", binOffs: 1, binSize: 1,
 					formatter: "pomegranateregions", parse: "SettingBox", parseFmt: {
 						datatype: "System.String", name: "Region", position: "1",
 						formatter: "pomegranateregions", defaultval: "Any Region"

@@ -25,20 +25,16 @@ document.addEventListener("DOMContentLoaded", function() {
 	document.getElementById("copy").addEventListener("click", copyText);
 
 	var u = new URL(document.URL).searchParams;
-	var flag = false;
 	if (u.has("a")) {
 		//	Plain text / ASCII string
 		//	very inefficient, unlikely to be used, but provided for completeness
 		bv.setup( { dataSrc: u.get("a"), dataType: "text" } );
-		flag = true;
 	} else if (u.has("b")) {
 		//	Binary string, base64 encoded
 		bv.setup( { dataSrc: u.get("b"), dataType: "base64" } );
-		flag = true;
 	} else if (u.has("q")) {
 		//	Query, Bingovista will fetch from remote server to get board data
 		bv.setup( { dataSrc: u.get("q"), dataType: "short" } );
-		flag = true;
 	}
 
 });

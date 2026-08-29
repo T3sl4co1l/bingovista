@@ -1099,11 +1099,12 @@ enableMod(n) {
 				this.modUnwind.enumNames.push(pack.enums[i].target);
 				this.modUnwind.enumLens.push(0);
 				this.enums[pack.enums[i].target] = [];
-				if (pack.enums[i].copy !== undefined)
-					this.enums[pack.enums[i].target] = this.enums[pack.enums[i].copy].slice(0);
 			}
-			if (pack.enums[i].add !== undefined)
+			if (pack.enums[i].copy !== undefined) {
+				this.enums[pack.enums[i].target] = this.enums[pack.enums[i].copy].slice(0);
+			} else { // if (pack.enums[i].add !== undefined) {
 				this.enums[pack.enums[i].target].push(...pack.enums[i].add);
+			}
 		}
 	}
 	this.CHALLENGE_DEFS.push(...pack.challenges);
