@@ -585,8 +585,13 @@ const pack = {
 			name: "WatcherBingoCollectRippleSpawnChallenge",
 			category: "Collecting Ripple Spawn eggs",
 			super: undefined,
-			//	desc of format ["0", "System.Int32|15|Amount|0|NULL", "System.Boolean|false|In one Cycle|1|NULL", "0", "0"]
-			textUpgrade: {},
+			//	desc of format (< v1.27) ["0", "System.Int32|15|Amount|0|NULL", "0", "0"]
+			//	or (>= v1.27) ["0", "System.Int32|15|Amount|0|NULL", "System.Boolean|false|In one Cycle|1|NULL", "0", "0"]
+			textUpgrade: {
+				4: [	//	< v1.27
+					{ op: "splice", offs: 2, rem: 0, data: ["System.Boolean|false|In one Cycle|1|NULL"] }
+				]
+			},
 			textDowngrade: {},
 			template: [
 				{
@@ -634,7 +639,7 @@ const pack = {
 				return d + ".";
 			},
 			toComment: function(p) {
-				return "Ripple Spawn eggs become visible when the player has reinforced Karma, is holding a Karma Flower, or if the Dial Warp perk is enabled.";
+				return "Ripple Spawn eggs become visible when the player has recently visited a Void Tree, has eaten a Karma Flower, or if the Dial Warp perk is enabled.";
 			},
 			toBinary: function(p) {
 				var b = Array(5); b.fill(0);
