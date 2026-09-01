@@ -3878,7 +3878,7 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		toPaint: function(p) {
 			if (p.specific) {
 				return [
-					{ type: "text", value: p.pearl.substring(p.pearl.lastIndexOf("_") + 1), color: Bingovista.colors.Unity_white },
+					{ type: "text", value: (p.pearl.lastIndexOf("_") >= 4) ? (p.pearl.substring(p.pearl.lastIndexOf("_") + 1)) : p.pearl, color: Bingovista.colors.Unity_white },
 					{ type: "break" },
 					{ type: "icon", value: "Symbol_Pearl", scale: 1, color: this.maps.pearls.find(o => o.name === p.pearl).color, rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 } }
 				];
