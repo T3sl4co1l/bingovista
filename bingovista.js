@@ -1372,7 +1372,7 @@ errorBoard(s) {
 	return {
 		comments: "",
 		character: "",
-		modifiers: [],
+		modifiers: ["0"],
 		perks: 0,
 		shelter: "",
 		size: 1,
@@ -2702,7 +2702,7 @@ challengeTextToAbstract(desc, template) {
  *	Sets this.board = {
  *		comments: <string>, 	//	board title (undefined if absent)
  *		character: <string>,	//	one of this.enums.characters[].text
- *		modifiers: <array>, 	//	array of strings; used for settings/flags and mods
+ *		modifiers: <array>, 	//	array of strings; used for settings/flags and mods; default ["0"]
  *		perks: <int>,       	//	bitmask of BingoEnum_PERKS
  *		shelter: <string>,  	//	starting shelter (undefined if absent)
  *		size: <int>,
@@ -2803,6 +2803,7 @@ parseText(s) {
 		this.board.version = "0.85";
 	}
 
+	if (this.board.modifiers.length < 1) this.board.modifiers = ["0"];
 	//	Determine mods to add, if any; configure all active mods
 	if (this.autodetectMods) {
 		for (var i = 0; i < this.modpacks.length; i++) {
@@ -2942,7 +2943,7 @@ binToBoard(a) {
 	this.board = {
 		comments: "",
 		character: "",
-		modifiers: [],
+		modifiers: ["0"],
 		perks: 0,
 		shelter: "",
 		size: a[6],	//	for now, width = height = size, so the source of this assignment doesn't matter
