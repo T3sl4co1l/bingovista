@@ -1988,8 +1988,12 @@ drawSquare(target, goal, x, y) {
 				xBase = x + this.square.border / 2 + (width - this.square.border) * (j + 0.5) / lines[i].length;
 			xBase = Math.round(xBase);
 			if (lines[i][j].type === "icon") {
-				if (lines[i][j].background !== undefined && lines[i][j].background.type === "icon") {
-					this.drawIcon(ctx, lines[i][j].background.value, xBase, yBase, lines[i][j].background.color, lines[i][j].background.scale, lines[i][j].background.rotation);
+				var b = lines[i][j].background;
+				if (b !== undefined && b.type === "icon") {
+					if (b.background !== undefined && b.background.type === "icon") {
+						this.drawIcon(ctx, b.background.value, xBase, yBase, b.background.color, b.background.scale, b.background.rotation);
+					}
+					this.drawIcon(ctx, b.value, xBase, yBase, b.color, b.scale, b.rotation);
 				}
 				this.drawIcon(ctx, lines[i][j].value, xBase, yBase, lines[i][j].color, lines[i][j].scale, lines[i][j].rotation);
 			} else if (lines[i][j].type === "text") {
@@ -3784,9 +3788,9 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 			if (p.specific) {
 				var regi = Bingovista.regionOfRoom(p.roomName).toUpperCase();
 				var r = this.regionToDisplayText(this.board.character, regi);
-				if (p.roomName === "GW_C11")
+				if (p.roomName.toUpperCase() === "GW_C11")
 					r += " underground";
-				if (p.roomName === "GW_C05")
+				if (p.roomName.toUpperCase() === "GW_C05")
 					r += " surface";
 				d = "Throw a grenade at the " + this.getMapLink(p.roomName.toUpperCase(), this.board.character, r) + " Scavenger toll" + (p.pass ? ", then pass it." : ".");
 			} else {
@@ -3878,10 +3882,11 @@ CHALLENGE_DEFS = [	//	Indexed by binary goal value
 		],
 		toPaint: function(p) {
 			if (p.specific) {
+				var pearl = this.maps.pearls.find(o => o.name === p.pearl);
 				return [
 					{ type: "text", value: (p.pearl.lastIndexOf("_") >= 4) ? (p.pearl.substring(p.pearl.lastIndexOf("_") + 1)) : p.pearl, color: Bingovista.colors.Unity_white },
 					{ type: "break" },
-					{ type: "icon", value: "Symbol_Pearl", scale: 1, color: this.maps.pearls.find(o => o.name === p.pearl).color, rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 } }
+					{ type: "icon", value: "Symbol_PearlStar", scale: 1, color: pearl.highlight || pearl.maincolor, rotation: 0, background: { type: "icon", value: "Symbol_Pearl", scale: 1, color: pearl.maincolor, rotation: 0, background: { type: "icon", value: "radialgradient", scale: 1, color: Bingovista.colors.Unity_white, rotation: 0 } } }
 				];
 			} else {
 				return [
